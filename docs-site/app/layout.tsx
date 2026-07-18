@@ -12,6 +12,9 @@ export const metadata: Metadata = {
     default: 'ChatSDK Ruby',
   },
   description: 'Unified Ruby SDK for building chat bots across Slack, Teams, Google Chat, and more.',
+  icons: {
+    icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">💎</text></svg>',
+  },
 };
 
 export default function Layout({ children }: LayoutProps<'/'>) {
