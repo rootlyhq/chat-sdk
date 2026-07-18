@@ -1,0 +1,232 @@
+---
+title: Building Adapters
+description: Guide to creating a custom platform adapter for ChatSDK by subclassing Adapter::Base.
+---
+
+This guide walks you through creating a custom platform adapter for ChatSDK.
+
+## Subclass Adapter::Base
+
+Create a new class that inherits from `ChatSDK::Adapter::Base`:
+
+```ruby
+module ChatSDK
+  module MyPlatform
+    class Adapter < ChatSDK::Adapter::Base
+      # Declare which capabilities your adapter supports
+      capabilities :edit_messages, :delete_messages, :threads, :direct_messages
+
+      def initialize(api_key:)
+        @api_key = api_key
+        @client = MyPlatform::Client.new(api_key: api_key)
+      end
+
+      def name
+        :my_platform
+      end
+
+      def client
+        @client
+      end
+
+      # --- Inbound ---
+
+      def verify_request!(rack_request)
+        # Verify the webhook signature
+        signature = rack_request.env["HTTP_X_SIGNATURE"]
+        body = rack_request.body.read
+        rack_request.body.rewind
+
+        unless valid_signature?(body, signature)
+          raise ChatSDK::SignatureVerificationError, "Invalid signature"
+        end
+
+        true
+      end
+
+      def ack_response(rack_request)
+        # Return a Rack response tuple if the platform requires
+        # an immediate acknowledgment, or nil for the default 200.
+        nil
+      end
+
+      def parse_events(rack_request)
+        body = rack_request.body.read
+        rack_request.body.rewind
+        payload = JSON.parse(body)
+
+        # Parse the platform payload into ChatSDK events
+        case payload["type"]
+        when "message"
+          [build_mention_event(payload)]
+        when "reaction"
+          [build_reaction_event(payload)]
+        else
+          []
+        end
+      end
+
+      # --- Outbound ---
+
+      def post_message(channel_id:, message:, thread_id: nil)
+        msg = ChatSDK::PostableMessage.from(message)
+        result = @client.send(
+          channel: channel_id,
+          text: msg.text,
+          thread: thread_id
+        )
+
+        ChatSDK::Message.new(
+          id: result["id"],
+          text: msg.text || "",
+          author: ChatSDK::Author.new(id: "bot", name: "bot", platform: name, bot: true),
+          thread_id: thread_id || result["id"],
+          channel_id: channel_id,
+          platform: name,
+          raw: result
+        )
+      end
+
+      def edit_message(channel_id:, message_id:, message:)
+        require_capability!(:edit_messages)
+        msg = ChatSDK::PostableMessage.from(message)
+        @client.update(channel: channel_id, id: message_id, text: msg.text)
+      end
+
+      def delete_message(channel_id:, message_id:)
+        require_capability!(:delete_messages)
+        @client.delete(channel: channel_id, id: message_id)
+      end
+
+      def mention(user_id)
+        "@#{user_id}"
+      end
+
+      def render(postable_message)
+        # Convert cards to your platform's format
+        if postable_message.card?
+          MyCardRenderer.new.render(postable_message.card)
+        else
+          postable_message.text
+        end
+      end
+
+      private
+
+      def valid_signature?(body, signature)
+        # Your signature verification logic
+        true
+      end
+
+      def build_mention_event(payload)
+        author = ChatSDK::Author.new(
+          id: payload["user_id"],
+          name: payload["user_name"],
+          platform: name
+        )
+        message = ChatSDK::Message.new(
+          id: payload["message_id"],
+          text: payload["text"],
+          author: author,
+          thread_id: payload["thread_id"],
+          channel_id: payload["channel_id"],
+          platform: name,
+          raw: payload
+        )
+        ChatSDK::Events::Mention.new(
+          message: message,
+          thread_id: payload["thread_id"],
+          channel_id: payload["channel_id"],
+          platform: name,
+          adapter_name: name
+        )
+      end
+    end
+  end
+end
+```
+
+## Required Methods
+
+Every adapter must implement these methods:
+
+| Method | Description |
+|--------|-------------|
+| `name` | Return a `Symbol` identifying this adapter |
+| `client` | Return the underlying API client |
+| `verify_request!(rack_request)` | Verify webhook signature; raise `SignatureVerificationError` on failure |
+| `parse_events(rack_request)` | Parse a webhook payload into an array of `Events::Base` subclasses |
+| `post_message(channel_id:, message:, thread_id:)` | Send a message; return a `Message` |
+| `mention(user_id)` | Format a user mention string |
+| `render(postable_message)` | Convert a `PostableMessage` to platform-native format |
+
+## Optional Methods
+
+These methods have default implementations that raise `NotSupportedError`. Override them and declare the matching capability:
+
+| Method | Capability |
+|--------|-----------|
+| `edit_message` | `:edit_messages` |
+| `delete_message` | `:delete_messages` |
+| `post_ephemeral` | `:ephemeral_messages` |
+| `upload_file` | `:file_uploads` |
+| `add_reaction` / `remove_reaction` | `:reactions` |
+| `open_dm` | `:direct_messages` |
+| `fetch_messages` | `:message_history` |
+| `open_modal` | `:modals` |
+| `start_typing` | `:typing_indicator` |
+
+## Declaring Capabilities
+
+Use the `capabilities` class method to declare what your adapter supports. Only declare capabilities for methods you actually implement:
+
+```ruby
+capabilities :edit_messages, :delete_messages, :reactions
+```
+
+If a user calls a method gated by a capability you have not declared, `require_capability!` raises `NotSupportedError`.
+
+## Event Types
+
+Your `parse_events` method should return instances of:
+
+| Event Class | Type Symbol | Used By |
+|-------------|------------|---------|
+| `Events::Mention` | `:mention` | `on_new_mention`, `on_new_message` |
+| `Events::SubscribedMessage` | `:subscribed_message` | `on_subscribed_message` |
+| `Events::DirectMessage` | `:direct_message` | `on_direct_message` |
+| `Events::Reaction` | `:reaction` | `on_reaction` |
+| `Events::Action` | `:action` | `on_action` |
+| `Events::SlashCommand` | `:slash_command` | `on_slash_command` |
+
+## Gem Structure
+
+Organize your adapter as a separate gem:
+
+```
+chat_sdk-my_platform/
+  lib/
+    chat_sdk/
+      my_platform.rb
+      my_platform/
+        adapter.rb
+        event_parser.rb
+        card_renderer.rb
+  chat_sdk-my_platform.gemspec
+  spec/
+```
+
+## Verifying Your Adapter
+
+Use the shared contract examples to verify your adapter implements the required interface:
+
+```ruby
+require "chat_sdk/testing/adapter_contract"
+
+RSpec.describe ChatSDK::MyPlatform::Adapter do
+  subject { described_class.new(api_key: "test") }
+  it_behaves_like "a chat_sdk platform adapter"
+end
+```
+
+See [Testing Adapters](testing-adapters) for more testing guidance.

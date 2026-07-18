@@ -1,0 +1,77 @@
+---
+title: Redis State Adapter
+description: Redis-backed state storage for multi-process and production deployments.
+---
+
+The Redis state adapter (`chat_sdk-state-redis`) stores all state data in Redis, making it suitable for multi-process and production deployments.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk-state-redis"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk-state-redis"
+
+# From URL
+state = ChatSDK::State::Redis.new(url: "redis://localhost:6379")
+
+# From environment variable (falls back to redis://localhost:6379)
+state = ChatSDK::State::Redis.new
+
+# With a pre-existing RedisClient instance
+client = RedisClient.config(url: "redis://localhost:6379").new_client
+state = ChatSDK::State::Redis.new(client: client)
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `REDIS_URL` | Redis connection URL (default: `redis://localhost:6379`) |
+
+## Key Namespacing
+
+All Redis keys are namespaced under `chat_sdk:`:
+
+| Key Pattern | Purpose |
+|-------------|---------|
+| `chat_sdk:subscriptions` | Set of subscribed thread IDs |
+| `chat_sdk:lock:*` | Per-thread processing locks |
+| `chat_sdk:kv:*` | Key-value store (thread state, dedupe records) |
+
+## When to Use
+
+Use Redis state when:
+
+- Running multiple processes (Puma workers, multiple dynos)
+- You need state to survive process restarts
+- You are deploying to production
+
+## Atomic Operations
+
+All Redis operations are atomic:
+
+- Locks use `SET NX PX` for acquisition and Lua scripts for safe release (only the lock owner can release).
+- `set_if_absent` uses `SET NX` to prevent race conditions.
+- TTL-based expiration is handled by Redis natively.
+
+## Clearing State
+
+```ruby
+state = ChatSDK::State::Redis.new
+state.clear  # Deletes all chat_sdk:* keys
+```
+
+Use with caution in production -- this removes all subscriptions, locks, and stored state.
+
+## Direct Client Access
+
+```ruby
+state = ChatSDK::State::Redis.new
+redis_client = state.client  # RedisClient instance
+```

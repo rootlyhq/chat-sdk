@@ -1,0 +1,61 @@
+---
+title: Memory State Adapter
+description: In-process state storage using Ruby hashes for development and single-process deployments.
+---
+
+The Memory state adapter (`ChatSDK::State::Memory`) stores all state data in-process using Ruby hashes protected by a `Mutex`.
+
+## Configuration
+
+No gem or external dependency is needed. Memory state is included in the core `chat_sdk` gem.
+
+```ruby
+require "chat_sdk"
+
+state = ChatSDK::State::Memory.new
+
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack },
+  state: state
+)
+```
+
+## When to Use
+
+Use Memory state when:
+
+- Developing locally
+- Running tests
+- Deploying a single-process application where state loss on restart is acceptable
+
+## Limitations
+
+- **Not multi-process safe** -- Each process has its own isolated state. Thread subscriptions, locks, and dedupe records are not shared.
+- **Not persistent** -- All data is lost when the process exits.
+- **Memory usage grows** -- Without Redis TTL eviction, expired keys are only cleaned up on access. In long-running processes, the in-memory store may grow.
+
+## Thread Safety
+
+Memory state uses a `Mutex` to synchronize all reads and writes. Multiple Ruby threads within the same process can safely access the state concurrently.
+
+## Clearing State
+
+```ruby
+state = ChatSDK::State::Memory.new
+state.clear  # Removes all subscriptions, locks, and stored values
+```
+
+This is useful in tests to reset state between examples.
+
+## TTL Behavior
+
+TTL-based expiration is supported but lazy. Keys are only evicted when accessed after their TTL has elapsed. This means:
+
+```ruby
+state.set("key", "value", ttl: 5)
+sleep(6)
+state.get("key")  # => nil (expired and cleaned up on access)
+```
+
+For production use with predictable memory behavior, prefer the [Redis State](state-redis) adapter.
