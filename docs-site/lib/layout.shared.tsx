@@ -4,7 +4,7 @@ import { appName, gitConfig } from './shared';
 export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
-      title: appName,
+      title: `💎 ${appName}`,
     },
     links: [
       { text: 'Docs', url: '/docs' },
