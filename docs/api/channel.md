@@ -1,0 +1,58 @@
+# API Reference: Channel
+
+`ChatSDK::Channel` represents a chat channel or DM conversation.
+
+## Constructor
+
+Channels are typically created via `chat.channel(id)` or `chat.open_dm(user_id)`, not directly.
+
+```ruby
+channel = bot.channel("C12345", adapter_name: :slack)
+```
+
+## Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | `String` | Channel identifier |
+| `adapter` | `Adapter::Base` | The platform adapter |
+| `chat` | `Chat` | The parent Chat instance |
+
+## Methods
+
+### post(content)
+
+Posts a top-level message to the channel (not in a thread). Accepts a `String`, `Cards::Node`, or `PostableMessage`.
+
+```ruby
+channel.post("Hello, channel!")
+channel.post(ChatSDK.card(title: "Announcement") { text "Big news" })
+```
+
+Returns a `ChatSDK::Message`.
+
+### thread(thread_id)
+
+Returns a `Thread` object for a specific thread within this channel.
+
+```ruby
+thread = channel.thread("1234567890.123456")
+thread.post("Replying in a thread")
+```
+
+## Equality
+
+Two channels are equal if they have the same `id`.
+
+## Example: Proactive Messaging
+
+```ruby
+# Post to a channel outside of an event handler
+bot = ChatBot.instance
+channel = bot.channel("C12345", adapter_name: :slack)
+channel.post("Daily standup reminder!")
+
+# Open a DM and send a message
+dm = bot.open_dm("U12345", adapter_name: :slack)
+dm.post("Your deploy succeeded.")
+```

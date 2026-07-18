@@ -1,0 +1,166 @@
+# Handling Events
+
+ChatSDK normalizes events from all platforms into a consistent set of callbacks. Register handlers on your `Chat` instance before mounting webhooks.
+
+## on_new_mention
+
+Fires when someone @-mentions your bot. This is the most common handler.
+
+```ruby
+bot.on_new_mention do |thread, message|
+  # thread  - ChatSDK::Thread (reply here)
+  # message - ChatSDK::Message (the incoming message)
+  thread.post("You said: #{message.text}")
+end
+```
+
+The `message` object provides:
+
+- `message.text` -- The message text
+- `message.author` -- A `ChatSDK::Author` with `id`, `name`, `platform`, `bot?`
+- `message.id` -- Platform-specific message ID
+- `message.thread_id` -- Thread identifier
+- `message.channel_id` -- Channel identifier
+- `message.raw` -- The raw platform payload (for escape-hatch access)
+
+## on_new_message(pattern)
+
+Matches mentions whose text matches a `Regexp` pattern.
+
+```ruby
+bot.on_new_message(/deploy (\w+)/) do |thread, message|
+  match = message.text.match(/deploy (\w+)/)
+  thread.post("Deploying #{match[1]}...")
+end
+```
+
+Only mention events whose `message.text` matches the regex will trigger this handler. This is useful for building command-style bots.
+
+## on_subscribed_message
+
+Fires when a new message arrives in a thread your bot has subscribed to. Use `thread.subscribe` inside another handler to opt in.
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post("I'm listening to this thread now.")
+  thread.subscribe
+end
+
+bot.on_subscribed_message do |thread, message|
+  # Called for every subsequent message in subscribed threads
+  thread.post("Got it: #{message.text}")
+end
+```
+
+Call `thread.unsubscribe` to stop receiving messages, or check `thread.subscribed?`.
+
+## on_direct_message
+
+Fires when a user sends your bot a direct message (not in a channel).
+
+```ruby
+bot.on_direct_message do |thread, message|
+  thread.post("This is a private conversation with #{message.author.name}.")
+end
+```
+
+## on_reaction
+
+Fires when a user adds or removes an emoji reaction. The block receives an event object.
+
+```ruby
+# Handle all reactions
+bot.on_reaction do |event|
+  # event.emoji     - String, e.g. "thumbsup"
+  # event.user_id   - Who reacted
+  # event.message_id - The message that was reacted to
+  # event.added?    - true if added, false if removed
+  # event.removed?  - opposite of added?
+  # event.thread    - ChatSDK::Thread for replying
+
+  if event.added?
+    event.thread.post("Thanks for the :#{event.emoji}:!")
+  end
+end
+
+# Filter to specific emojis (pass an Array)
+bot.on_reaction(%w[thumbsup heart]) do |event|
+  event.thread.post("Positive vibes!")
+end
+```
+
+## on_action
+
+Fires when a user clicks a button or interacts with a select menu in a card. Match by `action_id`.
+
+```ruby
+bot.on_action("approve_btn") do |event|
+  # event.action_id  - "approve_btn"
+  # event.value      - The value attached to the button/option
+  # event.user       - ChatSDK::Author
+  # event.trigger_id - For opening modals
+  # event.thread     - ChatSDK::Thread
+
+  event.thread.post("Approved by #{event.user.name}!")
+end
+```
+
+See [Actions](actions.md) for more examples, and [Cards](cards.md) for how to define buttons.
+
+## on_slash_command
+
+Fires when a user types a slash command (e.g., `/deploy`).
+
+```ruby
+bot.on_slash_command("/deploy") do |event|
+  # event.command    - "/deploy"
+  # event.text       - Everything after the command
+  # event.user_id    - Who ran the command
+  # event.channel_id - Where it was run
+  # event.trigger_id - For opening modals
+  # event.thread     - ChatSDK::Thread
+
+  event.thread.post("Deploying: #{event.text}")
+end
+```
+
+## Handler Signatures
+
+| Handler | Block signature | When it fires |
+|---------|----------------|---------------|
+| `on_new_mention` | `\|thread, message\|` | Bot is @-mentioned |
+| `on_new_message(pattern)` | `\|thread, message\|` | @-mention text matches pattern |
+| `on_subscribed_message` | `\|thread, message\|` | Message in a subscribed thread |
+| `on_direct_message` | `\|thread, message\|` | Direct message to the bot |
+| `on_reaction` | `\|event\|` | Emoji reaction added/removed |
+| `on_action(action_id)` | `\|event\|` | Card button/select interaction |
+| `on_slash_command(command)` | `\|event\|` | Slash command invoked |
+
+## Multiple Handlers
+
+You can register multiple handlers of the same type. They all fire for matching events:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  # Handler 1: logging
+  puts "Mention from #{message.author.name}: #{message.text}"
+end
+
+bot.on_new_mention do |thread, message|
+  # Handler 2: responding
+  thread.post("Acknowledged!")
+end
+```
+
+## Error Handling in Handlers
+
+If a handler raises an exception, ChatSDK logs the error and continues processing other handlers. The webhook returns 200 to the platform so the event is not retried.
+
+```ruby
+bot.on_new_mention do |thread, message|
+  raise "Something went wrong"
+  # This is logged but does not crash the process or return a 500.
+end
+```
+
+See [Error Handling](error-handling.md) for how to handle errors in your own code.

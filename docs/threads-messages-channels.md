@@ -1,0 +1,132 @@
+# Threads, Messages & Channels
+
+ChatSDK organizes conversations into three core objects: Threads, Messages, and Channels.
+
+## Thread
+
+A `ChatSDK::Thread` represents a conversation thread within a channel. It is the primary interface for posting replies.
+
+Inside event handlers, you receive a thread automatically:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post("Replying in this thread")
+end
+```
+
+Outside handlers, create a thread from a channel:
+
+```ruby
+channel = bot.channel("C12345", adapter_name: :slack)
+thread = channel.thread("1234567890.123456")
+thread.post("Hello from outside a handler")
+```
+
+### Thread Methods
+
+| Method | Description |
+|--------|-------------|
+| `post(content)` | Post text or a card to the thread |
+| `post_ephemeral(content, user_id:)` | Post a message visible only to one user |
+| `post_stream(placeholder:, &block)` | Stream a message with incremental updates |
+| `edit(message_id, content)` | Edit an existing message |
+| `delete(message_id)` | Delete a message |
+| `react(message_id, emoji)` | Add an emoji reaction |
+| `unreact(message_id, emoji)` | Remove an emoji reaction |
+| `upload(io:, filename:, comment:)` | Upload a file |
+| `messages(cursor:, limit:)` | Fetch conversation history |
+| `subscribe` | Subscribe to future messages in this thread |
+| `unsubscribe` | Unsubscribe from this thread |
+| `subscribed?` | Check if currently subscribed |
+| `state` | Get per-thread state data |
+| `set_state(value)` | Set per-thread state data (30-day TTL) |
+| `mention_user(user_id)` | Format a user mention for the platform |
+| `open_modal(trigger_id:, modal:)` | Open a modal dialog |
+
+### Thread Subscriptions
+
+Subscribe to a thread to receive future messages via `on_subscribed_message`:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.subscribe
+  thread.post("I'll listen to this thread now.")
+end
+
+bot.on_subscribed_message do |thread, message|
+  thread.post("I heard: #{message.text}")
+end
+```
+
+Check or cancel subscriptions:
+
+```ruby
+thread.subscribed?   # => true
+thread.unsubscribe
+thread.subscribed?   # => false
+```
+
+### Per-Thread State
+
+Store arbitrary data per thread:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  data = thread.state || { "count" => 0 }
+  data["count"] += 1
+  thread.set_state(data)
+  thread.post("Mention ##{data["count"]} in this thread.")
+end
+```
+
+State is stored with a 30-day TTL and uses the configured state backend (Memory or Redis).
+
+## Message
+
+A `ChatSDK::Message` is a normalized representation of an incoming message.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | `String` | Platform-specific message ID |
+| `text` | `String` | The message text |
+| `author` | `Author` | Who sent it |
+| `thread_id` | `String` | Thread identifier |
+| `channel_id` | `String` | Channel identifier |
+| `platform` | `Symbol` | `:slack`, `:teams`, `:gchat`, or `:test` |
+| `attachments` | `Array` | File attachments (if any) |
+| `raw` | `Object` | Raw platform payload |
+| `timestamp` | `String` | Platform timestamp |
+
+### Author
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | `String` | User ID |
+| `name` | `String` | Display name |
+| `platform` | `Symbol` | Platform identifier |
+| `bot?` | `Boolean` | Whether the author is a bot |
+
+## Channel
+
+A `ChatSDK::Channel` represents a chat channel or DM conversation.
+
+```ruby
+channel = bot.channel("C12345", adapter_name: :slack)
+channel.post("Hello, channel!")
+```
+
+| Method | Description |
+|--------|-------------|
+| `post(content)` | Post to the channel (top-level, not in a thread) |
+| `thread(thread_id)` | Get a Thread object for a specific thread in this channel |
+
+### Opening DMs
+
+To send a direct message to a user:
+
+```ruby
+dm_channel = bot.open_dm("U12345", adapter_name: :slack)
+dm_channel.post("Private message!")
+```
+
+`open_dm` calls the platform API to open or find the DM conversation, then returns a `Channel` you can post to.

@@ -1,0 +1,154 @@
+# Getting Started
+
+This guide walks you through installing ChatSDK Ruby, configuring a Slack adapter, and running a minimal bot.
+
+## Installation
+
+Add the core gem and the adapter gems you need to your `Gemfile`:
+
+```ruby
+gem "chat_sdk"
+gem "chat_sdk-slack"
+
+# Optional: persistent state via Redis (recommended for production)
+gem "chat_sdk-state-redis"
+```
+
+Then run:
+
+```bash
+bundle install
+```
+
+## Environment Variables
+
+For Slack, you need two values from your Slack app settings:
+
+```bash
+export SLACK_BOT_TOKEN="xoxb-..."
+export SLACK_SIGNING_SECRET="..."
+```
+
+## Create Your Bot
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/slack"
+
+slack = ChatSDK::Slack::Adapter.new
+state = ChatSDK::State::Memory.new
+
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack },
+  state: state
+)
+
+bot.on_new_mention do |thread, message|
+  thread.post("Hello, #{message.author.name}! You said: #{message.text}")
+end
+```
+
+The `on_new_mention` handler fires whenever someone @-mentions your bot. The block receives a `Thread` (for replying) and a `Message` (the incoming message).
+
+## Mounting Webhooks
+
+ChatSDK webhook endpoints are Rack-compatible. You can mount them in any Rack-based framework.
+
+### Plain Rack (config.ru)
+
+```ruby
+# config.ru
+require "chat_sdk"
+require "chat_sdk/slack"
+
+slack = ChatSDK::Slack::Adapter.new
+state = ChatSDK::State::Memory.new
+
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack },
+  state: state
+)
+
+bot.on_new_mention do |thread, message|
+  thread.post("Echo: #{message.text}")
+end
+
+# Mount the webhook at /webhooks/slack
+map "/webhooks/slack" do
+  run bot.webhooks[:slack]
+end
+```
+
+Start with:
+
+```bash
+bundle exec rackup config.ru -p 3000
+```
+
+Your Slack webhook URL is `https://your-domain.com/webhooks/slack`.
+
+### Rails
+
+In a Rails app, mount the webhook in `config/routes.rb`:
+
+```ruby
+# config/routes.rb
+Rails.application.routes.draw do
+  mount ChatBot.instance.webhooks[:slack] => "/webhooks/slack"
+end
+```
+
+See [Rails Integration](rails.md) for the complete setup with an initializer.
+
+## Multi-Adapter Router
+
+If you use multiple adapters, ChatSDK provides an automatic router that dispatches by path:
+
+```ruby
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack, teams: teams },
+  state: state
+)
+
+# Handles /webhooks/slack and /webhooks/teams automatically
+map "/webhooks" do
+  run bot.webhooks.router
+end
+```
+
+The router inspects the last path segment (e.g., `/webhooks/slack` routes to the `:slack` adapter).
+
+## Configuration Options
+
+```ruby
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack },
+  state: state,
+
+  # How long to keep deduplication records (seconds, default: 600)
+  dedupe_ttl: 600,
+
+  # Minimum interval between streaming edits (seconds, default: 0.5)
+  streaming_update_interval: 0.5,
+
+  # What to do when another handler holds the thread lock
+  # :drop (default) -- silently discard the event
+  # :force -- take the lock
+  # Proc -- custom logic returning :force or :drop
+  on_lock_conflict: :drop,
+
+  # Log level: :debug, :info, :warn, :error (default: :info)
+  log_level: :info
+)
+```
+
+## Next Steps
+
+- [Handling Events](handling-events.md) -- Register handlers for mentions, DMs, reactions, actions, and slash commands.
+- [Posting Messages](posting-messages.md) -- Send text, cards, and streaming messages.
+- [Cards](cards.md) -- Build rich cross-platform messages.
+- [Testing](testing.md) -- Test your bot without calling external APIs.

@@ -1,0 +1,62 @@
+# ChatSDK Ruby
+
+> Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, and more. Type-safe handlers, cards DSL, streaming, and pluggable adapters.
+
+## Documentation
+
+- [Introduction](docs/index.md)
+- [Getting Started](docs/getting-started.md)
+
+## Usage
+
+- [Usage Overview](docs/usage.md)
+- [Threads, Messages & Channels](docs/threads-messages-channels.md)
+- [Handling Events](docs/handling-events.md)
+- [Posting Messages](docs/posting-messages.md)
+- [Error Handling](docs/error-handling.md)
+- [Testing](docs/testing.md)
+- [Rails Integration](docs/rails.md)
+
+## Adapters
+
+- [Platform Adapters](docs/platform-adapters.md)
+- [State Adapters](docs/state-adapters.md)
+
+## Messaging
+
+- [Streaming](docs/streaming.md)
+- [Direct Messages](docs/direct-messages.md)
+- [Ephemeral Messages](docs/ephemeral-messages.md)
+- [Conversation History](docs/conversation-history.md)
+- [Concurrency](docs/concurrency.md)
+
+## Interactivity
+
+- [Cards](docs/cards.md)
+- [Modals](docs/modals.md)
+- [Actions](docs/actions.md)
+- [Slash Commands](docs/slash-commands.md)
+- [Emoji & Reactions](docs/emoji.md)
+
+## API Reference
+
+- [Chat](docs/api/chat.md)
+- [Thread](docs/api/thread.md)
+- [Channel](docs/api/channel.md)
+- [Message](docs/api/message.md)
+- [PostableMessage](docs/api/postable-message.md)
+- [Cards](docs/api/cards.md)
+- [Modals](docs/api/modals.md)
+
+## Official Adapters
+
+- [Slack](docs/adapters/slack.md)
+- [Microsoft Teams](docs/adapters/teams.md)
+- [Google Chat](docs/adapters/gchat.md)
+- [Redis State](docs/adapters/state-redis.md)
+- [Memory State](docs/adapters/state-memory.md)
+
+## Contributing
+
+- [Building Adapters](docs/contributing/building-adapters.md)
+- [Testing Adapters](docs/contributing/testing-adapters.md)

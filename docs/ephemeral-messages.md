@@ -1,0 +1,67 @@
+# Ephemeral Messages
+
+Ephemeral messages are visible only to a specific user and disappear when they navigate away. They are useful for confirmations, hints, and error messages that should not clutter the conversation for everyone.
+
+## Sending Ephemeral Messages
+
+Use `thread.post_ephemeral` with the target user's ID:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post_ephemeral(
+    "Only you can see this!",
+    user_id: message.author.id
+  )
+end
+```
+
+You can also send cards as ephemeral messages:
+
+```ruby
+card = ChatSDK.card(title: "Hint") do
+  text "Try using the /deploy command"
+end
+
+thread.post_ephemeral(card, user_id: message.author.id)
+```
+
+## Platform Support
+
+| Platform | Ephemeral Support | Notes |
+|----------|------------------|-------|
+| Slack | Yes | Uses `chat.postEphemeral` |
+| Teams | No | Raises `NotSupportedError` |
+| Google Chat | Yes | Uses `private_message_viewer` |
+
+## Handling Unsupported Platforms
+
+Check capabilities before sending, or rescue the error:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  if thread.adapter.supports?(:ephemeral_messages)
+    thread.post_ephemeral("Secret hint!", user_id: message.author.id)
+  else
+    thread.post("Hint: #{message.author.name}, try /deploy")
+  end
+end
+```
+
+Or use a rescue:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  begin
+    thread.post_ephemeral("Secret!", user_id: message.author.id)
+  rescue ChatSDK::NotSupportedError
+    thread.post("Public fallback message")
+  end
+end
+```
+
+## Use Cases
+
+- **Confirmations** -- "Your action was recorded" without notifying the whole channel
+- **Validation errors** -- "Invalid input, please try again" shown only to the user
+- **Help text** -- Show command usage only to the person who asked
+- **Onboarding** -- Welcome messages visible only to the new user

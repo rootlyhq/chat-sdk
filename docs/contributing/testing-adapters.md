@@ -1,0 +1,178 @@
+# Testing Adapters
+
+ChatSDK provides shared RSpec examples (contracts) to verify that custom adapters and state backends conform to the expected interface.
+
+## Adapter Contract
+
+The adapter contract verifies that your adapter:
+
+- Returns a `Symbol` from `#name`
+- Responds to `#client`
+- Responds to `#verify_request!`, `#parse_events`, `#post_message`, `#mention`, `#render`, `#supports?`
+- Raises `NotSupportedError` for undeclared capabilities
+
+```ruby
+require "chat_sdk/testing/adapter_contract"
+
+RSpec.describe MyAdapter do
+  subject { MyAdapter.new(api_key: "test-key") }
+
+  it_behaves_like "a chat_sdk platform adapter"
+end
+```
+
+## State Contract
+
+The state contract verifies that your state backend correctly implements:
+
+- **Subscriptions**: subscribe, unsubscribe, subscribed?
+- **Locks**: acquire_lock, release_lock, force_lock (including owner-based release)
+- **Key-Value**: get, set, delete, set_if_absent
+
+```ruby
+require "chat_sdk/testing/state_contract"
+
+RSpec.describe MyState do
+  subject { MyState.new }
+
+  it_behaves_like "a chat_sdk state adapter"
+end
+```
+
+## Unit Testing Event Parsing
+
+Test that your adapter correctly parses platform payloads into ChatSDK events:
+
+```ruby
+RSpec.describe MyAdapter do
+  let(:adapter) { MyAdapter.new(api_key: "test") }
+
+  describe "#parse_events" do
+    it "parses a message event" do
+      request = mock_rack_request(
+        body: '{"type":"message","text":"hello","user_id":"U1","channel_id":"C1"}',
+        content_type: "application/json"
+      )
+
+      events = adapter.parse_events(request)
+
+      expect(events.size).to eq(1)
+      expect(events.first).to be_a(ChatSDK::Events::Mention)
+      expect(events.first.message.text).to eq("hello")
+    end
+  end
+end
+```
+
+## Integration Testing with FakeAdapter
+
+Test your bot logic using `FakeAdapter` without needing your real adapter:
+
+```ruby
+RSpec.describe "MyBot" do
+  let(:bot) { ChatSDK::Testing.build_bot }
+  let(:adapter) { bot.config.adapters[:test] }
+
+  before { adapter.reset! }
+
+  it "responds to mentions" do
+    bot.on_new_mention do |thread, message|
+      thread.post("Echo: #{message.text}")
+    end
+
+    adapter.simulate_mention(bot, text: "hello")
+
+    expect(adapter.posted_messages.size).to eq(1)
+    expect(adapter.posted_messages.first.message.text).to eq("Echo: hello")
+  end
+
+  it "handles actions" do
+    bot.on_action("my_btn") do |event|
+      event.thread.post("Clicked!")
+    end
+
+    adapter.simulate_action(bot, action_id: "my_btn")
+
+    expect(adapter.posted_messages.size).to eq(1)
+  end
+end
+```
+
+## Testing Card Rendering
+
+Verify that your card renderer produces valid platform output:
+
+```ruby
+RSpec.describe MyCardRenderer do
+  let(:renderer) { MyCardRenderer.new }
+
+  it "renders a text node" do
+    card = ChatSDK.card { text "Hello" }
+    result = renderer.render(card)
+
+    expect(result).to include("Hello")
+  end
+
+  it "renders buttons" do
+    card = ChatSDK.card do
+      actions do
+        button "Click", id: "btn_1", value: "val"
+      end
+    end
+    result = renderer.render(card)
+
+    expect(result).to include("btn_1")
+  end
+end
+```
+
+## Testing Signature Verification
+
+```ruby
+RSpec.describe MyAdapter do
+  let(:adapter) { MyAdapter.new(api_key: "test", signing_secret: "secret") }
+
+  it "rejects invalid signatures" do
+    request = mock_rack_request(
+      body: "payload",
+      headers: { "HTTP_X_SIGNATURE" => "invalid" }
+    )
+
+    expect { adapter.verify_request!(request) }
+      .to raise_error(ChatSDK::SignatureVerificationError)
+  end
+
+  it "accepts valid signatures" do
+    request = mock_rack_request(
+      body: "payload",
+      headers: { "HTTP_X_SIGNATURE" => compute_signature("payload", "secret") }
+    )
+
+    expect { adapter.verify_request!(request) }.not_to raise_error
+  end
+end
+```
+
+## WebMock for API Calls
+
+Use WebMock to stub outbound API calls in adapter tests:
+
+```ruby
+require "webmock/rspec"
+
+RSpec.describe MyAdapter do
+  let(:adapter) { MyAdapter.new(api_key: "test") }
+
+  it "posts a message" do
+    stub_request(:post, "https://api.myplatform.com/messages")
+      .to_return(body: '{"id":"msg_1"}', status: 200)
+
+    result = adapter.post_message(
+      channel_id: "C1",
+      message: ChatSDK::PostableMessage.new(text: "Hello")
+    )
+
+    expect(result.id).to eq("msg_1")
+  end
+end
+```
