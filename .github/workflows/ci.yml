@@ -37,35 +37,6 @@ jobs:
       fail-fast: false
       matrix:
         ruby: ["3.3", "3.4", "4.0.6"]
-        gem:
-          - chat_sdk
-          - chat_sdk-slack
-          - chat_sdk-teams
-          - chat_sdk-gchat
-          - chat_sdk-mattermost
-
-    name: "${{ matrix.gem }} / Ruby ${{ matrix.ruby }}"
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Ruby ${{ matrix.ruby }}
-        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1.319.0
-        with:
-          ruby-version: ${{ matrix.ruby }}
-          bundler-cache: true
-
-      - name: Run specs
-        run: bundle exec rspec ${{ matrix.gem }}/spec
-
-  test-state-redis:
-    runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        ruby: ["3.3", "3.4", "4.0.6"]
 
     services:
       redis:
@@ -78,7 +49,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-    name: "chat_sdk-state-redis / Ruby ${{ matrix.ruby }}"
+    name: "Ruby ${{ matrix.ruby }}"
 
     steps:
       - name: Checkout
@@ -90,37 +61,20 @@ jobs:
           ruby-version: ${{ matrix.ruby }}
           bundler-cache: true
 
-      - name: Run specs
-        run: bundle exec rspec chat_sdk-state-redis/spec
+      - name: Run all specs
+        run: bundle exec rspec
         env:
           REDIS_URL: redis://localhost:6379
 
-  integration:
-    runs-on: ubuntu-latest
-    name: Integration specs
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-
-      - name: Set up Ruby
-        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1.319.0
-        with:
-          ruby-version: "4.0.6"
-          bundler-cache: true
-
-      - name: Run integration specs
-        run: bundle exec rspec chat_sdk/spec/integration
-
   build-and-test:
     runs-on: ubuntu-latest
-    needs: [lint, test, test-state-redis, integration]
+    needs: [lint, test]
     if: ${{ !cancelled() }}
     name: build-and-test (Summary)
     steps:
-      - name: All matrix jobs passed
+      - name: All jobs passed
         if: ${{ !(contains(needs.*.result, 'failure')) }}
         run: exit 0
-      - name: Some matrix jobs failed
+      - name: Some jobs failed
         if: ${{ contains(needs.*.result, 'failure') }}
         run: exit 1
