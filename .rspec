@@ -1,4 +1,4 @@
 --format documentation
 --color
 --require spec_helper
---pattern {chat_sdk,chat_sdk-slack,chat_sdk-teams,chat_sdk-gchat,chat_sdk-mattermost,chat_sdk-discord,chat_sdk-state-redis}/spec/**/*_spec.rb,chat_sdk/spec/integration/**/*_spec.rb
+--pattern {chat_sdk,chat_sdk-slack,chat_sdk-teams,chat_sdk-gchat,chat_sdk-mattermost,chat_sdk-discord,chat_sdk-telegram,chat_sdk-state-redis}/spec/**/*_spec.rb,chat_sdk/spec/integration/**/*_spec.rb

@@ -1,0 +1,111 @@
+# frozen_string_literal: true
+
+module ChatSDK
+  module Telegram
+    class ApiClient
+      BASE_URL = "https://api.telegram.org"
+
+      def initialize(bot_token)
+        @bot_token = bot_token
+      end
+
+      def send_message(chat_id:, text:, reply_markup: nil, reply_to_message_id: nil)
+        body = {"chat_id" => chat_id, "text" => text, "parse_mode" => "Markdown"}
+        body["reply_markup"] = reply_markup if reply_markup
+        body["reply_to_message_id"] = reply_to_message_id if reply_to_message_id
+        request(:post, "sendMessage", body)
+      end
+
+      def edit_message_text(chat_id:, message_id:, text:, reply_markup: nil)
+        body = {"chat_id" => chat_id, "message_id" => message_id, "text" => text, "parse_mode" => "Markdown"}
+        body["reply_markup"] = reply_markup if reply_markup
+        request(:post, "editMessageText", body)
+      end
+
+      def delete_message(chat_id:, message_id:)
+        request(:post, "deleteMessage", {"chat_id" => chat_id, "message_id" => message_id})
+      end
+
+      def send_document(chat_id:, document:, filename:, caption: nil, reply_to_message_id: nil)
+        payload = {
+          "chat_id" => chat_id,
+          "document" => Faraday::Multipart::FilePart.new(document, "application/octet-stream", filename)
+        }
+        payload["caption"] = caption if caption
+        payload["reply_to_message_id"] = reply_to_message_id if reply_to_message_id
+
+        response = upload_connection.post(api_path("sendDocument"), payload)
+        handle_response(response)
+      end
+
+      def set_message_reaction(chat_id:, message_id:, reaction:)
+        request(:post, "setMessageReaction", {
+          "chat_id" => chat_id,
+          "message_id" => message_id,
+          "reaction" => reaction
+        })
+      end
+
+      def send_chat_action(chat_id:, action:)
+        request(:post, "sendChatAction", {"chat_id" => chat_id, "action" => action})
+      end
+
+      private
+
+      def api_path(method)
+        "/bot#{@bot_token}/#{method}"
+      end
+
+      def connection
+        @connection ||= Faraday.new(url: BASE_URL) do |f|
+          f.request :json
+          f.response :json
+          f.adapter :net_http
+        end
+      end
+
+      def upload_connection
+        @upload_connection ||= Faraday.new(url: BASE_URL) do |f|
+          f.request :multipart
+          f.response :json
+          f.adapter :net_http
+        end
+      end
+
+      def request(method, api_method, body = nil)
+        response = connection.public_send(method, api_path(api_method)) do |req|
+          req.body = body if body && method != :get
+        end
+
+        handle_response(response)
+      end
+
+      def handle_response(response)
+        body = response.body
+
+        if response.success? && body.is_a?(Hash) && body["ok"]
+          return body["result"]
+        end
+
+        if response.status == 429
+          retry_after = body.is_a?(Hash) ? body.dig("parameters", "retry_after")&.to_i : nil
+          raise ChatSDK::RateLimitedError.new(
+            "Telegram API rate limited",
+            retry_after: retry_after,
+            status: response.status,
+            body: body,
+            adapter_name: :telegram
+          )
+        end
+
+        description = body.is_a?(Hash) ? body["description"] : response.status
+        raise ChatSDK::PlatformError.new(
+          "Telegram API error: #{description}",
+          status: response.status,
+          body: body,
+          adapter_name: :telegram
+        )
+      end
+    end
+  end
+end

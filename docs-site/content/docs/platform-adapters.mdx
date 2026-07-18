@@ -9,19 +9,19 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat | Mattermost | Discord |
-|---------|-------|-------|-------|------------|---------|
-| Post | yes | yes | yes | yes | yes |
-| Edit | yes | yes | yes | yes | yes |
-| Delete | yes | yes | yes | yes | yes |
-| Ephemeral | yes | no | yes | yes | no |
-| Reactions | yes | yes | yes | yes | yes |
-| Files | yes | yes | no | yes | yes |
-| Modals | yes | no | no | no | no |
-| Streaming | yes | yes | yes | yes | yes |
-| DMs | yes | yes | yes | yes | yes |
-| History | yes | yes | yes | yes | yes |
-| Typing | yes | no | no | yes | no |
+| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram |
+|---------|-------|-------|-------|------------|---------|----------|
+| Post | yes | yes | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes | yes | yes |
+| Delete | yes | yes | yes | yes | yes | yes |
+| Ephemeral | yes | no | yes | yes | no | no |
+| Reactions | yes | yes | yes | yes | yes | yes |
+| Files | yes | yes | no | yes | yes | yes |
+| Modals | yes | no | no | no | no | no |
+| Streaming | yes | yes | yes | yes | yes | yes |
+| DMs | yes | yes | yes | yes | yes | yes |
+| History | yes | yes | yes | yes | yes | no |
+| Typing | yes | no | no | yes | no | yes |
 
 ## Official Adapters
 
@@ -30,6 +30,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Google Chat](adapters/gchat) -- `gem "chat_sdk-gchat"` -- Google Chat API adapter with Card v2.
 - [Mattermost](adapters/mattermost) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
 - [Discord](adapters/discord) -- `gem "chat_sdk-discord"` -- Discord REST API v10 adapter with Ed25519 verification and embed rendering.
+- [Telegram](adapters/telegram) -- `gem "chat_sdk-telegram"` -- Telegram Bot API adapter with webhook secret token verification and inline keyboard rendering.
 
 ## Checking Capabilities at Runtime
 

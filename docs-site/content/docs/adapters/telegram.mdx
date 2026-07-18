@@ -1,0 +1,99 @@
+---
+title: Telegram Adapter
+description: Telegram Bot API adapter with webhook secret token verification and inline keyboard rendering via the chat_sdk-telegram gem.
+---
+
+The Telegram adapter (`chat_sdk-telegram`) integrates with Telegram via the Bot API with webhook secret token verification and inline keyboard rendering.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk"
+gem "chat_sdk-telegram"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/telegram"
+
+telegram = ChatSDK::Telegram::Adapter.new(
+  bot_token: ENV["TELEGRAM_BOT_TOKEN"],             # Bot token from @BotFather
+  secret_token: ENV["TELEGRAM_WEBHOOK_SECRET_TOKEN"], # Optional webhook secret
+  bot_username: ENV["TELEGRAM_BOT_USERNAME"]          # Bot username for mention detection
+)
+```
+
+`bot_token` is required. `secret_token` is optional but recommended for webhook verification. `bot_username` is needed for detecting @mentions in group chats.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `TELEGRAM_BOT_TOKEN` | Bot token from [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_WEBHOOK_SECRET_TOKEN` | Secret token for webhook request verification |
+| `TELEGRAM_BOT_USERNAME` | Bot username (without @) for mention detection |
+
+## Telegram Setup
+
+1. Create a bot via [@BotFather](https://t.me/BotFather) on Telegram.
+2. Copy the bot token provided by BotFather.
+3. Set a webhook URL using the Telegram Bot API:
+   ```
+   https://api.telegram.org/bot<token>/setWebhook?url=https://your-app.com/webhooks/telegram&secret_token=your-secret
+   ```
+4. Optionally set a secret token for webhook verification.
+5. Add the bot to your group or start a private chat.
+
+## Webhook URL
+
+```
+https://your-domain.com/webhooks/telegram
+```
+
+```ruby
+map "/webhooks/telegram" do
+  run bot.webhooks[:telegram]
+end
+```
+
+## Capabilities
+
+| Capability | Supported | Notes |
+|------------|-----------|-------|
+| `edit_messages` | Yes | |
+| `delete_messages` | Yes | |
+| `ephemeral_messages` | No | Raises `NotSupportedError` |
+| `file_uploads` | Yes | Multipart upload via `sendDocument` |
+| `reactions` | Yes | Via `setMessageReaction` |
+| `modals` | No | Raises `NotSupportedError` |
+| `typing_indicator` | Yes | Via `sendChatAction` |
+| `streaming_edit` | Yes | |
+| `threads` | No | Raises `NotSupportedError` |
+| `direct_messages` | Yes | Chat ID equals user ID for private chats |
+| `message_history` | No | Raises `NotSupportedError` |
+
+## Webhook Verification
+
+When a `secret_token` is configured, the adapter verifies the `X-Telegram-Bot-Api-Secret-Token` header on every incoming request using a constant-time comparison. If no secret token is configured, verification is skipped.
+
+## Cards Rendering
+
+Cards are rendered as Markdown-formatted text messages with Telegram inline keyboards. Buttons become `callback_data` buttons, link buttons become URL buttons, and select menus expand into one button per option.
+
+## Direct Client Access
+
+```ruby
+telegram_adapter = bot.adapter(:telegram)
+client = telegram_adapter.client  # ApiClient
+```
+
+## Mention Formatting
+
+Telegram mentions use the `tg://user?id=` deep link format:
+
+```ruby
+telegram_adapter.mention("123456")  # => "[user](tg://user?id=123456)"
+```

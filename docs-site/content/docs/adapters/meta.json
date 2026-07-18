@@ -6,6 +6,7 @@
     "gchat",
     "mattermost",
     "discord",
+    "telegram",
     "state-memory",
     "state-redis"
   ]

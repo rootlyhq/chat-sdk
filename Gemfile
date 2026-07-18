@@ -8,6 +8,7 @@ gem "chat_sdk-teams", path: "chat_sdk-teams"
 gem "chat_sdk-gchat", path: "chat_sdk-gchat"
 gem "chat_sdk-mattermost", path: "chat_sdk-mattermost"
 gem "chat_sdk-discord", path: "chat_sdk-discord"
+gem "chat_sdk-telegram", path: "chat_sdk-telegram"
 gem "chat_sdk-state-redis", path: "chat_sdk-state-redis"
 
 group :development, :test do
