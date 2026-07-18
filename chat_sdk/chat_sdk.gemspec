@@ -11,7 +11,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["eng@rootly.com"]
   spec.summary       = "Unified Ruby SDK for building chat bots across Slack, Teams, Google Chat, and more"
   spec.description   = "Platform-agnostic chat bot framework with normalized events, cards DSL, streaming, and pluggable adapters"
-  spec.homepage      = "https://github.com/rootlyhq/rootly-chat-sdk"
+  spec.homepage      = "https://github.com/rootlyhq/chat-sdk"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 3.2.0"
   spec.files         = Dir["lib/**/*", "LICENSE", "README.md"]

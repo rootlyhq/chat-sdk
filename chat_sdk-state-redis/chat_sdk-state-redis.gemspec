@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email         = ["eng@rootly.com"]
   spec.summary       = "Redis state backend for ChatSDK"
   spec.description   = "Redis-backed conversation state storage for the ChatSDK framework"
-  spec.homepage      = "https://github.com/rootlyhq/rootly-chat-sdk"
+  spec.homepage      = "https://github.com/rootlyhq/chat-sdk"
   spec.license       = "MIT"
   spec.required_ruby_version = ">= 3.2.0"
   spec.files         = Dir["lib/**/*", "LICENSE", "README.md"]

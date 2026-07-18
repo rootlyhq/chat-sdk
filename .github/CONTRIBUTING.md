@@ -2,15 +2,15 @@
 
 ## Reporting issues
 
-For bugs, feature requests, or new adapter requests, [pick an issue template](https://github.com/rootlyhq/rootly-chat-sdk/issues/new/choose). Each one asks for the information we need to triage the report.
+For bugs, feature requests, or new adapter requests, [pick an issue template](https://github.com/rootlyhq/chat-sdk/issues/new/choose). Each one asks for the information we need to triage the report.
 
 For security vulnerabilities, see [SECURITY.md](./SECURITY.md). Do not file a public issue.
 
 ## Development setup
 
 ```bash
-git clone git@github.com:rootlyhq/rootly-chat-sdk.git
-cd rootly-chat-sdk
+git clone git@github.com:rootlyhq/chat-sdk.git
+cd chat-sdk
 mise install        # installs Ruby 4.0.6
 bundle install
 bundle exec rake spec

@@ -7,8 +7,12 @@ module ChatSDK
         Converter.to_ai_messages(messages, include_names: include_names, &transform)
       end
 
-      def create_tools(chat:, preset: :messenger, require_approval: true)
-        ToolBuilder.new(chat: chat, preset: preset, require_approval: require_approval).build
+      def create_tools(preset: :messenger, require_approval: true)
+        ToolBuilder.new(preset: preset, require_approval: require_approval).build
+      end
+
+      def create_executor(chat:)
+        ToolExecutor.new(chat: chat)
       end
     end
   end
