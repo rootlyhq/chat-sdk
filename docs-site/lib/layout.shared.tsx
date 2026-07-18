@@ -8,6 +8,7 @@ export function baseOptions(): BaseLayoutProps {
     },
     links: [
       { text: 'Docs', url: '/docs' },
+      { text: 'API', url: '/docs/api/chat' },
       { text: 'Adapters', url: '/adapters' },
     ],
     githubUrl: `https://github.com/${gitConfig.user}/${gitConfig.repo}`,
