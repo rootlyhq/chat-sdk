@@ -22,6 +22,9 @@
     "react-dom": "^19.2.7",
     "shiki": "^4.3.1"
   },
+  "overrides": {
+    "postcss": "$postcss"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
     "@types/mdx": "^2.0.14",
@@ -31,6 +34,6 @@
     "oxlint": "^1.73.0",
     "postcss": "^8.5.17",
     "tailwindcss": "^4.3.2",
-    "typescript": "^6.0.3"
+    "typescript": "7.0.2"
   }
 }
