@@ -43,10 +43,10 @@ const features = [
 
 const codeSnippets = [
   {
-    title: 'config.rb — setup',
+    title: 'setup.rb',
     accent: true,
     code: `bot = ChatSDK::Chat.new(
-  user_name: "rootly-bot",
+  user_name: "my-bot",
   adapters: {
     slack: ChatSDK::Slack::Adapter.new,
     teams: ChatSDK::Teams::Adapter.new
@@ -55,36 +55,49 @@ const codeSnippets = [
 )`,
   },
   {
-    title: 'handlers.rb — events',
+    title: 'events.rb',
     accent: false,
     code: `bot.on_new_mention do |thread, message|
   thread.subscribe
-  thread.post("Hello! I'm listening.")
+  thread.post("Hi #{message.author.name}!")
+end
+
+bot.on_reaction(%w[thumbsup]) do |event|
+  event.thread.post("Thanks for the reaction!")
+end
+
+bot.on_slash_command("/weather") do |event|
+  forecast = Weather.fetch(event.text)
+  event.respond(forecast)
 end`,
   },
   {
-    title: 'cards.rb — rich messages',
+    title: 'cards.rb',
     accent: false,
-    code: `thread.post(ChatSDK.card(title: "Incident #4821") do
-  text "Database CPU at 98%"
+    code: `thread.post(ChatSDK.card(title: "Deploy v2.1.0") do
+  text "Ready to ship to production"
   fields do
-    field "Service", "postgres-primary"
-    field "On-call", "@quentin"
+    field "Branch", "main"
+    field "Author", "@alice"
   end
   actions do
-    button "Ack", id: "incident:ack", style: :primary
-    button "Resolve", id: "incident:resolve", style: :danger
+    button "Approve", id: "deploy:approve", style: :primary
+    button "Cancel", id: "deploy:cancel", style: :danger
+    link_button "View diff", url: "https://github.com/..."
   end
 end)`,
   },
   {
-    title: 'ai.rb — LLM integration',
+    title: 'ai.rb',
     accent: false,
-    code: `# Convert chat history → LLM messages
-ai_msgs = ChatSDK::AI.to_ai_messages(thread.messages)
+    code: `bot.on_new_mention do |thread, message|
+  # Fetch conversation history
+  history = ChatSDK::AI.to_ai_messages(thread.messages)
 
-# Stream LLM response back to chat
-thread.post_ai_stream(llm.chat(ai_msgs))`,
+  # Stream any LLM response back to chat
+  response = MyLLM.stream(messages: history)
+  thread.post_ai_stream(response)
+end`,
   },
 ];
 
