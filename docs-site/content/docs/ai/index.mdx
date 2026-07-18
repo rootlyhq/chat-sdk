@@ -36,7 +36,7 @@ Generate tool definitions for AI agents with preset permission levels:
 
 ```ruby
 # Create tool definitions for an agent
-tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger)
+tools = ChatSDK::AI.create_tools(preset: :messenger)
 
 # Three presets available:
 # :reader    - fetch_messages, fetch_thread (read-only)
@@ -44,8 +44,8 @@ tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger)
 # :moderator - messenger + edit_message, delete_message, remove_reaction
 
 # Execute a tool call from an LLM response
-builder = ChatSDK::AI::ToolBuilder.new(chat: chat, preset: :messenger)
-result = builder.execute(:post_message, {
+executor = ChatSDK::AI.create_executor(chat: chat)
+result = executor.execute(:post_message, {
   adapter_name: "slack",
   channel_id: "C123",
   text: "Hello from the AI agent!"
@@ -69,7 +69,7 @@ ChatSDK::AI::StreamHandler.stream_to_thread(thread, llm_chunks)
 ## Provider-Agnostic Example
 
 ```ruby
-chat.on_new_mention do |event, thread|
+chat.on_new_mention do |thread, message|
   # 1. Fetch conversation history
   messages, _ = thread.messages
 

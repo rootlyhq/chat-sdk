@@ -113,8 +113,8 @@ end
 
 RSpec.describe "MyBot" do
   it "responds to mentions" do
-    bot = build_bot
-    adapter = fake_adapter
+    adapter = ChatSDK::Testing::FakeAdapter.new
+    bot = build_bot(adapters: { test: adapter })
 
     bot.on_new_mention do |thread, message|
       thread.post("Hi!")
