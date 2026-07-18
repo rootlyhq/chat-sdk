@@ -5,7 +5,9 @@
 
 > **Beta** — This SDK is experimental and under active development. APIs may change between minor versions. Not recommended for production use yet.
 
-Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, and more. **Write your bot logic once, deploy everywhere.** Ruby port of [chat-sdk.dev](https://chat-sdk.dev).
+Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, and more. **Write your bot logic once, deploy everywhere.**
+
+Inspired by and built upon the API design of [Vercel's Chat SDK](https://chat-sdk.dev) (TypeScript). This is an independent Ruby implementation — not a fork — with idiomatic Ruby patterns, a block-based cards DSL, and adapters tailored for the Ruby ecosystem.
 
 ## Installation
 

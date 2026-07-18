@@ -265,9 +265,9 @@ export default async function HomePage() {
           Rootly
         </a>
         {' · '}MIT Licensed{' · '}
-        Ruby port of{' '}
+        Inspired by{' '}
         <a href="https://chat-sdk.dev" className="font-medium text-gray-600 dark:text-gray-300 hover:underline">
-          chat-sdk.dev
+          Vercel&apos;s Chat SDK
         </a>
       </footer>
     </main>
