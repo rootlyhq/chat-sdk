@@ -218,15 +218,15 @@ export default async function HomePage() {
             <div className="grid md:grid-cols-3 gap-4">
               {[
                 { tier: '1', label: 'Normalized', code: 'thread.post("hello")', desc: 'Cross-platform, zero config' },
-                { tier: '2', label: 'Adapter', code: 'bot.adapter(:slack).post_message(...)', desc: 'Platform-aware, still normalized format' },
-                { tier: '3', label: 'Raw Client', code: 'bot.adapter(:slack).client.chat_postMessage(...)', desc: 'Full native API access' },
+                { tier: '2', label: 'Adapter', code: 'adapter.post_message(...)', desc: 'Platform-aware, normalized format' },
+                { tier: '3', label: 'Raw Client', code: 'client.chat_postMessage(...)', desc: 'Full native API access' },
               ].map((t) => (
-                <div key={t.tier} className="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                <div key={t.tier} className="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 overflow-hidden">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="w-6 h-6 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-center">{t.tier}</span>
+                    <span className="w-6 h-6 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-center shrink-0">{t.tier}</span>
                     <span className="font-semibold text-sm">{t.label}</span>
                   </div>
-                  <code className="text-xs text-gray-600 dark:text-gray-400 block mb-2 font-mono">{t.code}</code>
+                  <code className="text-xs text-gray-600 dark:text-gray-400 block mb-2 font-mono truncate">{t.code}</code>
                   <p className="text-xs text-gray-400">{t.desc}</p>
                 </div>
               ))}
