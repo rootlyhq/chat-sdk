@@ -1,0 +1,108 @@
+---
+title: Platform Adapters
+description: Capability matrix, escape hatches, and overview of all platform adapters.
+---
+
+A platform adapter translates between ChatSDK's normalized API and a specific chat platform. Each adapter is a subclass of `ChatSDK::Adapter::Base`.
+
+## Capability Matrix
+
+Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
+
+| Feature | Slack | Teams | GChat | Mattermost |
+|---------|-------|-------|-------|------------|
+| Post | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes |
+| Delete | yes | yes | yes | yes |
+| Ephemeral | yes | no | yes | yes |
+| Reactions | yes | yes | yes | yes |
+| Files | yes | yes | no | yes |
+| Modals | yes | no | no | no |
+| Streaming | yes | yes | yes | yes |
+| DMs | yes | yes | yes | yes |
+| History | yes | yes | yes | yes |
+| Typing | yes | no | no | yes |
+
+## Official Adapters
+
+- [Slack](adapters/slack) -- `gem "chat_sdk-slack"` -- Full-featured adapter using the Slack Web API and Block Kit.
+- [Microsoft Teams](adapters/teams) -- `gem "chat_sdk-teams"` -- Bot Framework adapter with Adaptive Cards.
+- [Google Chat](adapters/gchat) -- `gem "chat_sdk-gchat"` -- Google Chat API adapter with Card v2.
+- [Mattermost](adapters/mattermost) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
+
+## Checking Capabilities at Runtime
+
+```ruby
+slack = ChatSDK::Slack::Adapter.new
+
+slack.supports?(:modals)           # => true
+slack.supports?(:edit_messages)    # => true
+
+teams = ChatSDK::Teams::Adapter.new(app_id: "...", app_password: "...")
+teams.supports?(:modals)           # => false
+teams.supports?(:ephemeral_messages) # => false
+```
+
+## All Capabilities
+
+The full list of capabilities that an adapter can declare:
+
+| Capability | Method it gates |
+|------------|----------------|
+| `:edit_messages` | `edit_message` |
+| `:delete_messages` | `delete_message` |
+| `:ephemeral_messages` | `post_ephemeral` |
+| `:file_uploads` | `upload_file` |
+| `:reactions` | `add_reaction`, `remove_reaction` |
+| `:modals` | `open_modal` |
+| `:typing_indicator` | `start_typing` |
+| `:streaming_edit` | Used by the streaming system |
+| `:threads` | Thread support |
+| `:direct_messages` | `open_dm` |
+| `:message_history` | `fetch_messages` |
+| `:scheduled_messages` | `schedule_message` |
+
+## Escape Hatches
+
+Sometimes you need platform-specific functionality that is not part of the normalized API. ChatSDK provides three tiers of escape hatches.
+
+### Tier 1: Raw Payload Access
+
+Every `Message` and `Event` includes a `raw` attribute with the original platform payload:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  # Access the raw Slack event payload
+  slack_ts = message.raw["ts"]
+  slack_user = message.raw["user"]
+end
+```
+
+### Tier 2: Direct Client Access
+
+Each adapter exposes its underlying API client via `adapter.client`:
+
+```ruby
+slack_adapter = bot.adapter(:slack)
+slack_client = slack_adapter.client  # Slack::Web::Client
+
+# Call any Slack API method directly
+slack_client.users_info(user: "U12345")
+```
+
+### Tier 3: Conditional Logic by Platform
+
+Use `event.platform` or `adapter.name` to branch:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  if message.platform == :slack
+    thread.react(message.id, "eyes")
+  end
+  thread.post("Acknowledged!")
+end
+```
+
+## Building Custom Adapters
+
+See [Building Adapters](contributing/building-adapters) for a guide on creating your own platform adapter.

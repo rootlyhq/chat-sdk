@@ -1,0 +1,123 @@
+---
+title: Error Handling
+description: ChatSDK error hierarchy and how to handle configuration, platform, and rate limit errors.
+---
+
+ChatSDK defines a hierarchy of errors that give you precise control over what went wrong and where.
+
+## Error Classes
+
+All ChatSDK errors inherit from `ChatSDK::Error`, which itself inherits from `StandardError`.
+
+```
+ChatSDK::Error
+  ChatSDK::ConfigurationError
+  ChatSDK::NotSupportedError
+  ChatSDK::LockConflictError
+  ChatSDK::SignatureVerificationError
+  ChatSDK::DuplicateEventError
+  ChatSDK::PlatformError
+    ChatSDK::RateLimitedError
+```
+
+## ConfigurationError
+
+Raised when required configuration is missing or invalid.
+
+```ruby
+# Missing bot token
+ChatSDK::Slack::Adapter.new(bot_token: nil)
+# => ChatSDK::ConfigurationError: Slack bot_token required
+
+# Empty user_name
+ChatSDK::Chat.new(user_name: "", adapters: {...}, state: state)
+# => ChatSDK::ConfigurationError: user_name is required
+```
+
+## NotSupportedError
+
+Raised when you call a method that the adapter does not support. Includes the capability name and adapter name.
+
+```ruby
+teams = ChatSDK::Teams::Adapter.new(app_id: "...", app_password: "...")
+teams.post_ephemeral(channel_id: "C1", user_id: "U1", message: msg)
+# => ChatSDK::NotSupportedError: teams adapter does not support ephemeral_messages
+```
+
+Handle gracefully:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  begin
+    thread.post_ephemeral("Hint!", user_id: message.author.id)
+  rescue ChatSDK::NotSupportedError
+    thread.post("Hint!")  # Fallback to regular message
+  end
+end
+```
+
+Check support before calling:
+
+```ruby
+if thread.adapter.supports?(:ephemeral_messages)
+  thread.post_ephemeral("Secret!", user_id: user_id)
+else
+  thread.post("Not-so-secret!")
+end
+```
+
+## PlatformError
+
+Raised when the platform API returns an error. Includes optional `status`, `body`, and `adapter_name`.
+
+```ruby
+begin
+  thread.post("Hello")
+rescue ChatSDK::PlatformError => e
+  puts e.message       # "channel_not_found"
+  puts e.status        # 404
+  puts e.adapter_name  # :slack
+end
+```
+
+## RateLimitedError
+
+A subclass of `PlatformError` with a `retry_after` attribute indicating how many seconds to wait.
+
+```ruby
+begin
+  thread.post("Hello")
+rescue ChatSDK::RateLimitedError => e
+  sleep(e.retry_after || 1)
+  retry
+end
+```
+
+## SignatureVerificationError
+
+Raised by adapters when a webhook request has an invalid or expired signature. ChatSDK webhook endpoints catch this automatically and return a 401 response.
+
+## Handler Errors
+
+Exceptions raised inside event handlers are caught by the dispatcher. They are logged but do not crash the process or return an error response to the platform.
+
+```ruby
+bot.on_new_mention do |thread, message|
+  raise "Something broke"
+  # Logged as: Handler error (mention): Something broke
+  # The webhook still returns 200 to the platform
+end
+```
+
+If you need custom error handling, wrap your handler logic in a begin/rescue:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  begin
+    risky_operation(message.text)
+  rescue => e
+    thread.post("Sorry, something went wrong: #{e.message}")
+    ErrorTracker.notify(e)
+  end
+end
+```

@@ -1,0 +1,164 @@
+---
+title: Testing
+description: Test your bot logic with FakeAdapter and simulation methods without calling external APIs.
+---
+
+ChatSDK includes a complete testing toolkit so you can verify your bot logic without calling any external APIs.
+
+## FakeAdapter
+
+`ChatSDK::Testing::FakeAdapter` is an in-memory adapter that records every outbound call. It also provides simulation methods to dispatch inbound events.
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/testing"
+
+bot = ChatSDK::Testing.build_bot
+
+# build_bot creates a Chat with:
+#   adapters: { test: FakeAdapter.new }
+#   state: State::Memory.new
+#   user_name: "test-bot"
+```
+
+## Simulating Events
+
+The FakeAdapter provides simulation methods that dispatch events through the full handler pipeline.
+
+### simulate\_mention
+
+```ruby
+adapter = bot.config.adapters[:test]
+
+bot.on_new_mention do |thread, message|
+  thread.post("Echo: #{message.text}")
+end
+
+adapter.simulate_mention(bot, text: "hello", user_id: "U123", channel_id: "C123")
+
+assert_equal 1, adapter.posted_messages.size
+assert_equal "Echo: hello", adapter.posted_messages.first.message.text
+```
+
+### simulate\_action
+
+```ruby
+bot.on_action("approve_btn") do |event|
+  event.thread.post("Approved by #{event.user.name}!")
+end
+
+adapter.simulate_action(bot, action_id: "approve_btn", value: "item-1")
+
+assert_equal 1, adapter.posted_messages.size
+```
+
+### simulate\_reaction
+
+```ruby
+bot.on_reaction do |event|
+  event.thread.post("Got a :#{event.emoji}:!")
+end
+
+adapter.simulate_reaction(bot, emoji: "thumbsup")
+```
+
+### simulate\_slash\_command
+
+```ruby
+bot.on_slash_command("/deploy") do |event|
+  event.thread.post("Deploying #{event.text}")
+end
+
+adapter.simulate_slash_command(bot, command: "/deploy", text: "production")
+```
+
+## Inspecting Outbound Calls
+
+FakeAdapter records calls in arrays you can assert against:
+
+| Attribute | Records |
+|-----------|---------|
+| `posted_messages` | `post_message` calls |
+| `edited_messages` | `edit_message` calls |
+| `deleted_messages` | `delete_message` calls |
+| `ephemeral_messages_sent` | `post_ephemeral` calls |
+| `reactions_added` | `add_reaction` calls |
+| `reactions_removed` | `remove_reaction` calls |
+| `files_uploaded` | `upload_file` calls |
+| `modals_opened` | `open_modal` calls |
+| `typing_started` | `start_typing` calls |
+| `dm_channels` | `open_dm` calls |
+
+Each recorded call is a `RecordedCall` struct with a `type` and keyword attributes matching the method parameters.
+
+## Resetting State
+
+Call `adapter.reset!` between tests to clear all recorded calls:
+
+```ruby
+# RSpec
+before(:each) do
+  adapter.reset!
+end
+```
+
+## Testing Helpers
+
+Include `ChatSDK::Testing::Helpers` in your test suite for convenience methods:
+
+```ruby
+RSpec.configure do |config|
+  config.include ChatSDK::Testing::Helpers
+end
+
+RSpec.describe "MyBot" do
+  it "responds to mentions" do
+    bot = build_bot
+    adapter = fake_adapter
+
+    bot.on_new_mention do |thread, message|
+      thread.post("Hi!")
+    end
+
+    adapter.simulate_mention(bot, text: "hello")
+    expect(adapter.posted_messages.size).to eq(1)
+  end
+end
+```
+
+Available helpers:
+
+- `build_bot(**options)` -- Creates a Chat with FakeAdapter and Memory state
+- `fake_adapter` -- Returns a memoized FakeAdapter instance
+- `build_message(text:, user_id:, ...)` -- Creates a Message object for unit tests
+- `build_card(title:, &block)` -- Creates a card node via `ChatSDK.card`
+
+## Shared Contract Examples
+
+ChatSDK provides RSpec shared examples for verifying custom adapters and state backends:
+
+### Adapter Contract
+
+```ruby
+require "chat_sdk/testing/adapter_contract"
+
+RSpec.describe MyCustomAdapter do
+  subject { MyCustomAdapter.new(...) }
+  it_behaves_like "a chat_sdk platform adapter"
+end
+```
+
+This verifies that your adapter responds to all required methods and raises `NotSupportedError` for undeclared capabilities.
+
+### State Contract
+
+```ruby
+require "chat_sdk/testing/state_contract"
+
+RSpec.describe MyCustomState do
+  subject { MyCustomState.new(...) }
+  it_behaves_like "a chat_sdk state adapter"
+end
+```
+
+This verifies subscriptions, locks (acquire, release, force), and key-value operations (get, set, delete, set\_if\_absent).

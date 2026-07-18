@@ -1,0 +1,157 @@
+---
+title: Posting Messages
+description: Send plain text, cards, streaming messages, ephemeral messages, and file uploads.
+---
+
+ChatSDK provides several ways to send messages: plain text, cards, streaming, ephemeral, and file uploads.
+
+## Plain Text
+
+The simplest way to post is with a string:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post("Hello, world!")
+end
+```
+
+## Cards
+
+Pass a card built with the DSL:
+
+```ruby
+card = ChatSDK.card(title: "Deploy Status") do
+  text "Deployment complete"
+  fields do
+    field "Environment", "production"
+    field "Duration", "42s"
+  end
+end
+
+thread.post(card)
+```
+
+Cards are automatically rendered as Block Kit (Slack), Adaptive Cards (Teams), or Card v2 (Google Chat). See [Cards](cards) for the full DSL reference.
+
+## PostableMessage
+
+Under the hood, `thread.post` converts its argument using `PostableMessage.from`. You can construct a `PostableMessage` directly when you need both text and a card:
+
+```ruby
+msg = ChatSDK::PostableMessage.new(
+  text: "Fallback text for notifications",
+  card: ChatSDK.card(title: "Rich Card") { text "Details here" }
+)
+thread.post(msg)
+```
+
+## Posting to a Channel
+
+Outside of event handlers, use `bot.channel` to post to a channel:
+
+```ruby
+channel = bot.channel("C12345", adapter_name: :slack)
+channel.post("Scheduled announcement!")
+```
+
+If you only have one adapter configured, you can omit `adapter_name:`:
+
+```ruby
+channel = bot.channel("C12345")
+channel.post("Hello from the bot!")
+```
+
+## Posting to a Thread
+
+To post to a specific thread within a channel, use `channel.thread`:
+
+```ruby
+channel = bot.channel("C12345")
+thread = channel.thread("1234567890.123456")
+thread.post("Replying to this thread.")
+```
+
+## Editing Messages
+
+`thread.edit` updates an existing message. You need the message ID returned from `post`:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  result = thread.post("Processing...")
+  # ... do work ...
+  thread.edit(result.id, "Done!")
+end
+```
+
+## Deleting Messages
+
+```ruby
+result = thread.post("Temporary message")
+thread.delete(result.id)
+```
+
+## Ephemeral Messages
+
+Ephemeral messages are only visible to a specific user. Not all adapters support this.
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post_ephemeral("Only you can see this!", user_id: message.author.id)
+end
+```
+
+See [Ephemeral Messages](ephemeral-messages).
+
+## Streaming
+
+For AI-style token-by-token responses, use `thread.post_stream`:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post_stream(placeholder: "Thinking...") do |stream|
+    response = ""
+    ai_generate(message.text) do |token|
+      response += token
+      stream << token
+    end
+  end
+end
+```
+
+The stream posts a placeholder message and edits it as chunks arrive, with built-in throttling. See [Streaming](streaming).
+
+## File Uploads
+
+```ruby
+bot.on_new_mention do |thread, message|
+  File.open("report.pdf", "rb") do |file|
+    thread.upload(io: file, filename: "report.pdf", comment: "Here's the report")
+  end
+end
+```
+
+## Reactions
+
+Add or remove emoji reactions on messages:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.react(message.id, "eyes")
+  # ... later ...
+  thread.unreact(message.id, "eyes")
+  thread.react(message.id, "white_check_mark")
+end
+```
+
+## Mentioning Users
+
+Format a user mention for the current platform:
+
+```ruby
+bot.on_new_mention do |thread, message|
+  mention = thread.mention_user(message.author.id)
+  thread.post("#{mention} your request has been processed.")
+end
+```
+
+This produces `<@U123>` on Slack, `<at>U123</at>` on Teams, and `<users/U123>` on Google Chat.

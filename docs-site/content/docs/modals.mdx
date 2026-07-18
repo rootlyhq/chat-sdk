@@ -1,0 +1,145 @@
+---
+title: Modals
+description: Build popup dialogs for forms, confirmations, and multi-step workflows.
+---
+
+Modals are popup dialogs that collect structured input from users. They are useful for forms, confirmations, and multi-step workflows.
+
+## Building a Modal
+
+Use `ChatSDK::Modals::Builder` to define a modal:
+
+```ruby
+modal = ChatSDK::Modals::Builder.new(
+  title: "Create Issue",
+  submit_label: "Submit",
+  callback_id: "create_issue_modal"
+) do
+  text_input id: "title", label: "Issue Title", placeholder: "Enter a title"
+  text_input id: "description", label: "Description", multiline: true, optional: true
+
+  select_input id: "priority", label: "Priority", placeholder: "Choose priority" do
+    option "Low", value: "low"
+    option "Medium", value: "medium"
+    option "High", value: "high", description: "Needs immediate attention"
+  end
+
+  static_text "Fill out the form above to create a new issue."
+end.build
+```
+
+## Opening a Modal
+
+Modals require a `trigger_id`, which is provided by button clicks and slash commands. Open a modal from an action or slash command handler:
+
+```ruby
+bot.on_action("open_form_btn") do |event|
+  modal = ChatSDK::Modals::Builder.new(
+    title: "Feedback Form",
+    submit_label: "Send",
+    callback_id: "feedback_modal"
+  ) do
+    text_input id: "feedback", label: "Your Feedback", multiline: true
+    select_input id: "rating", label: "Rating" do
+      option "Great", value: "5"
+      option "Good", value: "4"
+      option "OK", value: "3"
+      option "Poor", value: "2"
+    end
+  end.build
+
+  event.thread.open_modal(trigger_id: event.trigger_id, modal: modal)
+end
+```
+
+From a slash command:
+
+```ruby
+bot.on_slash_command("/feedback") do |event|
+  modal = ChatSDK::Modals::Builder.new(title: "Quick Feedback") do
+    text_input id: "comment", label: "Comment"
+  end.build
+
+  event.thread.open_modal(trigger_id: event.trigger_id, modal: modal)
+end
+```
+
+## Modal Input Types
+
+### text\_input
+
+A single-line or multi-line text field.
+
+```ruby
+text_input id: "name", label: "Your Name"
+text_input id: "bio", label: "Bio", multiline: true, optional: true, placeholder: "Tell us about yourself"
+```
+
+Parameters:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `id` | `String` | Yes | Unique identifier for the input |
+| `label` | `String` | Yes | Label displayed above the input |
+| `placeholder` | `String` | No | Placeholder text |
+| `multiline` | `Boolean` | No | Multi-line text area (default: false) |
+| `optional` | `Boolean` | No | Whether the field is optional (default: false) |
+
+### select\_input
+
+A dropdown menu with predefined options.
+
+```ruby
+select_input id: "team", label: "Team", placeholder: "Select a team" do
+  option "Engineering", value: "eng"
+  option "Design", value: "design"
+  option "Product", value: "product", description: "Product management"
+end
+```
+
+### static\_text
+
+Non-interactive text content within the modal.
+
+```ruby
+static_text "Please fill out all required fields."
+```
+
+## Platform Support
+
+| Platform | Modal Support |
+|----------|--------------|
+| Slack | Yes -- rendered as Slack views |
+| Teams | No -- raises `NotSupportedError` |
+| Google Chat | No -- raises `NotSupportedError` |
+
+Only Slack currently supports modals. Check before opening:
+
+```ruby
+if event.thread.adapter.supports?(:modals)
+  event.thread.open_modal(trigger_id: event.trigger_id, modal: modal)
+else
+  event.thread.post("Modals are not supported on this platform.")
+end
+```
+
+## Testing Modals
+
+Use `FakeAdapter` to verify modal opens:
+
+```ruby
+bot = ChatSDK::Testing.build_bot
+adapter = bot.config.adapters[:test]
+
+bot.on_action("open_form") do |event|
+  modal = ChatSDK::Modals::Builder.new(title: "Test") do
+    text_input id: "name", label: "Name"
+  end.build
+  event.thread.open_modal(trigger_id: event.trigger_id, modal: modal)
+end
+
+adapter.simulate_action(bot, action_id: "open_form", trigger_id: "T999")
+
+assert_equal 1, adapter.modals_opened.size
+assert_equal "T999", adapter.modals_opened.first.trigger_id
+```

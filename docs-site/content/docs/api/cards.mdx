@@ -1,0 +1,121 @@
+---
+title: "API Reference: Cards"
+description: Cards::Builder, Cards::Node, and context classes for building structured messages.
+---
+
+The cards system consists of `Cards::Builder`, `Cards::Node`, and context classes for building structured messages.
+
+## ChatSDK.card
+
+Top-level entry point for building cards:
+
+```ruby
+card = ChatSDK.card(title: "My Card", subtitle: "Optional") do
+  text "Content here"
+end
+```
+
+Returns a `Cards::Node` of type `:card`.
+
+## Cards::Builder
+
+Block-based DSL for constructing card nodes.
+
+### Methods
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `text(content)` | `String` | Add a text block |
+| `divider` | -- | Add a horizontal divider |
+| `image(url:, alt:)` | `String`, `String?` | Add an image |
+| `fields(&block)` | Block | Add key-value fields |
+| `section(title = nil, &block)` | `String?`, Block | Add a grouped section |
+| `actions(&block)` | Block | Add interactive elements |
+
+## Cards::FieldsContext
+
+Available inside a `fields` block:
+
+```ruby
+fields do
+  field "Label", "Value"
+  field "Status", "Active"
+end
+```
+
+### Methods
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `field(label, value)` | `String`, `String` | Add a key-value field |
+
+## Cards::ActionsContext
+
+Available inside an `actions` block:
+
+```ruby
+actions do
+  button "Click", id: "btn_1"
+  link_button "Open", url: "https://example.com"
+  select id: "menu", placeholder: "Choose" do
+    option "A", value: "a"
+  end
+end
+```
+
+### Methods
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `button(text, id:, style:, value:)` | `String`, keyword args | Add a button |
+| `link_button(text, url:)` | `String`, `String` | Add a link button |
+| `select(id:, placeholder:, &block)` | keyword args, Block | Add a select menu |
+
+## Cards::SelectContext
+
+Available inside a `select` block:
+
+```ruby
+select id: "menu" do
+  option "Label", value: "val", description: "Help text"
+end
+```
+
+### Methods
+
+| Method | Parameters | Description |
+|--------|-----------|-------------|
+| `option(text, value:, description:)` | `String`, keyword args | Add a select option |
+
+## Cards::Node
+
+The immutable tree node that represents a card element.
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `type` | `Symbol` | Node type (`:card`, `:text`, `:fields`, etc.) |
+| `attributes` | `Hash` | Node-specific attributes |
+| `children` | `Array<Node>` | Child nodes (frozen) |
+
+### Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `fallback_text` | `String` | Plain-text representation of the card tree |
+
+### Node Types
+
+| Type | Attributes | Children |
+|------|-----------|----------|
+| `:card` | `title`, `subtitle` | Any node types |
+| `:text` | `content` | None |
+| `:divider` | None | None |
+| `:image` | `url`, `alt` | None |
+| `:fields` | None | `:field` nodes |
+| `:field` | `label`, `value` | None |
+| `:section` | `title` | Any node types |
+| `:actions` | None | Button/select nodes |
+| `:button` | `text`, `id`, `style`, `value` | None |
+| `:link_button` | `text`, `url` | None |
+| `:select` | `id`, `placeholder` | `:option` nodes |
+| `:option` | `text`, `value`, `description` | None |

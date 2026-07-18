@@ -1,0 +1,169 @@
+---
+title: Agent Tools
+description: Generate provider-agnostic tool definitions for AI agents with preset permission levels.
+---
+
+`ChatSDK::AI::ToolBuilder` generates provider-agnostic tool definitions for AI agents that can interact with chat platforms.
+
+## Creating Tools
+
+```ruby
+tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger)
+```
+
+Returns a hash of `tool_name => definition`:
+
+```ruby
+{
+  fetch_messages: {
+    description: "Fetch recent messages from a channel or thread",
+    parameters: { type: "object", properties: { ... }, required: [...] },
+    read_only: true,
+    requires_approval: false
+  },
+  post_message: {
+    description: "Post a message to a channel or thread",
+    parameters: { ... },
+    read_only: false,
+    requires_approval: true
+  },
+  # ...
+}
+```
+
+## Presets
+
+| Preset | Tools | Use Case |
+|--------|-------|----------|
+| `:reader` | `fetch_messages`, `fetch_thread` | Read-only agents that observe conversations |
+| `:messenger` | Reader + `post_message`, `send_direct_message`, `add_reaction`, `start_typing` | Agents that participate in conversations |
+| `:moderator` | Messenger + `edit_message`, `delete_message`, `remove_reaction` | Full moderation capabilities |
+
+## Approval Gates
+
+Write tools can be gated behind approval:
+
+```ruby
+# With approval (default) -- write tools have requires_approval: true
+tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger, require_approval: true)
+
+# Without approval -- all tools have requires_approval: false
+tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger, require_approval: false)
+```
+
+Read-only tools (`fetch_messages`, `fetch_thread`) never require approval regardless of the setting.
+
+## Executing Tools
+
+Use `ToolBuilder#execute` to dispatch an LLM's tool call to the correct adapter method:
+
+```ruby
+builder = ChatSDK::AI::ToolBuilder.new(chat: chat, preset: :messenger)
+
+# When your LLM returns a tool call:
+result = builder.execute(:post_message, {
+  adapter_name: "slack",
+  channel_id: "C123",
+  text: "Hello from the agent!"
+})
+# => { id: "msg_1", text: "Hello from the agent!" }
+```
+
+Arguments accept both symbol and string keys.
+
+## Available Tools
+
+### fetch\_messages
+
+Fetch recent messages from a channel or thread.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name (e.g., "slack") |
+| `channel_id` | string | yes | Channel ID |
+| `thread_id` | string | no | Thread ID |
+| `limit` | integer | no | Max messages (default: 20) |
+
+### fetch\_thread
+
+Fetch all messages in a specific thread.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `thread_id` | string | yes | Thread ID |
+
+### post\_message
+
+Post a message to a channel or thread.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `thread_id` | string | no | Thread ID (for replies) |
+| `text` | string | yes | Message text (markdown) |
+
+### send\_direct\_message
+
+Send a direct message to a user.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `user_id` | string | yes | User ID |
+| `text` | string | yes | Message text |
+
+### edit\_message
+
+Edit an existing message. Moderator preset only.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `message_id` | string | yes | Message ID to edit |
+| `text` | string | yes | New message text |
+
+### delete\_message
+
+Delete a message. Moderator preset only.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `message_id` | string | yes | Message ID to delete |
+
+### add\_reaction
+
+Add an emoji reaction to a message.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `message_id` | string | yes | Message ID |
+| `emoji` | string | yes | Emoji name (e.g., "thumbsup") |
+
+### remove\_reaction
+
+Remove an emoji reaction. Moderator preset only.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `message_id` | string | yes | Message ID |
+| `emoji` | string | yes | Emoji name |
+
+### start\_typing
+
+Show a typing indicator in a channel.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `adapter_name` | string | yes | Adapter name |
+| `channel_id` | string | yes | Channel ID |
+| `thread_id` | string | no | Thread ID |
