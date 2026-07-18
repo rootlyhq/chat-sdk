@@ -1,121 +1,240 @@
 ---
-title: "API Reference: Cards"
-description: Cards::Builder, Cards::Node, and context classes for building structured messages.
+title: "API: Cards"
+description: The ChatSDK card DSL provides a platform-agnostic way to build rich messages with text, fields, images, actions, and sections.
 ---
 
-The cards system consists of `Cards::Builder`, `Cards::Node`, and context classes for building structured messages.
+The card DSL provides a platform-agnostic way to build rich messages. Cards are composed of `Cards::Node` trees that adapters render into platform-specific formats (Slack blocks, Teams adaptive cards, etc.).
 
-## ChatSDK.card
+## ChatSDK.card DSL
 
-Top-level entry point for building cards:
+The top-level entry point for building cards.
 
 ```ruby
-card = ChatSDK.card(title: "My Card", subtitle: "Optional") do
-  text "Content here"
+card = ChatSDK.card(title: "Deploy Status", subtitle: "Production") do
+  text "Deployment completed successfully."
+
+  fields do
+    field "Environment", "production"
+    field "Duration", "2m 34s"
+  end
+
+  divider
+
+  image url: "https://example.com/chart.png", alt: "Metrics"
+
+  section "Details" do
+    text "All health checks passing."
+  end
+
+  actions do
+    button "Approve", id: "approve_btn", style: :primary, value: "deploy_123"
+    button "Reject",  id: "reject_btn",  style: :danger
+    link_button "View Logs", url: "https://example.com/logs"
+    select id: "env_select", placeholder: "Choose environment" do
+      option "Production",  value: "prod"
+      option "Staging",     value: "staging", description: "Pre-production"
+    end
+  end
 end
 ```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `title` | `String` | No | `nil` | Card title |
+| `subtitle` | `String` | No | `nil` | Card subtitle |
+| `&block` | `Block` | No | -- | Builder DSL block |
 
 Returns a `Cards::Node` of type `:card`.
 
 ## Cards::Builder
 
-Block-based DSL for constructing card nodes.
+The builder provides these methods inside the card block:
 
-### Methods
+### text(content)
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `text(content)` | `String` | Add a text block |
-| `divider` | -- | Add a horizontal divider |
-| `image(url:, alt:)` | `String`, `String?` | Add an image |
-| `fields(&block)` | Block | Add key-value fields |
-| `section(title = nil, &block)` | `String?`, Block | Add a grouped section |
-| `actions(&block)` | Block | Add interactive elements |
+Adds a text block.
 
-## Cards::FieldsContext
+```ruby
+text "Hello, world!"
+```
 
-Available inside a `fields` block:
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `content` | `String` | Yes | Text content (may include markdown) |
+
+### divider
+
+Adds a horizontal divider.
+
+```ruby
+divider
+```
+
+### image(url:, alt: nil)
+
+Adds an image block.
+
+```ruby
+image url: "https://example.com/img.png", alt: "Description"
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `url` | `String` | Yes | -- | Image URL |
+| `alt` | `String` | No | `nil` | Alt text |
+
+### fields(&block)
+
+Adds a field group. Inside the block, use `field(label, value)` to add key-value pairs.
 
 ```ruby
 fields do
-  field "Label", "Value"
   field "Status", "Active"
+  field "Region", "us-east-1"
 end
 ```
 
-### Methods
+### section(title = nil, &block)
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `field(label, value)` | `String`, `String` | Add a key-value field |
-
-## Cards::ActionsContext
-
-Available inside an `actions` block:
+Adds a section with an optional title. The block accepts the same methods as the top-level builder (`text`, `divider`, `image`, `fields`, `actions`).
 
 ```ruby
-actions do
-  button "Click", id: "btn_1"
-  link_button "Open", url: "https://example.com"
-  select id: "menu", placeholder: "Choose" do
-    option "A", value: "a"
+section "Summary" do
+  text "Everything is operational."
+  fields do
+    field "Uptime", "99.9%"
   end
 end
 ```
 
-### Methods
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `title` | `String` | No | `nil` | Section heading |
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `button(text, id:, style:, value:)` | `String`, keyword args | Add a button |
-| `link_button(text, url:)` | `String`, `String` | Add a link button |
-| `select(id:, placeholder:, &block)` | keyword args, Block | Add a select menu |
+### actions(&block)
 
-## Cards::SelectContext
-
-Available inside a `select` block:
+Adds an action group. Inside the block, use `button`, `link_button`, and `select` to add interactive elements.
 
 ```ruby
-select id: "menu" do
-  option "Label", value: "val", description: "Help text"
+actions do
+  button "Click me", id: "btn_1"
 end
 ```
 
-### Methods
+## Action Elements
 
-| Method | Parameters | Description |
-|--------|-----------|-------------|
-| `option(text, value:, description:)` | `String`, keyword args | Add a select option |
+These methods are available inside an `actions` block:
+
+### button(text, id:, style: nil, value: nil)
+
+Adds an interactive button.
+
+```ruby
+button "Approve", id: "approve", style: :primary, value: "req_123"
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `text` | `String` | Yes | -- | Button label |
+| `id` | `String` | Yes | -- | Action ID (matched by `on_action`) |
+| `style` | `Symbol` | No | `nil` | Visual style (e.g. `:primary`, `:danger`) |
+| `value` | `String` | No | `nil` | Value sent with the action payload |
+
+### link\_button(text, url:)
+
+Adds a button that opens a URL.
+
+```ruby
+link_button "View Docs", url: "https://docs.example.com"
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `text` | `String` | Yes | Button label |
+| `url` | `String` | Yes | URL to open |
+
+### select(id:, placeholder: nil, &block)
+
+Adds a dropdown select menu. Use `option` inside the block to define choices.
+
+```ruby
+select id: "priority", placeholder: "Choose priority" do
+  option "High",   value: "high"
+  option "Medium", value: "medium"
+  option "Low",    value: "low", description: "Non-urgent"
+end
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Action ID |
+| `placeholder` | `String` | No | `nil` | Placeholder text |
+
+### option(text, value:, description: nil)
+
+Defines a select option (used inside a `select` block).
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `text` | `String` | Yes | -- | Display text |
+| `value` | `String` | Yes | -- | Value sent in the action payload |
+| `description` | `String` | No | `nil` | Optional description shown below the text |
+
+## Fields Context
+
+Inside a `fields` block:
+
+### field(label, value)
+
+Adds a key-value field.
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `label` | `String` | Yes | Field label |
+| `value` | `String` | Yes | Field value |
 
 ## Cards::Node
 
-The immutable tree node that represents a card element.
+The node structure that represents a card tree.
+
+### Constructor
+
+```ruby
+Cards::Node.new(type, attributes: {}, children: [])
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `type` | `Symbol` | Yes | -- | Node type (`:card`, `:text`, `:divider`, `:image`, `:fields`, `:field`, `:section`, `:actions`, `:button`, `:link_button`, `:select`, `:option`, `:modal`, `:input`) |
+| `attributes` | `Hash` | No | `{}` | Node attributes |
+| `children` | `Array<Node>` | No | `[]` | Child nodes (frozen after creation) |
+
+### Attributes
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `type` | `Symbol` | Node type (`:card`, `:text`, `:fields`, etc.) |
-| `attributes` | `Hash` | Node-specific attributes |
-| `children` | `Array<Node>` | Child nodes (frozen) |
+| `type` | `Symbol` | Node type |
+| `attributes` | `Hash` | Node attributes |
+| `children` | `Array<Node>` | Frozen array of child nodes |
 
-### Methods
+### Instance Methods
 
-| Method | Returns | Description |
-|--------|---------|-------------|
-| `fallback_text` | `String` | Plain-text representation of the card tree |
+#### fallback\_text
 
-### Node Types
+Returns a plain-text representation of the card tree, useful as fallback for platforms that do not support rich cards.
 
-| Type | Attributes | Children |
-|------|-----------|----------|
-| `:card` | `title`, `subtitle` | Any node types |
-| `:text` | `content` | None |
-| `:divider` | None | None |
-| `:image` | `url`, `alt` | None |
-| `:fields` | None | `:field` nodes |
-| `:field` | `label`, `value` | None |
-| `:section` | `title` | Any node types |
-| `:actions` | None | Button/select nodes |
-| `:button` | `text`, `id`, `style`, `value` | None |
-| `:link_button` | `text`, `url` | None |
-| `:select` | `id`, `placeholder` | `:option` nodes |
-| `:option` | `text`, `value`, `description` | None |
+```ruby
+card = ChatSDK.card(title: "Alert") do
+  text "Server is down"
+  fields do
+    field "Region", "us-east-1"
+  end
+end
+
+card.fallback_text
+# => "Server is down\nRegion: us-east-1"
+```
+
+### Equality
+
+Two nodes are equal (`==`) if they have the same `type`, `attributes`, and `children`.

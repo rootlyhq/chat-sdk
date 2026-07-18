@@ -1,0 +1,73 @@
+---
+title: "API: PostableMessage"
+description: ChatSDK::PostableMessage wraps outbound message content (text, cards, attachments, metadata) in a uniform structure.
+---
+
+`ChatSDK::PostableMessage` wraps outbound message content in a uniform structure that adapters can consume. It holds text, an optional card, attachments, and metadata.
+
+## Constructor
+
+```ruby
+ChatSDK::PostableMessage.new(
+  text: nil,
+  card: nil,
+  attachments: [],
+  metadata: {}
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `text` | `String` | No | `nil` | Plain text content |
+| `card` | `Cards::Node` | No | `nil` | Rich card content |
+| `attachments` | `Array` | No | `[]` | File or media attachments |
+| `metadata` | `Hash` | No | `{}` | Arbitrary metadata passed to the adapter |
+
+Raises `ArgumentError` if both `text` and `card` are `nil` -- at least one is required.
+
+## Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `text` | `String` | Plain text content |
+| `card` | `Cards::Node` | Rich card node, or `nil` |
+| `attachments` | `Array` | Attachments array |
+| `metadata` | `Hash` | Arbitrary metadata |
+
+## Class Methods
+
+### PostableMessage.from(content)
+
+Factory method that coerces various types into a `PostableMessage`.
+
+```ruby
+PostableMessage.from("Hello")
+# => PostableMessage(text: "Hello")
+
+PostableMessage.from(ChatSDK.card(title: "Hi") { text "Body" })
+# => PostableMessage(card: <Node>, text: "Hi\nBody")
+
+PostableMessage.from(existing_postable_message)
+# => existing_postable_message (returned as-is)
+```
+
+| Input type | Behavior |
+|------------|----------|
+| `PostableMessage` | Returned as-is (identity) |
+| `String` | Wrapped as `PostableMessage.new(text: content)` |
+| `Cards::Node` | Wrapped as `PostableMessage.new(card: content, text: content.fallback_text)` |
+| Anything else | Raises `ArgumentError` |
+
+## Instance Methods
+
+### card?
+
+Returns `true` if the message contains a card.
+
+```ruby
+msg = PostableMessage.new(text: "plain")
+msg.card?  # => false
+
+msg = PostableMessage.new(card: some_node, text: "fallback")
+msg.card?  # => true
+```

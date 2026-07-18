@@ -1,0 +1,148 @@
+---
+title: "API: Chat"
+description: ChatSDK::Chat is the central object that holds adapters, state, event handlers, and webhook endpoints.
+---
+
+`ChatSDK::Chat` is the central object that holds adapters, state, event handlers, and webhook endpoints.
+
+## Constructor
+
+```ruby
+ChatSDK::Chat.new(
+  user_name:,
+  adapters:,
+  state:,
+  **options
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `user_name` | `String` | Yes | -- | Bot display name. Must be non-empty. |
+| `adapters` | `Hash{Symbol => Adapter::Base}` | Yes | -- | Platform adapters keyed by name (e.g. `{ slack: my_slack_adapter }`) |
+| `state` | `State::Base` | Yes | -- | State backend (e.g. `State::Memory.new` or a Redis-backed implementation) |
+| `dedupe_ttl` | `Integer` | No | `600` | Deduplication window in seconds for incoming events |
+| `streaming_update_interval` | `Float` | No | `0.5` | Minimum seconds between streaming message edits |
+| `on_lock_conflict` | `Symbol` or `Proc` | No | `:drop` | Lock conflict policy. Must be `:drop`, `:force`, or a callable |
+| `handler_executor` | `Symbol` | No | `:inline` | How event handlers are executed |
+| `log_level` | `Symbol` | No | `:info` | Log level for the SDK logger |
+
+Raises `ConfigurationError` if `user_name` is blank, `adapters` is empty, or `state` is nil.
+
+## Instance Methods
+
+### Event Registration
+
+#### on\_new\_mention
+
+```ruby
+chat.on_new_mention { |thread, message| ... }
+```
+
+Register a handler for @-mentions of the bot.
+
+#### on\_new\_message(pattern = nil)
+
+```ruby
+chat.on_new_message(/deploy/) { |thread, message| ... }
+```
+
+Register a handler for @-mentions matching a `Regexp` or `String` pattern. If `pattern` is `nil`, matches all mentions (equivalent to `on_new_mention`).
+
+#### on\_subscribed\_message
+
+```ruby
+chat.on_subscribed_message { |thread, message| ... }
+```
+
+Register a handler for messages in threads the bot has subscribed to.
+
+#### on\_direct\_message
+
+```ruby
+chat.on_direct_message { |thread, message| ... }
+```
+
+Register a handler for direct messages sent to the bot.
+
+#### on\_reaction(emojis = nil)
+
+```ruby
+chat.on_reaction(%w[thumbsup thumbsdown]) { |event| ... }
+```
+
+Register a handler for emoji reactions. Pass an `Array` of emoji names to filter, or `nil` to match all reactions.
+
+#### on\_action(action\_id)
+
+```ruby
+chat.on_action("approve_btn") { |event| ... }
+```
+
+Register a handler for interactive card actions (buttons, selects) matching `action_id`.
+
+#### on\_slash\_command(command)
+
+```ruby
+chat.on_slash_command("/deploy") { |event| ... }
+```
+
+Register a handler for slash commands matching `command`.
+
+### Adapter Access
+
+#### adapter(name)
+
+```ruby
+chat.adapter(:slack) # => Adapter::Base
+```
+
+Returns the adapter registered under `name`. Raises `ConfigurationError` if not found.
+
+### Channel / DM Access
+
+#### channel(id, adapter\_name: nil)
+
+```ruby
+chat.channel("C123")                        # => Channel (uses first adapter)
+chat.channel("C123", adapter_name: :slack)   # => Channel (explicit adapter)
+```
+
+Returns a `Channel` for the given ID. If `adapter_name` is omitted, uses the first registered adapter.
+
+#### open\_dm(user\_id, adapter\_name: nil)
+
+```ruby
+dm = chat.open_dm("U456", adapter_name: :slack)
+dm.post("Hello via DM!")
+```
+
+Opens a DM conversation with the user via the adapter's `open_dm` and returns a `Channel` bound to that DM channel ID.
+
+### Webhooks
+
+```ruby
+chat.webhooks[:slack]     # => Webhook::Endpoint (Rack app for a single adapter)
+chat.webhooks.router      # => Webhook::Router   (Rack app routing to all adapters)
+```
+
+`webhooks[adapter_name]` returns a `Webhook::Endpoint` Rack application for the named adapter. Endpoints are memoized on first access.
+
+`webhooks.router` returns a `Webhook::Router` Rack application that routes incoming requests to the correct adapter endpoint.
+
+### Dispatch
+
+#### dispatch(event, adapter\_name:)
+
+```ruby
+chat.dispatch(event, adapter_name: :slack)
+```
+
+Dispatches a parsed event through the handler pipeline. Called internally by webhook endpoints; you can also call it directly for testing or custom ingestion.
+
+## Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `config` | `ChatSDK::Config` | Read-only configuration object |
+| `state` | `State::Base` | State backend instance |

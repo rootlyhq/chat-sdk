@@ -1,0 +1,251 @@
+---
+title: "API: Adapter"
+description: ChatSDK::Adapter::Base is the abstract interface that platform adapters must implement, with a capabilities DSL for declaring supported features.
+---
+
+`ChatSDK::Adapter::Base` is the abstract base class that all platform adapters must inherit from. It defines the interface for sending messages, handling webhooks, and querying platform features. The `Adapter::Capabilities` module provides a DSL for declaring which features an adapter supports.
+
+## Adapter::Base
+
+### Interface Methods
+
+All methods below raise `NotImplementedError` in the base class and must be overridden by concrete adapters.
+
+#### name
+
+Returns the adapter name as a symbol.
+
+```ruby
+def name
+  :slack
+end
+```
+
+#### client
+
+Returns the underlying platform API client.
+
+```ruby
+adapter.client  # => Slack::Web::Client, etc.
+```
+
+### Inbound (Webhook) Methods
+
+#### verify\_request!(rack\_request)
+
+Verifies the authenticity of an incoming webhook request (e.g. signature verification). Raises `SignatureVerificationError` on failure.
+
+```ruby
+adapter.verify_request!(rack_request)
+```
+
+#### ack\_response(rack\_request)
+
+Returns an immediate acknowledgment response for the webhook, or `nil` if none is needed. The default implementation returns `nil`.
+
+```ruby
+response = adapter.ack_response(rack_request)
+# => [200, {}, [""]] or nil
+```
+
+#### parse\_events(rack\_request)
+
+Parses a webhook request into an array of SDK event objects.
+
+```ruby
+events = adapter.parse_events(rack_request)
+# => [Events::Mention, Events::Action, ...]
+```
+
+### Outbound Methods
+
+#### post\_message(channel\_id:, message:, thread\_id: nil)
+
+Posts a message to a channel, optionally in a thread.
+
+```ruby
+adapter.post_message(
+  channel_id: "C123",
+  message: PostableMessage.new(text: "Hello"),
+  thread_id: "T456"
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `channel_id` | `String` | Yes | -- | Target channel |
+| `message` | `PostableMessage` | Yes | -- | Message to post |
+| `thread_id` | `String` | No | `nil` | Thread to reply in |
+
+#### edit\_message(channel\_id:, message\_id:, message:)
+
+Edits an existing message. Requires the `:edit_messages` capability.
+
+```ruby
+adapter.edit_message(
+  channel_id: "C123",
+  message_id: "M789",
+  message: PostableMessage.new(text: "Updated")
+)
+```
+
+#### delete\_message(channel\_id:, message\_id:)
+
+Deletes a message. Requires the `:delete_messages` capability.
+
+```ruby
+adapter.delete_message(channel_id: "C123", message_id: "M789")
+```
+
+#### post\_ephemeral(channel\_id:, user\_id:, message:, thread\_id: nil)
+
+Posts an ephemeral message visible only to the specified user. Requires the `:ephemeral_messages` capability.
+
+```ruby
+adapter.post_ephemeral(
+  channel_id: "C123",
+  user_id: "U456",
+  message: PostableMessage.new(text: "Only you see this"),
+  thread_id: "T789"
+)
+```
+
+#### upload\_file(channel\_id:, io:, filename:, thread\_id: nil, comment: nil)
+
+Uploads a file. Requires the `:file_uploads` capability.
+
+```ruby
+adapter.upload_file(
+  channel_id: "C123",
+  io: File.open("report.pdf", "rb"),
+  filename: "report.pdf",
+  thread_id: "T456",
+  comment: "Monthly report"
+)
+```
+
+#### add\_reaction(channel\_id:, message\_id:, emoji:)
+
+Adds an emoji reaction. Requires the `:reactions` capability.
+
+```ruby
+adapter.add_reaction(channel_id: "C123", message_id: "M789", emoji: "thumbsup")
+```
+
+#### remove\_reaction(channel\_id:, message\_id:, emoji:)
+
+Removes an emoji reaction. Requires the `:reactions` capability.
+
+```ruby
+adapter.remove_reaction(channel_id: "C123", message_id: "M789", emoji: "thumbsup")
+```
+
+#### open\_dm(user\_id)
+
+Opens a DM channel with a user and returns the channel ID. Requires the `:direct_messages` capability.
+
+```ruby
+channel_id = adapter.open_dm("U456")
+```
+
+#### fetch\_messages(channel\_id:, thread\_id: nil, cursor: nil, limit: 50)
+
+Fetches message history. Requires the `:message_history` capability.
+
+```ruby
+messages, next_cursor = adapter.fetch_messages(
+  channel_id: "C123",
+  thread_id: "T456",
+  limit: 20
+)
+```
+
+#### open\_modal(trigger\_id:, modal:)
+
+Opens a modal dialog. Requires the `:modals` capability.
+
+```ruby
+adapter.open_modal(trigger_id: "T123", modal: modal_node)
+```
+
+#### start\_typing(channel\_id:, thread\_id: nil)
+
+Shows a typing indicator. Requires the `:typing_indicator` capability.
+
+```ruby
+adapter.start_typing(channel_id: "C123", thread_id: "T456")
+```
+
+#### mention(user\_id)
+
+Returns a platform-specific mention string for a user.
+
+```ruby
+adapter.mention("U123")  # => "<@U123>" (Slack)
+```
+
+#### render(postable\_message)
+
+Renders a `PostableMessage`'s card using the built-in `Cards::Renderer`. Adapters typically override this to produce platform-specific formats.
+
+```ruby
+rendered = adapter.render(postable_message)
+```
+
+## Adapter::Capabilities
+
+A module included by `Adapter::Base` that provides a DSL for declaring and querying adapter capabilities.
+
+### Known Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| `:edit_messages` | Can edit posted messages |
+| `:delete_messages` | Can delete messages |
+| `:ephemeral_messages` | Can post ephemeral (user-only) messages |
+| `:file_uploads` | Can upload files |
+| `:reactions` | Can add/remove emoji reactions |
+| `:modals` | Can open modal dialogs |
+| `:typing_indicator` | Can show typing indicators |
+| `:streaming_edit` | Supports streaming via message edits |
+| `:threads` | Supports threaded conversations |
+| `:direct_messages` | Can open DM channels |
+| `:scheduled_messages` | Can schedule messages for later |
+| `:message_history` | Can fetch message history |
+
+### Class Method: capabilities(*caps)
+
+Declares which capabilities the adapter supports. Call this in the adapter class body.
+
+```ruby
+class MySlackAdapter < ChatSDK::Adapter::Base
+  capabilities :edit_messages, :delete_messages, :reactions,
+               :ephemeral_messages, :file_uploads, :modals,
+               :typing_indicator, :streaming_edit, :threads,
+               :direct_messages, :message_history
+
+  # ... implementation
+end
+```
+
+Raises `ArgumentError` if any capability name is not in the known list.
+
+### Class Method: declared\_capabilities
+
+Returns the array of capabilities declared on the class.
+
+```ruby
+MySlackAdapter.declared_capabilities
+# => [:edit_messages, :delete_messages, ...]
+```
+
+### Instance Method: supports?(capability)
+
+Returns `true` if the adapter's class has declared the given capability.
+
+```ruby
+adapter.supports?(:reactions)  # => true
+adapter.supports?(:modals)     # => false
+```
+
+Methods that require a capability call `require_capability!` internally, which raises `NotSupportedError` if the capability is missing.

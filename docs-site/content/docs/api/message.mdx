@@ -1,0 +1,103 @@
+---
+title: "API: Message"
+description: ChatSDK::Message represents an incoming message from any platform, and ChatSDK::Author represents the user who sent it.
+---
+
+`ChatSDK::Message` represents an incoming message from any chat platform. `ChatSDK::Author` represents the user or bot that sent the message.
+
+## ChatSDK::Message
+
+### Constructor
+
+```ruby
+ChatSDK::Message.new(
+  id:,
+  text:,
+  author:,
+  thread_id:,
+  channel_id:,
+  platform:,
+  attachments: [],
+  raw: nil,
+  timestamp: nil
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Platform message ID |
+| `text` | `String` | Yes | -- | Message text content |
+| `author` | `Author` | Yes | -- | The message author |
+| `thread_id` | `String` | Yes | -- | Thread ID (may equal `channel_id` for top-level messages) |
+| `channel_id` | `String` | Yes | -- | Channel ID |
+| `platform` | `Symbol` | Yes | -- | Platform identifier (e.g. `:slack`, `:teams`) |
+| `attachments` | `Array` | No | `[]` | File or media attachments |
+| `raw` | `Object` | No | `nil` | Raw platform payload for advanced use |
+| `timestamp` | `Time` or `String` | No | `nil` | Message timestamp |
+
+### Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | `String` | Platform message ID |
+| `text` | `String` | Message text content |
+| `author` | `Author` | The message author |
+| `thread_id` | `String` | Thread ID |
+| `channel_id` | `String` | Channel ID |
+| `platform` | `Symbol` | Platform identifier |
+| `attachments` | `Array` | File or media attachments |
+| `raw` | `Object` | Raw platform payload |
+| `timestamp` | `Time` or `String` | Message timestamp |
+
+### Equality
+
+Two messages are equal (`==`, `eql?`) if they have the same `id` and `platform`. The `hash` method is consistent with equality.
+
+```ruby
+msg_a == msg_b  # true when msg_a.id == msg_b.id && msg_a.platform == msg_b.platform
+```
+
+## ChatSDK::Author
+
+### Constructor
+
+```ruby
+ChatSDK::Author.new(
+  id:,
+  name:,
+  platform:,
+  bot: false,
+  raw: nil
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Platform user ID |
+| `name` | `String` | Yes | -- | Display name |
+| `platform` | `Symbol` | Yes | -- | Platform identifier |
+| `bot` | `Boolean` | No | `false` | Whether this author is a bot |
+| `raw` | `Object` | No | `nil` | Raw platform user data |
+
+### Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | `String` | Platform user ID |
+| `name` | `String` | Display name |
+| `platform` | `Symbol` | Platform identifier |
+| `raw` | `Object` | Raw platform user data |
+
+### Instance Methods
+
+#### bot?
+
+Returns `true` if the author is a bot.
+
+```ruby
+message.author.bot?  # => false
+```
+
+### Equality
+
+Two authors are equal (`==`, `eql?`) if they have the same `id` and `platform`. The `hash` method is consistent with equality.

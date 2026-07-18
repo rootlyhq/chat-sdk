@@ -1,17 +1,27 @@
 ---
-title: "API Reference: Channel"
-description: ChatSDK::Channel represents a chat channel or DM conversation.
+title: "API: Channel"
+description: ChatSDK::Channel represents a chat channel and provides methods for posting messages and accessing threads.
 ---
 
-`ChatSDK::Channel` represents a chat channel or DM conversation.
+`ChatSDK::Channel` represents a chat channel. It provides methods for posting top-level messages and creating `Thread` objects for threaded conversations.
 
 ## Constructor
 
-Channels are typically created via `chat.channel(id)` or `chat.open_dm(user_id)`, not directly.
-
 ```ruby
-channel = bot.channel("C12345", adapter_name: :slack)
+ChatSDK::Channel.new(
+  id:,
+  adapter:,
+  chat:
+)
 ```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Channel identifier |
+| `adapter` | `Adapter::Base` | Yes | -- | The platform adapter |
+| `chat` | `Chat` | Yes | -- | The parent Chat instance |
+
+Channels are typically created via `Chat#channel` or `Chat#open_dm` rather than directly.
 
 ## Attributes
 
@@ -21,41 +31,39 @@ channel = bot.channel("C12345", adapter_name: :slack)
 | `adapter` | `Adapter::Base` | The platform adapter |
 | `chat` | `Chat` | The parent Chat instance |
 
-## Methods
+## Instance Methods
 
 ### post(content)
 
 Posts a top-level message to the channel (not in a thread). Accepts a `String`, `Cards::Node`, or `PostableMessage`.
 
 ```ruby
+channel = chat.channel("C123")
 channel.post("Hello, channel!")
-channel.post(ChatSDK.card(title: "Announcement") { text "Big news" })
+channel.post(ChatSDK.card(title: "Alert") { text "Something happened" })
 ```
 
-Returns a `ChatSDK::Message`.
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `content` | `String`, `Cards::Node`, or `PostableMessage` | Yes | Message content to post |
+
+Returns the result from the adapter's `post_message`.
 
 ### thread(thread\_id)
 
-Returns a `Thread` object for a specific thread within this channel.
+Returns a `Thread` object bound to this channel.
 
 ```ruby
-thread = channel.thread("1234567890.123456")
-thread.post("Replying in a thread")
+thread = channel.thread("T456")
+thread.post("Replying in the thread")
 ```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `thread_id` | `String` | Yes | Thread identifier |
+
+Returns a `ChatSDK::Thread` instance.
 
 ## Equality
 
-Two channels are equal if they have the same `id`.
-
-## Example: Proactive Messaging
-
-```ruby
-# Post to a channel outside of an event handler
-bot = ChatBot.instance
-channel = bot.channel("C12345", adapter_name: :slack)
-channel.post("Daily standup reminder!")
-
-# Open a DM and send a message
-dm = bot.open_dm("U12345", adapter_name: :slack)
-dm.post("Your deploy succeeded.")
-```
+Two channels are equal (`==`, `eql?`) if they have the same `id`. The `hash` method is consistent with equality, making channels usable as hash keys.

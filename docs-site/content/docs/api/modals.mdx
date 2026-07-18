@@ -1,0 +1,119 @@
+---
+title: "API: Modals"
+description: ChatSDK::Modals::Builder provides a DSL for constructing modal dialogs with text inputs, select menus, and static text.
+---
+
+`ChatSDK::Modals::Builder` provides a DSL for constructing modal dialogs that can be opened via `Thread#open_modal`. Modals are built as `Cards::Node` trees of type `:modal`.
+
+## Constructor
+
+```ruby
+ChatSDK::Modals::Builder.new(
+  title:,
+  submit_label: nil,
+  callback_id: nil,
+  &block
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `title` | `String` | Yes | -- | Modal title |
+| `submit_label` | `String` | No | `nil` | Custom label for the submit button |
+| `callback_id` | `String` | No | `nil` | Callback ID for identifying submissions |
+
+## Building a Modal
+
+```ruby
+modal = ChatSDK::Modals::Builder.new(
+  title: "Create Incident",
+  submit_label: "Submit",
+  callback_id: "create_incident"
+) do
+  static_text "Please fill out the details below."
+
+  text_input id: "title",
+             label: "Incident Title",
+             placeholder: "Brief description"
+
+  text_input id: "description",
+             label: "Description",
+             placeholder: "What happened?",
+             multiline: true,
+             optional: true
+
+  select_input id: "severity", label: "Severity", placeholder: "Choose severity" do
+    option "Critical", value: "sev1"
+    option "Major",    value: "sev2"
+    option "Minor",    value: "sev3", description: "Non-urgent issue"
+  end
+end.build
+```
+
+Call `.build` to produce a `Cards::Node` of type `:modal`.
+
+## Instance Methods
+
+### text\_input(id:, label:, placeholder: nil, multiline: false, optional: false)
+
+Adds a text input field to the modal.
+
+```ruby
+text_input id: "name", label: "Your Name"
+text_input id: "notes", label: "Notes", multiline: true, optional: true
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Input identifier |
+| `label` | `String` | Yes | -- | Display label |
+| `placeholder` | `String` | No | `nil` | Placeholder text |
+| `multiline` | `Boolean` | No | `false` | Allow multi-line input |
+| `optional` | `Boolean` | No | `false` | Whether the field is optional |
+
+Produces a `Cards::Node` of type `:input` with `input_type: :text`.
+
+### select\_input(id:, label:, placeholder: nil, optional: false, &block)
+
+Adds a select dropdown to the modal. Use `option` inside the block to define choices (same DSL as card selects via `Cards::SelectContext`).
+
+```ruby
+select_input id: "team", label: "Team" do
+  option "Backend",  value: "backend"
+  option "Frontend", value: "frontend"
+end
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Input identifier |
+| `label` | `String` | Yes | -- | Display label |
+| `placeholder` | `String` | No | `nil` | Placeholder text |
+| `optional` | `Boolean` | No | `false` | Whether the field is optional |
+
+Produces a `Cards::Node` of type `:input` with `input_type: :select` and option children.
+
+### static\_text(content)
+
+Adds a read-only text block to the modal.
+
+```ruby
+static_text "This action cannot be undone."
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `content` | `String` | Yes | Text content to display |
+
+Produces a `Cards::Node` of type `:text`.
+
+### build
+
+Builds and returns the final `Cards::Node` of type `:modal`.
+
+```ruby
+node = builder.build
+# => Cards::Node(type: :modal, attributes: {title: "...", ...}, children: [...])
+```
+
+The returned node can be passed to `Thread#open_modal` or `Adapter::Base#open_modal`.

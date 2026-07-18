@@ -1,0 +1,168 @@
+---
+title: "API: State"
+description: ChatSDK::State::Base is the abstract interface for thread subscriptions, distributed locks, and key-value storage.
+---
+
+`ChatSDK::State::Base` is the abstract base class for state backends. It provides the interface for thread subscriptions, distributed locks, and key-value storage. The SDK ships with `State::Memory` for development/testing; production deployments typically use a Redis-backed implementation.
+
+## State::Base
+
+All methods raise `NotImplementedError` and must be implemented by concrete backends.
+
+### Thread Subscriptions
+
+#### subscribe(thread\_id)
+
+Marks a thread as subscribed. Messages in subscribed threads trigger the `on_subscribed_message` handler.
+
+```ruby
+state.subscribe("slack:C123:T456")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `thread_id` | `String` | Yes | Thread state key |
+
+#### unsubscribe(thread\_id)
+
+Removes a thread subscription.
+
+```ruby
+state.unsubscribe("slack:C123:T456")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `thread_id` | `String` | Yes | Thread state key |
+
+#### subscribed?(thread\_id)
+
+Returns `true` if the thread is currently subscribed.
+
+```ruby
+state.subscribed?("slack:C123:T456")  # => true / false
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `thread_id` | `String` | Yes | Thread state key |
+
+### Distributed Locks
+
+#### acquire\_lock(key, owner:, ttl:)
+
+Attempts to acquire an exclusive lock. Returns `true` if the lock was acquired, `false` if it is already held.
+
+```ruby
+state.acquire_lock("handler:C123:T456", owner: "worker-1", ttl: 30)
+# => true
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | `String` | Yes | Lock key |
+| `owner` | `String` | Yes | Lock owner identifier |
+| `ttl` | `Numeric` | Yes | Time-to-live in seconds |
+
+#### release\_lock(key, owner:)
+
+Releases a lock held by the given owner. Returns `true` if released, `false` if the lock is not held by this owner.
+
+```ruby
+state.release_lock("handler:C123:T456", owner: "worker-1")
+# => true
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | `String` | Yes | Lock key |
+| `owner` | `String` | Yes | Lock owner identifier |
+
+#### force\_lock(key, owner:, ttl:)
+
+Acquires a lock unconditionally, overriding any existing holder. Always returns `true`.
+
+```ruby
+state.force_lock("handler:C123:T456", owner: "worker-2", ttl: 30)
+# => true
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | `String` | Yes | Lock key |
+| `owner` | `String` | Yes | Lock owner identifier |
+| `ttl` | `Numeric` | Yes | Time-to-live in seconds |
+
+### Key-Value Store
+
+#### get(key)
+
+Returns the stored value, or `nil` if the key does not exist or has expired.
+
+```ruby
+state.get("myapp:counter")  # => 42 or nil
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | `String` | Yes | Storage key |
+
+#### set(key, value, ttl: nil)
+
+Stores a value. Optionally sets a TTL in seconds.
+
+```ruby
+state.set("myapp:counter", 42, ttl: 3600)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | -- | Storage key |
+| `value` | any | Yes | -- | Value to store |
+| `ttl` | `Numeric` | No | `nil` | Time-to-live in seconds. `nil` means no expiration. |
+
+#### delete(key)
+
+Deletes a key and its associated expiration and lock data.
+
+```ruby
+state.delete("myapp:counter")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `key` | `String` | Yes | Storage key |
+
+#### set\_if\_absent(key, value, ttl: nil)
+
+Stores a value only if the key does not already exist (or has expired). Returns `true` if set, `false` if the key already exists.
+
+```ruby
+state.set_if_absent("myapp:initialized", true, ttl: 600)
+# => true  (first call)
+# => false (subsequent calls within TTL)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `key` | `String` | Yes | -- | Storage key |
+| `value` | any | Yes | -- | Value to store |
+| `ttl` | `Numeric` | No | `nil` | Time-to-live in seconds |
+
+## State::Memory
+
+`ChatSDK::State::Memory` is the built-in in-memory implementation of `State::Base`. It is suitable for development, testing, and single-process deployments.
+
+```ruby
+state = ChatSDK::State::Memory.new
+```
+
+All operations are thread-safe via a `Mutex`. In addition to the base interface, `State::Memory` provides:
+
+### clear
+
+Resets all stored data, subscriptions, and locks.
+
+```ruby
+state.clear
+```

@@ -1,0 +1,179 @@
+---
+title: "API: AI"
+description: ChatSDK::AI provides utilities for integrating LLMs with chat -- message conversion, tool definitions, tool execution, and streaming.
+---
+
+`ChatSDK::AI` provides utilities for integrating LLMs with the chat SDK. It handles converting chat messages to AI-friendly formats, generating tool definitions for function calling, executing tool calls, and streaming AI responses into threads.
+
+## Module Methods
+
+### AI.to\_ai\_messages(messages, include\_names: false, &transform)
+
+Converts an array of `ChatSDK::Message` objects into the `[{role:, content:}]` format used by LLM APIs.
+
+```ruby
+messages = thread.messages(limit: 50)
+ai_messages = ChatSDK::AI.to_ai_messages(messages, include_names: true)
+# => [{role: "user", content: "[Alice]: hello"}, {role: "assistant", content: "Hi!"}]
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `messages` | `Array<Message>` | Yes | -- | Chat messages to convert |
+| `include_names` | `Boolean` | No | `false` | Prefix user messages with `[author_name]: ` |
+| `&transform` | `Block` | No | -- | Optional block `\|hash, message\|` to transform each converted hash |
+
+Messages are sorted by `timestamp` (falling back to `id`), and blank messages are filtered out. Bot authors produce `"assistant"` role; all others produce `"user"` role.
+
+When messages have attachments, the `content` field becomes a multipart array with text and attachment parts (images get `type: "image"`, other files get `type: "file"`).
+
+The optional block receives each converted hash and the original message, and should return the (possibly modified) hash, or `nil` to skip the message.
+
+### AI.create\_tools(preset: :messenger, require\_approval: true)
+
+Generates a hash of tool definitions suitable for LLM function calling.
+
+```ruby
+tools = ChatSDK::AI.create_tools(preset: :messenger)
+# Pass to your LLM client as tool/function definitions
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `preset` | `Symbol` | No | `:messenger` | Tool preset (see presets below) |
+| `require_approval` | `Boolean` | No | `true` | Whether write tools require user approval |
+
+Returns `Hash{Symbol => Hash}` where each value contains `:description`, `:parameters`, `:read_only`, and `:requires_approval`.
+
+### AI.create\_executor(chat:)
+
+Creates a `ToolExecutor` that can execute tool calls against a `Chat` instance.
+
+```ruby
+executor = ChatSDK::AI.create_executor(chat: chat)
+result = executor.execute(:post_message, {
+  adapter_name: "slack",
+  channel_id: "C123",
+  text: "Hello from AI!"
+})
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `chat` | `Chat` | Yes | The Chat instance to execute tools against |
+
+Returns a `ChatSDK::AI::ToolExecutor` instance.
+
+## AI::Converter
+
+Handles the conversion logic used by `AI.to_ai_messages`.
+
+### Constants
+
+| Constant | Value | Description |
+|----------|-------|-------------|
+| `ROLE_USER` | `"user"` | Role for human users |
+| `ROLE_ASSISTANT` | `"assistant"` | Role for bot authors |
+
+### Attachment Handling
+
+Attachments are converted to multipart content:
+
+- **Image attachments** (MIME type starting with `image/`): `{type: "image", url: ..., media_type: ...}`
+- **File attachments**: `{type: "file", url: ..., filename: ..., media_type: ...}`
+- **Other**: `{type: "text", text: attachment.to_s}`
+
+## AI::ToolBuilder
+
+Builds tool definition hashes from presets.
+
+### Presets
+
+| Preset | Tools Included |
+|--------|----------------|
+| `:reader` | `fetch_messages`, `fetch_thread` |
+| `:messenger` | `fetch_messages`, `fetch_thread`, `post_message`, `send_direct_message`, `add_reaction`, `start_typing` |
+| `:moderator` | `fetch_messages`, `fetch_thread`, `post_message`, `send_direct_message`, `add_reaction`, `edit_message`, `delete_message`, `remove_reaction`, `start_typing` |
+
+### Tool Definitions
+
+| Tool | Description | Read-only |
+|------|-------------|-----------|
+| `fetch_messages` | Fetch recent messages from a channel or thread | Yes |
+| `fetch_thread` | Fetch all messages in a specific thread | Yes |
+| `post_message` | Post a message to a channel or thread | No |
+| `send_direct_message` | Send a direct message to a user | No |
+| `edit_message` | Edit an existing message | No |
+| `delete_message` | Delete a message | No |
+| `add_reaction` | Add an emoji reaction to a message | No |
+| `remove_reaction` | Remove an emoji reaction from a message | No |
+| `start_typing` | Show typing indicator in a channel | No |
+
+When `require_approval: true` (the default), write tools (non-read-only) have `requires_approval: true` set.
+
+## AI::ToolExecutor
+
+Executes tool calls against a `Chat` instance.
+
+### Constructor
+
+```ruby
+ChatSDK::AI::ToolExecutor.new(chat: chat)
+```
+
+### Instance Methods
+
+#### execute(tool\_name, arguments)
+
+Executes a tool call and returns a result hash.
+
+```ruby
+result = executor.execute(:fetch_messages, {
+  adapter_name: "slack",
+  channel_id: "C123",
+  limit: 10
+})
+# => [{id: "msg1", text: "hello", author: "Alice", timestamp: ...}, ...]
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tool_name` | `Symbol` or `String` | Yes | Name of the tool to execute |
+| `arguments` | `Hash` | Yes | Tool arguments (keys can be strings or symbols) |
+
+Raises `ChatSDK::Error` if the tool name is unknown.
+
+**Return values by tool:**
+
+| Tool | Returns |
+|------|---------|
+| `fetch_messages` | `Array<{id:, text:, author:, timestamp:}>` |
+| `fetch_thread` | `Array<{id:, text:, author:, timestamp:}>` |
+| `post_message` | `{id:, text:}` |
+| `send_direct_message` | `{id:, channel_id:}` |
+| `edit_message` | `{success: true}` |
+| `delete_message` | `{success: true}` |
+| `add_reaction` | `{success: true}` |
+| `remove_reaction` | `{success: true}` |
+| `start_typing` | `{success: true}` |
+
+## AI::StreamHandler
+
+Streams AI output into a chat thread.
+
+### StreamHandler.stream\_to\_thread(thread, enumerable, placeholder: "Thinking...")
+
+Convenience method that pipes an enumerable of string chunks through `Thread#post_stream`.
+
+```ruby
+chunks = my_ai_client.chat_stream(messages: ai_messages)
+ChatSDK::AI::StreamHandler.stream_to_thread(thread, chunks, placeholder: "Thinking...")
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `thread` | `Thread` | Yes | -- | Target thread |
+| `enumerable` | `Enumerable` | Yes | -- | Yields string chunks |
+| `placeholder` | `String` | No | `"Thinking..."` | Initial placeholder message |
+
+This is the method called by `Thread#post_ai_stream`.

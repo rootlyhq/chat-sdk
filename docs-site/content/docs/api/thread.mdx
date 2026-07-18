@@ -1,0 +1,262 @@
+---
+title: "API: Thread"
+description: ChatSDK::Thread is the primary interface for sending messages, managing subscriptions, and interacting with threads.
+---
+
+`ChatSDK::Thread` represents a conversation thread. It is the primary interface for sending messages, managing subscriptions, and interacting within a thread.
+
+## Constructor
+
+```ruby
+ChatSDK::Thread.new(
+  id:,
+  channel_id:,
+  adapter:,
+  chat:
+)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `id` | `String` | Yes | -- | Thread identifier |
+| `channel_id` | `String` | Yes | -- | Channel this thread belongs to |
+| `adapter` | `Adapter::Base` | Yes | -- | The platform adapter |
+| `chat` | `Chat` | Yes | -- | The parent Chat instance |
+
+Threads are typically created via `Channel#thread` rather than directly.
+
+## Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | `String` | Thread identifier |
+| `channel_id` | `String` | Channel this thread belongs to |
+| `adapter` | `Adapter::Base` | The platform adapter |
+| `chat` | `Chat` | The parent Chat instance |
+
+## Instance Methods
+
+### post(content)
+
+Posts a message to the thread. Accepts a `String`, `Cards::Node`, or `PostableMessage`.
+
+```ruby
+thread.post("Hello!")
+thread.post(ChatSDK.card(title: "Info") { text "Details here" })
+```
+
+Returns the result from the adapter (typically a `Message` with the posted message's ID).
+
+### post\_ephemeral(content, user\_id:)
+
+Posts a message visible only to the specified user.
+
+```ruby
+thread.post_ephemeral("Only you see this", user_id: "U123")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `content` | `String`, `Cards::Node`, or `PostableMessage` | Yes | Message content |
+| `user_id` | `String` | Yes | User who will see the ephemeral message |
+
+Raises `NotSupportedError` if the adapter does not support `:ephemeral_messages`.
+
+### post\_stream(placeholder: nil, &block)
+
+Posts a streaming message that is updated incrementally via edits. Creates a `Streaming::Stream` object using the chat's `streaming_update_interval` config.
+
+```ruby
+thread.post_stream(placeholder: "Loading...") do |stream|
+  stream << "First chunk "
+  stream << "second chunk "
+  stream << "done."
+end
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `placeholder` | `String` | No | `nil` | Initial message text posted before streaming begins |
+
+The block receives a `Streaming::Stream` that supports `<<` to append text chunks. The stream flushes edits at the configured `streaming_update_interval`.
+
+### post\_ai\_stream(enumerable, placeholder: "Thinking...")
+
+Streams an AI response (from any `Enumerable` that yields string chunks) into the thread.
+
+```ruby
+chunks = ai_client.chat_stream(messages: msgs)
+thread.post_ai_stream(chunks, placeholder: "Thinking...")
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `enumerable` | `Enumerable` | Yes | -- | An enumerable yielding string chunks |
+| `placeholder` | `String` | No | `"Thinking..."` | Initial placeholder text |
+
+Delegates to `ChatSDK::AI::StreamHandler.stream_to_thread`.
+
+### edit(message\_id, content)
+
+Edits an existing message.
+
+```ruby
+result = thread.post("Draft")
+thread.edit(result.id, "Final version")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `message_id` | `String` | Yes | ID of the message to edit |
+| `content` | `String`, `Cards::Node`, or `PostableMessage` | Yes | New message content |
+
+### delete(message\_id)
+
+Deletes a message.
+
+```ruby
+result = thread.post("Temporary")
+thread.delete(result.id)
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `message_id` | `String` | Yes | ID of the message to delete |
+
+### react(message\_id, emoji)
+
+Adds an emoji reaction to a message.
+
+```ruby
+thread.react(message.id, "thumbsup")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `message_id` | `String` | Yes | ID of the message to react to |
+| `emoji` | `String` | Yes | Emoji name (e.g. `"thumbsup"`) |
+
+### unreact(message\_id, emoji)
+
+Removes an emoji reaction from a message.
+
+```ruby
+thread.unreact(message.id, "thumbsup")
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `message_id` | `String` | Yes | ID of the message |
+| `emoji` | `String` | Yes | Emoji name to remove |
+
+### upload(io:, filename:, comment: nil)
+
+Uploads a file to the thread.
+
+```ruby
+File.open("report.pdf", "rb") do |f|
+  thread.upload(io: f, filename: "report.pdf", comment: "Monthly report")
+end
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `io` | `IO` | Yes | -- | Readable IO object |
+| `filename` | `String` | Yes | -- | Name for the uploaded file |
+| `comment` | `String` | No | `nil` | Optional comment attached to the upload |
+
+Raises `NotSupportedError` if the adapter does not support `:file_uploads`.
+
+### messages(cursor: nil, limit: 50)
+
+Fetches conversation history for the thread.
+
+```ruby
+messages, next_cursor = thread.messages(limit: 20)
+```
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| `cursor` | `String` | No | `nil` | Pagination cursor from a previous call |
+| `limit` | `Integer` | No | `50` | Maximum number of messages to return |
+
+Returns the result from the adapter's `fetch_messages` (typically `[Array<Message>, cursor]`).
+
+### state
+
+Returns per-thread state data, or `nil` if none is stored.
+
+```ruby
+data = thread.state  # => {"count" => 3} or nil
+```
+
+### set\_state(value)
+
+Stores per-thread state data with a 30-day TTL.
+
+```ruby
+thread.set_state({"count" => 3, "last_run" => Time.now.iso8601})
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `value` | any | Yes | Value to store (must be serializable by the state backend) |
+
+### subscribe
+
+Subscribes the bot to future messages in this thread. Messages in subscribed threads trigger the `on_subscribed_message` handler.
+
+```ruby
+thread.subscribe
+```
+
+### unsubscribe
+
+Unsubscribes from the thread.
+
+```ruby
+thread.unsubscribe
+```
+
+### subscribed?
+
+Returns `true` if the bot is currently subscribed to this thread.
+
+```ruby
+thread.subscribed?  # => true / false
+```
+
+### mention\_user(user\_id)
+
+Returns a formatted user mention string for the current platform.
+
+```ruby
+thread.mention_user("U123")  # => "<@U123>" (Slack)
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `user_id` | `String` | Yes | Platform user ID |
+
+### open\_modal(trigger\_id:, modal:)
+
+Opens a modal dialog. Requires a `trigger_id` from an interactive event (action or slash command).
+
+```ruby
+modal = ChatSDK::Modals::Builder.new(title: "Feedback") do
+  text_input id: "comment", label: "Comment", multiline: true
+end.build
+
+thread.open_modal(trigger_id: event.trigger_id, modal: modal)
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `trigger_id` | `String` | Yes | Trigger ID from the originating event |
+| `modal` | `Cards::Node` | Yes | Modal node built with `Modals::Builder` |
+
+Raises `NotSupportedError` if the adapter does not support `:modals`.
+
+## Equality
+
+Two threads are equal (`==`, `eql?`) if they have the same `id` and `channel_id`. The `hash` method is consistent with equality, making threads usable as hash keys.
