@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Webhook
     class Router
@@ -11,7 +13,7 @@ module ChatSDK
         adapter = @adapters[path]
 
         unless adapter
-          return [404, { "content-type" => "text/plain" }, ["Unknown adapter: #{path}"]]
+          return [404, {"content-type" => "text/plain"}, ["Unknown adapter: #{path}"]]
         end
 
         endpoint = Endpoint.new(chat: @chat, adapter: adapter, adapter_name: path)

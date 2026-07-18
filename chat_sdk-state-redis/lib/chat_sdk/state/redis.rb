@@ -18,9 +18,7 @@ module ChatSDK
         @client = client || RedisClient.config(url: url || ENV["REDIS_URL"] || "redis://localhost:6379").new_client
       end
 
-      def client
-        @client
-      end
+      attr_reader :client
 
       # Subscriptions
       def subscribe(thread_id)
@@ -74,10 +72,10 @@ module ChatSDK
 
       def set_if_absent(key, value, ttl: nil)
         serialized = JSON.generate(value)
-        if ttl
-          result = @client.call("SET", kv_key(key), serialized, "NX", "PX", (ttl * 1000).to_i)
+        result = if ttl
+          @client.call("SET", kv_key(key), serialized, "NX", "PX", (ttl * 1000).to_i)
         else
-          result = @client.call("SET", kv_key(key), serialized, "NX")
+          @client.call("SET", kv_key(key), serialized, "NX")
         end
         result == "OK"
       end

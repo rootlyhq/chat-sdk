@@ -1,23 +1,18 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
-require "chat_sdk/testing"
-require "rack"
-
-# Force autoload of shared examples
-ChatSDK::Testing::AdapterContract
 
 RSpec.describe ChatSDK::GChat::Adapter do
+  subject { described_class.new(project_number: project_number) }
+
   let(:project_number) { "123456789" }
-  let(:mock_credentials) { instance_double("Google::Auth::ServiceAccountCredentials") }
+  let(:mock_credentials) { instance_double(Google::Auth::ServiceAccountCredentials) }
   let(:mock_client) { instance_double(Google::Apps::Chat::V1::ChatService::Client) }
 
   before do
     allow(Google::Auth).to receive(:get_application_default).and_return(mock_credentials)
     allow(Google::Apps::Chat::V1::ChatService::Client).to receive(:new).and_return(mock_client)
   end
-
-  subject { described_class.new(project_number: project_number) }
 
   it_behaves_like "a chat_sdk platform adapter"
 
@@ -36,7 +31,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
   describe "#verify_request!" do
     let(:valid_token) { "valid.jwt.token" }
-    let(:token_payload) { { "iss" => "chat@system.gserviceaccount.com", "aud" => project_number } }
+    let(:token_payload) { {"iss" => "chat@system.gserviceaccount.com", "aud" => project_number} }
 
     it "accepts a valid bearer token" do
       allow(Google::Auth::IDTokens).to receive(:verify_oidc)
@@ -45,20 +40,20 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
       env = Rack::MockRequest.env_for(
         "/gchat/events",
-        method: "POST",
-        input: "{}",
+        :method => "POST",
+        :input => "{}",
         "CONTENT_TYPE" => "application/json",
         "HTTP_AUTHORIZATION" => "Bearer #{valid_token}"
       )
       request = Rack::Request.new(env)
-      expect(subject.verify_request!(request)).to eq(true)
+      expect(subject.verify_request!(request)).to be(true)
     end
 
     it "rejects a missing bearer token" do
       env = Rack::MockRequest.env_for(
         "/gchat/events",
-        method: "POST",
-        input: "{}",
+        :method => "POST",
+        :input => "{}",
         "CONTENT_TYPE" => "application/json"
       )
       request = Rack::Request.new(env)
@@ -72,8 +67,8 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
       env = Rack::MockRequest.env_for(
         "/gchat/events",
-        method: "POST",
-        input: "{}",
+        :method => "POST",
+        :input => "{}",
         "CONTENT_TYPE" => "application/json",
         "HTTP_AUTHORIZATION" => "Bearer invalid.token"
       )
@@ -83,15 +78,15 @@ RSpec.describe ChatSDK::GChat::Adapter do
     end
 
     it "rejects a token with unexpected issuer" do
-      bad_payload = { "iss" => "badactor@evil.com", "aud" => project_number }
+      bad_payload = {"iss" => "badactor@evil.com", "aud" => project_number}
       allow(Google::Auth::IDTokens).to receive(:verify_oidc)
         .with("suspect.token", aud: project_number)
         .and_return(bad_payload)
 
       env = Rack::MockRequest.env_for(
         "/gchat/events",
-        method: "POST",
-        input: "{}",
+        :method => "POST",
+        :input => "{}",
         "CONTENT_TYPE" => "application/json",
         "HTTP_AUTHORIZATION" => "Bearer suspect.token"
       )
@@ -105,8 +100,8 @@ RSpec.describe ChatSDK::GChat::Adapter do
     def build_request(body)
       env = Rack::MockRequest.env_for(
         "/gchat/events",
-        method: "POST",
-        input: body,
+        :method => "POST",
+        :input => body,
         "CONTENT_TYPE" => "application/json"
       )
       Rack::Request.new(env)
@@ -118,15 +113,15 @@ RSpec.describe ChatSDK::GChat::Adapter do
           "type" => "MESSAGE",
           "message" => {
             "name" => "spaces/SPACE1/messages/MSG1",
-            "sender" => { "name" => "users/123", "displayName" => "Alice" },
+            "sender" => {"name" => "users/123", "displayName" => "Alice"},
             "text" => "@Bot hello",
             "argumentText" => "hello",
-            "thread" => { "name" => "spaces/SPACE1/threads/THREAD1" },
-            "space" => { "name" => "spaces/SPACE1" },
+            "thread" => {"name" => "spaces/SPACE1/threads/THREAD1"},
+            "space" => {"name" => "spaces/SPACE1"},
             "annotations" => [
               {
                 "type" => "USER_MENTION",
-                "userMention" => { "type" => "MENTION", "user" => { "name" => "users/bot" } }
+                "userMention" => {"type" => "MENTION", "user" => {"name" => "users/bot"}}
               }
             ]
           }
@@ -153,10 +148,10 @@ RSpec.describe ChatSDK::GChat::Adapter do
           "type" => "MESSAGE",
           "message" => {
             "name" => "spaces/SPACE1/messages/MSG2",
-            "sender" => { "name" => "users/456", "displayName" => "Bob" },
+            "sender" => {"name" => "users/456", "displayName" => "Bob"},
             "text" => "just a message",
-            "thread" => { "name" => "spaces/SPACE1/threads/THREAD2" },
-            "space" => { "name" => "spaces/SPACE1" }
+            "thread" => {"name" => "spaces/SPACE1/threads/THREAD2"},
+            "space" => {"name" => "spaces/SPACE1"}
           }
         }
         request = build_request(JSON.generate(payload))
@@ -174,15 +169,15 @@ RSpec.describe ChatSDK::GChat::Adapter do
           "type" => "CARD_CLICKED",
           "action" => {
             "actionMethodName" => "btn:approve",
-            "parameters" => [{ "key" => "value", "value" => "yes" }]
+            "parameters" => [{"key" => "value", "value" => "yes"}]
           },
-          "user" => { "name" => "users/123", "displayName" => "Alice" },
+          "user" => {"name" => "users/123", "displayName" => "Alice"},
           "message" => {
             "name" => "spaces/SPACE1/messages/MSG1",
-            "space" => { "name" => "spaces/SPACE1" },
-            "thread" => { "name" => "spaces/SPACE1/threads/THREAD1" }
+            "space" => {"name" => "spaces/SPACE1"},
+            "thread" => {"name" => "spaces/SPACE1/threads/THREAD1"}
           },
-          "space" => { "name" => "spaces/SPACE1" }
+          "space" => {"name" => "spaces/SPACE1"}
         }
         request = build_request(JSON.generate(payload))
         events = subject.parse_events(request)
@@ -199,7 +194,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
     context "ADDED_TO_SPACE event" do
       it "returns empty array" do
-        payload = { "type" => "ADDED_TO_SPACE", "space" => { "name" => "spaces/SPACE1" } }
+        payload = {"type" => "ADDED_TO_SPACE", "space" => {"name" => "spaces/SPACE1"}}
         request = build_request(JSON.generate(payload))
         expect(subject.parse_events(request)).to be_empty
       end
@@ -207,7 +202,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
     context "REMOVED_FROM_SPACE event" do
       it "returns empty array" do
-        payload = { "type" => "REMOVED_FROM_SPACE", "space" => { "name" => "spaces/SPACE1" } }
+        payload = {"type" => "REMOVED_FROM_SPACE", "space" => {"name" => "spaces/SPACE1"}}
         request = build_request(JSON.generate(payload))
         expect(subject.parse_events(request)).to be_empty
       end
@@ -225,8 +220,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
     it "creates a message via the GAPIC client" do
       result = double("result",
         name: "spaces/SPACE1/messages/MSG99",
-        thread: double(name: "spaces/SPACE1/threads/THREAD99")
-      )
+        thread: double(name: "spaces/SPACE1/threads/THREAD99"))
       allow(mock_client).to receive(:create_message).and_return(result)
 
       response = subject.post_message(
@@ -246,8 +240,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
     it "includes thread when thread_id is provided" do
       result = double("result",
         name: "spaces/SPACE1/messages/MSG100",
-        thread: double(name: "spaces/SPACE1/threads/THREAD1")
-      )
+        thread: double(name: "spaces/SPACE1/threads/THREAD1"))
       allow(mock_client).to receive(:create_message).and_return(result)
 
       subject.post_message(
@@ -260,7 +253,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
         parent: "spaces/SPACE1",
         message: hash_including(
           text: "Threaded reply",
-          thread: { name: "spaces/SPACE1/threads/THREAD1" }
+          thread: {name: "spaces/SPACE1/threads/THREAD1"}
         )
       )
     end
@@ -271,8 +264,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
       end
       result = double("result",
         name: "spaces/SPACE1/messages/MSG101",
-        thread: double(name: "spaces/SPACE1/threads/T1")
-      )
+        thread: double(name: "spaces/SPACE1/threads/T1"))
       allow(mock_client).to receive(:create_message).and_return(result)
 
       subject.post_message(channel_id: "SPACE1", message: card)
@@ -320,8 +312,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
     it "creates a message with private_message_viewer" do
       result = double("result",
         name: "spaces/SPACE1/messages/MSG_EPH",
-        thread: double(name: "spaces/SPACE1/threads/T1")
-      )
+        thread: double(name: "spaces/SPACE1/threads/T1"))
       allow(mock_client).to receive(:create_message).and_return(result)
 
       subject.post_ephemeral(
@@ -334,7 +325,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
         parent: "spaces/SPACE1",
         message: hash_including(
           text: "Only you can see this",
-          private_message_viewer: { name: "users/USER1" }
+          private_message_viewer: {name: "users/USER1"}
         )
       )
     end
@@ -368,12 +359,12 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
     describe "#render" do
       it "renders a text node" do
-        node = ChatSDK::Cards::Node.new(:text, attributes: { content: "Hello" })
+        node = ChatSDK::Cards::Node.new(:text, attributes: {content: "Hello"})
         result = renderer.render(node)
         expect(result[:cards_v2]).to be_an(Array)
         card = result[:cards_v2][0][:card]
         widget = card[:sections][0][:widgets][0]
-        expect(widget).to eq({ textParagraph: { text: "Hello" } })
+        expect(widget).to eq({textParagraph: {text: "Hello"}})
       end
 
       it "renders a card with title and children" do
@@ -385,7 +376,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
         result = renderer.render(card)
 
         card_data = result[:cards_v2][0][:card]
-        expect(card_data[:header]).to eq({ title: "Incident", subtitle: "SEV1" })
+        expect(card_data[:header]).to eq({title: "Incident", subtitle: "SEV1"})
         expect(card_data[:sections].size).to be >= 2
       end
 
@@ -440,7 +431,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
         approve = buttons[0]
         expect(approve[:text]).to eq("Approve")
         expect(approve[:onClick][:action][:actionMethodName]).to eq("btn:approve")
-        expect(approve[:onClick][:action][:parameters]).to eq([{ key: "value", value: "yes" }])
+        expect(approve[:onClick][:action][:parameters]).to eq([{key: "value", value: "yes"}])
         expect(approve[:color]).to include(green: 0.53)
 
         reject = buttons[1]

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../../../../spec/spec_helper"
 require "rack/test"
 
@@ -30,7 +32,7 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
   end
 
   let(:state) { ChatSDK::State::Memory.new }
-  let(:chat) { ChatSDK::Chat.new(user_name: "test-bot", adapters: { webhook_test: test_adapter }, state: state) }
+  let(:chat) { ChatSDK::Chat.new(user_name: "test-bot", adapters: {webhook_test: test_adapter}, state: state) }
   let(:endpoint) { described_class.new(chat: chat, adapter: test_adapter, adapter_name: :webhook_test) }
 
   let(:app) { endpoint }
@@ -112,7 +114,7 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
 
   describe "ack response" do
     it "returns ack response when adapter provides one" do
-      ack = [200, { "content-type" => "application/json" }, ['{"challenge":"abc"}']]
+      ack = [200, {"content-type" => "application/json"}, ['{"challenge":"abc"}']]
       allow(test_adapter).to receive(:ack_response).and_return(ack)
 
       status, headers, body = endpoint.call(env)

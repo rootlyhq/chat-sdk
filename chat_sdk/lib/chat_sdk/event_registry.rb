@@ -1,6 +1,8 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class EventRegistry
-    Handler = Struct.new(:type, :matcher, :block, keyword_init: true)
+    Handler = Struct.new(:type, :matcher, :block)
 
     def initialize
       @handlers = []

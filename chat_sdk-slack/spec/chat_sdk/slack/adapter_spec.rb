@@ -1,18 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
-require "chat_sdk/testing"
 require "openssl"
-require "rack"
-
-# Force autoload of shared examples
-ChatSDK::Testing::AdapterContract
 
 RSpec.describe ChatSDK::Slack::Adapter do
+  subject { described_class.new(bot_token: bot_token, signing_secret: signing_secret) }
+
   let(:bot_token) { "xoxb-test-token-12345" }
   let(:signing_secret) { "test_signing_secret_abc123" }
-
-  subject { described_class.new(bot_token: bot_token, signing_secret: signing_secret) }
 
   it_behaves_like "a chat_sdk platform adapter"
 
@@ -48,8 +43,8 @@ RSpec.describe ChatSDK::Slack::Adapter do
 
       env = Rack::MockRequest.env_for(
         "/slack/events",
-        method: "POST",
-        input: body,
+        :method => "POST",
+        :input => body,
         "CONTENT_TYPE" => "application/json",
         "HTTP_X_SLACK_REQUEST_TIMESTAMP" => timestamp,
         "HTTP_X_SLACK_SIGNATURE" => signature
@@ -60,7 +55,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
     it "accepts a valid signature" do
       body = '{"type":"event_callback"}'
       request = build_signed_request(body)
-      expect(subject.verify_request!(request)).to eq(true)
+      expect(subject.verify_request!(request)).to be(true)
     end
 
     it "rejects an invalid signature" do
@@ -73,8 +68,8 @@ RSpec.describe ChatSDK::Slack::Adapter do
     it "rejects missing signature headers" do
       env = Rack::MockRequest.env_for(
         "/slack/events",
-        method: "POST",
-        input: '{"type":"event_callback"}',
+        :method => "POST",
+        :input => '{"type":"event_callback"}',
         "CONTENT_TYPE" => "application/json"
       )
       request = Rack::Request.new(env)
@@ -96,21 +91,21 @@ RSpec.describe ChatSDK::Slack::Adapter do
       body = '{"type":"url_verification","challenge":"test_challenge_xyz"}'
       env = Rack::MockRequest.env_for(
         "/slack/events",
-        method: "POST",
-        input: body,
+        :method => "POST",
+        :input => body,
         "CONTENT_TYPE" => "application/json"
       )
       request = Rack::Request.new(env)
       result = subject.ack_response(request)
-      expect(result).to eq([200, { "content-type" => "text/plain" }, ["test_challenge_xyz"]])
+      expect(result).to eq([200, {"content-type" => "text/plain"}, ["test_challenge_xyz"]])
     end
 
     it "returns nil for non-verification events" do
       body = '{"type":"event_callback","event":{}}'
       env = Rack::MockRequest.env_for(
         "/slack/events",
-        method: "POST",
-        input: body,
+        :method => "POST",
+        :input => body,
         "CONTENT_TYPE" => "application/json"
       )
       request = Rack::Request.new(env)
@@ -122,8 +117,8 @@ RSpec.describe ChatSDK::Slack::Adapter do
     def build_request(body, content_type: "application/json")
       env = Rack::MockRequest.env_for(
         "/slack/events",
-        method: "POST",
-        input: body,
+        :method => "POST",
+        :input => body,
         "CONTENT_TYPE" => content_type
       )
       Rack::Request.new(env)
@@ -244,7 +239,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
             "type" => "reaction_added",
             "user" => "U123",
             "reaction" => "thumbsup",
-            "item" => { "ts" => "1234567890.123456", "channel" => "C789" }
+            "item" => {"ts" => "1234567890.123456", "channel" => "C789"}
           }
         }
         request = build_request(JSON.generate(payload))
@@ -267,7 +262,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
             "type" => "reaction_removed",
             "user" => "U123",
             "reaction" => "thumbsup",
-            "item" => { "ts" => "1234567890.123456", "channel" => "C789" }
+            "item" => {"ts" => "1234567890.123456", "channel" => "C789"}
           }
         }
         request = build_request(JSON.generate(payload))
@@ -283,12 +278,12 @@ RSpec.describe ChatSDK::Slack::Adapter do
       it "parses into Action events" do
         payload = {
           "type" => "block_actions",
-          "user" => { "id" => "U123", "name" => "testuser" },
-          "channel" => { "id" => "C789" },
-          "message" => { "ts" => "1234567890.123456" },
+          "user" => {"id" => "U123", "name" => "testuser"},
+          "channel" => {"id" => "C789"},
+          "message" => {"ts" => "1234567890.123456"},
           "trigger_id" => "T999",
           "actions" => [
-            { "action_id" => "btn:approve", "value" => "yes" }
+            {"action_id" => "btn:approve", "value" => "yes"}
           ]
         }
         request = build_request(JSON.generate(payload))
@@ -308,12 +303,12 @@ RSpec.describe ChatSDK::Slack::Adapter do
       it "parses the payload parameter" do
         inner = {
           "type" => "block_actions",
-          "user" => { "id" => "U123", "name" => "testuser" },
-          "channel" => { "id" => "C789" },
-          "message" => { "ts" => "1234567890.123456" },
+          "user" => {"id" => "U123", "name" => "testuser"},
+          "channel" => {"id" => "C789"},
+          "message" => {"ts" => "1234567890.123456"},
           "trigger_id" => "T999",
           "actions" => [
-            { "action_id" => "btn:ok", "value" => "clicked" }
+            {"action_id" => "btn:ok", "value" => "clicked"}
           ]
         }
         body = "payload=#{Rack::Utils.escape(JSON.generate(inner))}"
@@ -359,9 +354,9 @@ RSpec.describe ChatSDK::Slack::Adapter do
 
     describe "#render" do
       it "renders a text node as a section block" do
-        node = ChatSDK::Cards::Node.new(:text, attributes: { content: "Hello world" })
+        node = ChatSDK::Cards::Node.new(:text, attributes: {content: "Hello world"})
         result = renderer.render(node)
-        expect(result).to eq([{ type: "section", text: { type: "mrkdwn", text: "Hello world" } }])
+        expect(result).to eq([{type: "section", text: {type: "mrkdwn", text: "Hello world"}}])
       end
 
       it "renders a card with multiple children" do
@@ -392,7 +387,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
         expect(result.size).to eq(1)
         expect(result[0][:type]).to eq("section")
         expect(result[0][:fields].size).to eq(2)
-        expect(result[0][:fields][0]).to eq({ type: "mrkdwn", text: "*Status*\nActive" })
+        expect(result[0][:fields][0]).to eq({type: "mrkdwn", text: "*Status*\nActive"})
       end
 
       it "renders an image" do
@@ -424,7 +419,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
 
         approve_btn = actions_block[:elements][0]
         expect(approve_btn[:type]).to eq("button")
-        expect(approve_btn[:text]).to eq({ type: "plain_text", text: "Approve" })
+        expect(approve_btn[:text]).to eq({type: "plain_text", text: "Approve"})
         expect(approve_btn[:action_id]).to eq("btn:approve")
         expect(approve_btn[:style]).to eq("primary")
         expect(approve_btn[:value]).to eq("yes")
@@ -450,9 +445,9 @@ RSpec.describe ChatSDK::Slack::Adapter do
         select_el = result[0][:elements][0]
         expect(select_el[:type]).to eq("static_select")
         expect(select_el[:action_id]).to eq("severity_select")
-        expect(select_el[:placeholder]).to eq({ type: "plain_text", text: "Choose severity" })
+        expect(select_el[:placeholder]).to eq({type: "plain_text", text: "Choose severity"})
         expect(select_el[:options].size).to eq(2)
-        expect(select_el[:options][1][:description]).to eq({ type: "plain_text", text: "Less critical" })
+        expect(select_el[:options][1][:description]).to eq({type: "plain_text", text: "Less critical"})
       end
     end
   end
@@ -474,8 +469,8 @@ RSpec.describe ChatSDK::Slack::Adapter do
         result = renderer.render(modal)
 
         expect(result[:type]).to eq("modal")
-        expect(result[:title]).to eq({ type: "plain_text", text: "Create Incident" })
-        expect(result[:submit]).to eq({ type: "plain_text", text: "Submit" })
+        expect(result[:title]).to eq({type: "plain_text", text: "Create Incident"})
+        expect(result[:submit]).to eq({type: "plain_text", text: "Submit"})
         expect(result[:callback_id]).to eq("incident_form")
         expect(result[:blocks].size).to eq(2)
 
@@ -483,12 +478,12 @@ RSpec.describe ChatSDK::Slack::Adapter do
         expect(title_block[:type]).to eq("input")
         expect(title_block[:block_id]).to eq("title")
         expect(title_block[:element][:type]).to eq("plain_text_input")
-        expect(title_block[:element][:multiline]).to eq(false)
-        expect(title_block[:element][:placeholder]).to eq({ type: "plain_text", text: "Enter title" })
+        expect(title_block[:element][:multiline]).to be(false)
+        expect(title_block[:element][:placeholder]).to eq({type: "plain_text", text: "Enter title"})
 
         desc_block = result[:blocks][1]
-        expect(desc_block[:element][:multiline]).to eq(true)
-        expect(desc_block[:optional]).to eq(true)
+        expect(desc_block[:element][:multiline]).to be(true)
+        expect(desc_block[:optional]).to be(true)
       end
 
       it "renders a modal with select input" do

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class PostableMessage
     attr_reader :text, :card, :attachments, :metadata

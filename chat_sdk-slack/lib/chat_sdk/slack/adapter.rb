@@ -4,8 +4,8 @@ module ChatSDK
   module Slack
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :ephemeral_messages,
-                   :file_uploads, :reactions, :modals, :typing_indicator,
-                   :streaming_edit, :threads, :direct_messages, :message_history
+        :file_uploads, :reactions, :modals, :typing_indicator,
+        :streaming_edit, :threads, :direct_messages, :message_history
 
       attr_reader :client
 
@@ -62,9 +62,7 @@ module ChatSDK
         return nil unless parsed
 
         if parsed["type"] == "url_verification"
-          [200, { "content-type" => "text/plain" }, [parsed["challenge"]]]
-        else
-          nil
+          [200, {"content-type" => "text/plain"}, [parsed["challenge"]]]
         end
       end
 
@@ -81,7 +79,7 @@ module ChatSDK
       # Outbound
       def post_message(channel_id:, message:, thread_id: nil)
         msg = ChatSDK::PostableMessage.from(message)
-        params = { channel: channel_id }
+        params = {channel: channel_id}
         params[:thread_ts] = thread_id if thread_id
 
         if msg.card?
@@ -107,7 +105,7 @@ module ChatSDK
 
       def edit_message(channel_id:, message_id:, message:)
         msg = ChatSDK::PostableMessage.from(message)
-        params = { channel: channel_id, ts: message_id }
+        params = {channel: channel_id, ts: message_id}
 
         if msg.card?
           params[:blocks] = @renderer.render(msg.card)
@@ -125,7 +123,7 @@ module ChatSDK
 
       def post_ephemeral(channel_id:, user_id:, message:, thread_id: nil)
         msg = ChatSDK::PostableMessage.from(message)
-        params = { channel: channel_id, user: user_id }
+        params = {channel: channel_id, user: user_id}
         params[:thread_ts] = thread_id if thread_id
 
         if msg.card?
@@ -139,7 +137,7 @@ module ChatSDK
       end
 
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
-        params = { channels: channel_id, file: Faraday::Multipart::FilePart.new(io, nil, filename) }
+        params = {channels: channel_id, file: Faraday::Multipart::FilePart.new(io, nil, filename)}
         params[:thread_ts] = thread_id if thread_id
         params[:initial_comment] = comment if comment
         @client.files_upload(**params)
@@ -159,15 +157,13 @@ module ChatSDK
       end
 
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
-        if thread_id
-          result = @client.conversations_replies(channel: channel_id, ts: thread_id, cursor: cursor, limit: limit)
-          messages = result["messages"].map { |m| parse_slack_message(m, channel_id) }
-          [messages, result["response_metadata"]&.dig("next_cursor")]
+        result = if thread_id
+          @client.conversations_replies(channel: channel_id, ts: thread_id, cursor: cursor, limit: limit)
         else
-          result = @client.conversations_history(channel: channel_id, cursor: cursor, limit: limit)
-          messages = result["messages"].map { |m| parse_slack_message(m, channel_id) }
-          [messages, result["response_metadata"]&.dig("next_cursor")]
+          @client.conversations_history(channel: channel_id, cursor: cursor, limit: limit)
         end
+        messages = result["messages"].map { |m| parse_slack_message(m, channel_id) }
+        [messages, result["response_metadata"]&.dig("next_cursor")]
       end
 
       def open_modal(trigger_id:, modal:)

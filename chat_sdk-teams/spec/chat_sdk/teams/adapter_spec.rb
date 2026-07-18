@@ -1,20 +1,15 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
-require "chat_sdk/testing"
 require "openssl"
 require "rack"
-require "base64"
-
-# Force autoload of shared examples
-ChatSDK::Testing::AdapterContract
 
 RSpec.describe ChatSDK::Teams::Adapter do
+  subject { described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id) }
+
   let(:app_id) { "test-app-id-12345" }
   let(:app_password) { "test-app-password-secret" }
   let(:tenant_id) { "test-tenant-id" }
-
-  subject { described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id) }
 
   it_behaves_like "a chat_sdk platform adapter"
 
@@ -59,7 +54,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         "exp" => Time.now.to_i + 3600,
         "iat" => Time.now.to_i
       }
-      JWT.encode(default_payload.merge(payload), key, algorithm, { kid: kid_header })
+      JWT.encode(default_payload.merge(payload), key, algorithm, {kid: kid_header})
     end
 
     def build_jwks_response(public_key, kid_value)
@@ -75,33 +70,33 @@ RSpec.describe ChatSDK::Teams::Adapter do
     end
 
     before do
-      openid_config = { "jwks_uri" => "https://login.botframework.com/v1/.well-known/keys" }
+      openid_config = {"jwks_uri" => "https://login.botframework.com/v1/.well-known/keys"}
       stub_request(:get, ChatSDK::Teams::JwtVerifier::OPENID_CONFIG_URL)
-        .to_return(status: 200, body: JSON.generate(openid_config), headers: { "Content-Type" => "application/json" })
+        .to_return(status: 200, body: JSON.generate(openid_config), headers: {"Content-Type" => "application/json"})
 
       jwks = build_jwks_response(rsa_key.public_key, kid)
       stub_request(:get, "https://login.botframework.com/v1/.well-known/keys")
-        .to_return(status: 200, body: JSON.generate(jwks), headers: { "Content-Type" => "application/json" })
+        .to_return(status: 200, body: JSON.generate(jwks), headers: {"Content-Type" => "application/json"})
     end
 
     it "accepts a valid JWT" do
       token = build_jwt
       env = Rack::MockRequest.env_for(
         "/api/messages",
-        method: "POST",
-        input: '{"type":"message"}',
+        :method => "POST",
+        :input => '{"type":"message"}',
         "CONTENT_TYPE" => "application/json",
         "HTTP_AUTHORIZATION" => "Bearer #{token}"
       )
       request = Rack::Request.new(env)
-      expect(subject.verify_request!(request)).to eq(true)
+      expect(subject.verify_request!(request)).to be(true)
     end
 
     it "rejects missing authorization header" do
       env = Rack::MockRequest.env_for(
         "/api/messages",
-        method: "POST",
-        input: '{"type":"message"}',
+        :method => "POST",
+        :input => '{"type":"message"}',
         "CONTENT_TYPE" => "application/json"
       )
       request = Rack::Request.new(env)
@@ -110,11 +105,11 @@ RSpec.describe ChatSDK::Teams::Adapter do
     end
 
     it "rejects a JWT with wrong audience" do
-      token = build_jwt({ "aud" => "wrong-app-id" })
+      token = build_jwt({"aud" => "wrong-app-id"})
       env = Rack::MockRequest.env_for(
         "/api/messages",
-        method: "POST",
-        input: '{"type":"message"}',
+        :method => "POST",
+        :input => '{"type":"message"}',
         "CONTENT_TYPE" => "application/json",
         "HTTP_AUTHORIZATION" => "Bearer #{token}"
       )
@@ -124,11 +119,11 @@ RSpec.describe ChatSDK::Teams::Adapter do
     end
 
     it "rejects an expired JWT" do
-      token = build_jwt({ "exp" => Time.now.to_i - 3600 })
+      token = build_jwt({"exp" => Time.now.to_i - 3600})
       env = Rack::MockRequest.env_for(
         "/api/messages",
-        method: "POST",
-        input: '{"type":"message"}',
+        :method => "POST",
+        :input => '{"type":"message"}',
         "CONTENT_TYPE" => "application/json",
         "HTTP_AUTHORIZATION" => "Bearer #{token}"
       )
@@ -142,8 +137,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
     def build_request(body)
       env = Rack::MockRequest.env_for(
         "/api/messages",
-        method: "POST",
-        input: body,
+        :method => "POST",
+        :input => body,
         "CONTENT_TYPE" => "application/json"
       )
       Rack::Request.new(env)
@@ -155,8 +150,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
           "type" => "message",
           "id" => "act-123",
           "text" => "Hello Teams",
-          "from" => { "id" => "user-1", "name" => "Alice" },
-          "conversation" => { "id" => "conv-1", "conversationType" => "channel" },
+          "from" => {"id" => "user-1", "name" => "Alice"},
+          "conversation" => {"id" => "conv-1", "conversationType" => "channel"},
           "serviceUrl" => "https://smba.trafficmanager.net/teams/"
         }
         request = build_request(JSON.generate(activity))
@@ -178,8 +173,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
           "type" => "message",
           "id" => "act-456",
           "text" => "Hello bot",
-          "from" => { "id" => "user-2", "name" => "Bob" },
-          "conversation" => { "id" => "conv-dm-1", "conversationType" => "personal" },
+          "from" => {"id" => "user-2", "name" => "Bob"},
+          "conversation" => {"id" => "conv-dm-1", "conversationType" => "personal"},
           "serviceUrl" => "https://smba.trafficmanager.net/teams/"
         }
         request = build_request(JSON.generate(activity))
@@ -195,12 +190,12 @@ RSpec.describe ChatSDK::Teams::Adapter do
           "type" => "message",
           "id" => "act-789",
           "text" => "<at>Bot</at> help me",
-          "from" => { "id" => "user-3", "name" => "Carol" },
-          "conversation" => { "id" => "conv-2", "conversationType" => "channel" },
+          "from" => {"id" => "user-3", "name" => "Carol"},
+          "conversation" => {"id" => "conv-2", "conversationType" => "channel"},
           "serviceUrl" => "https://smba.trafficmanager.net/teams/",
           "entities" => [{
             "type" => "mention",
-            "mentioned" => { "id" => app_id, "name" => "Bot" }
+            "mentioned" => {"id" => app_id, "name" => "Bot"}
           }]
         }
         request = build_request(JSON.generate(activity))
@@ -216,8 +211,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
           "type" => "message",
           "id" => "act-self",
           "text" => "My own message",
-          "from" => { "id" => app_id, "name" => "Bot" },
-          "conversation" => { "id" => "conv-1" },
+          "from" => {"id" => app_id, "name" => "Bot"},
+          "conversation" => {"id" => "conv-1"},
           "serviceUrl" => "https://smba.trafficmanager.net/teams/"
         }
         request = build_request(JSON.generate(activity))
@@ -230,10 +225,10 @@ RSpec.describe ChatSDK::Teams::Adapter do
       it "parses reactionsAdded into Reaction event" do
         activity = {
           "type" => "messageReaction",
-          "from" => { "id" => "user-1", "name" => "Alice" },
-          "conversation" => { "id" => "conv-1" },
+          "from" => {"id" => "user-1", "name" => "Alice"},
+          "conversation" => {"id" => "conv-1"},
           "replyToId" => "msg-100",
-          "reactionsAdded" => [{ "type" => "like" }],
+          "reactionsAdded" => [{"type" => "like"}],
           "serviceUrl" => "https://smba.trafficmanager.net/teams/"
         }
         request = build_request(JSON.generate(activity))
@@ -251,10 +246,10 @@ RSpec.describe ChatSDK::Teams::Adapter do
       it "parses reactionsRemoved into Reaction event with added=false" do
         activity = {
           "type" => "messageReaction",
-          "from" => { "id" => "user-1", "name" => "Alice" },
-          "conversation" => { "id" => "conv-1" },
+          "from" => {"id" => "user-1", "name" => "Alice"},
+          "conversation" => {"id" => "conv-1"},
           "replyToId" => "msg-100",
-          "reactionsRemoved" => [{ "type" => "like" }],
+          "reactionsRemoved" => [{"type" => "like"}],
           "serviceUrl" => "https://smba.trafficmanager.net/teams/"
         }
         request = build_request(JSON.generate(activity))
@@ -271,8 +266,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
         activity = {
           "type" => "invoke",
           "name" => "adaptiveCard/action",
-          "from" => { "id" => "user-1", "name" => "Alice" },
-          "conversation" => { "id" => "conv-1" },
+          "from" => {"id" => "user-1", "name" => "Alice"},
+          "conversation" => {"id" => "conv-1"},
           "value" => {
             "action" => "btn:approve",
             "data" => "yes"
@@ -304,8 +299,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
         "type" => "message",
         "id" => "act-1",
         "text" => "hello",
-        "from" => { "id" => "user-1" },
-        "conversation" => { "id" => "conv-1" },
+        "from" => {"id" => "user-1"},
+        "conversation" => {"id" => "conv-1"},
         "serviceUrl" => "https://smba.trafficmanager.net/teams/"
       }
       request = build_request(JSON.generate(activity))
@@ -316,14 +311,14 @@ RSpec.describe ChatSDK::Teams::Adapter do
       stub_request(:post, ChatSDK::Teams::BotFrameworkClient::TOKEN_URL)
         .to_return(
           status: 200,
-          body: JSON.generate({ "access_token" => "test-token", "expires_in" => 3600 }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"access_token" => "test-token", "expires_in" => 3600}),
+          headers: {"Content-Type" => "application/json"}
         )
       stub_request(:post, "https://smba.trafficmanager.net/teams/v3/conversations/conv-1/activities")
         .to_return(
           status: 200,
-          body: JSON.generate({ "id" => "new-msg-1" }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"id" => "new-msg-1"}),
+          headers: {"Content-Type" => "application/json"}
         )
 
       result = subject.post_message(channel_id: "conv-1", message: "Test reply")
@@ -362,7 +357,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
 
     describe "#render" do
       it "renders a text node as AdaptiveCard with TextBlock" do
-        node = ChatSDK::Cards::Node.new(:text, attributes: { content: "Hello world" })
+        node = ChatSDK::Cards::Node.new(:text, attributes: {content: "Hello world"})
         result = renderer.render(node)
 
         expect(result["type"]).to eq("AdaptiveCard")
@@ -370,7 +365,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         expect(result["body"].size).to eq(1)
         expect(result["body"][0]["type"]).to eq("TextBlock")
         expect(result["body"][0]["text"]).to eq("Hello world")
-        expect(result["body"][0]["wrap"]).to eq(true)
+        expect(result["body"][0]["wrap"]).to be(true)
       end
 
       it "renders a card with multiple children" do
@@ -386,7 +381,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         expect(result["body"][0]["type"]).to eq("TextBlock")
         expect(result["body"][0]["text"]).to eq("Line 1")
         # Divider is rendered as separator on next element
-        expect(result["body"][1]["separator"]).to eq(true)
+        expect(result["body"][1]["separator"]).to be(true)
         expect(result["body"][1]["text"]).to eq("Line 2")
       end
 
@@ -402,8 +397,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
         fact_set = result["body"][0]
         expect(fact_set["type"]).to eq("FactSet")
         expect(fact_set["facts"].size).to eq(2)
-        expect(fact_set["facts"][0]).to eq({ "title" => "Status", "value" => "Active" })
-        expect(fact_set["facts"][1]).to eq({ "title" => "Severity", "value" => "SEV1" })
+        expect(fact_set["facts"][0]).to eq({"title" => "Status", "value" => "Active"})
+        expect(fact_set["facts"][1]).to eq({"title" => "Severity", "value" => "SEV1"})
       end
 
       it "renders an image" do
@@ -434,7 +429,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         approve = action_set["actions"][0]
         expect(approve["type"]).to eq("Action.Submit")
         expect(approve["title"]).to eq("Approve")
-        expect(approve["data"]).to eq({ "action" => "btn:approve", "value" => "yes" })
+        expect(approve["data"]).to eq({"action" => "btn:approve", "value" => "yes"})
         expect(approve["style"]).to eq("positive")
 
         reject = action_set["actions"][1]
@@ -465,7 +460,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         expect(choice_set["id"]).to eq("severity_select")
         expect(choice_set["placeholder"]).to eq("Choose severity")
         expect(choice_set["choices"].size).to eq(2)
-        expect(choice_set["choices"][0]).to eq({ "title" => "SEV1", "value" => "sev1" })
+        expect(choice_set["choices"][0]).to eq({"title" => "SEV1", "value" => "sev1"})
       end
 
       it "renders a section as Container" do
@@ -496,8 +491,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
       stub_request(:post, ChatSDK::Teams::BotFrameworkClient::TOKEN_URL)
         .to_return(
           status: 200,
-          body: JSON.generate({ "access_token" => "test-token", "expires_in" => 3600 }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"access_token" => "test-token", "expires_in" => 3600}),
+          headers: {"Content-Type" => "application/json"}
         )
     end
 
@@ -505,8 +500,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
       stub_request(:post, "https://smba.trafficmanager.net/teams/v3/conversations/conv-1/activities")
         .to_return(
           status: 200,
-          body: JSON.generate({ "id" => "msg-1" }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"id" => "msg-1"}),
+          headers: {"Content-Type" => "application/json"}
         )
 
       result = subject.post_message(channel_id: "conv-1", message: "Hello Teams!")
@@ -523,8 +518,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
         }
         .to_return(
           status: 200,
-          body: JSON.generate({ "id" => "msg-card-1" }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"id" => "msg-card-1"}),
+          headers: {"Content-Type" => "application/json"}
         )
 
       card = ChatSDK.card do
@@ -551,8 +546,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
       stub_request(:post, ChatSDK::Teams::BotFrameworkClient::TOKEN_URL)
         .to_return(
           status: 200,
-          body: JSON.generate({ "access_token" => "test-token", "expires_in" => 3600 }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"access_token" => "test-token", "expires_in" => 3600}),
+          headers: {"Content-Type" => "application/json"}
         )
     end
 
@@ -560,8 +555,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
       stub_request(:put, "https://smba.trafficmanager.net/teams/v3/conversations/conv-1/activities/msg-1")
         .to_return(
           status: 200,
-          body: JSON.generate({ "id" => "msg-1" }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"id" => "msg-1"}),
+          headers: {"Content-Type" => "application/json"}
         )
 
       result = subject.edit_message(channel_id: "conv-1", message_id: "msg-1", message: "Updated text")
@@ -576,8 +571,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
       stub_request(:post, ChatSDK::Teams::BotFrameworkClient::TOKEN_URL)
         .to_return(
           status: 200,
-          body: JSON.generate({ "access_token" => "test-token", "expires_in" => 3600 }),
-          headers: { "Content-Type" => "application/json" }
+          body: JSON.generate({"access_token" => "test-token", "expires_in" => 3600}),
+          headers: {"Content-Type" => "application/json"}
         )
     end
 

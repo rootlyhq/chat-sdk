@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Testing
     module StateContract
@@ -48,8 +50,8 @@ module ChatSDK
 
         describe "key-value store" do
           it "gets and sets values" do
-            subject.set("k1", { "count" => 1 })
-            expect(subject.get("k1")).to eq({ "count" => 1 })
+            subject.set("k1", {"count" => 1})
+            expect(subject.get("k1")).to eq({"count" => 1})
           end
 
           it "returns nil for missing keys" do

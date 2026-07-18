@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Events
     class SlashCommand < Base
       attr_reader :command, :text, :user_id, :channel_id, :trigger_id
 
-      def initialize(command:, text: "", user_id:, channel_id:, trigger_id: nil, **kwargs)
+      def initialize(command:, user_id:, channel_id:, text: "", trigger_id: nil, **kwargs)
         super(type: :slash_command, **kwargs)
         @command = command
         @text = text

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Testing
     module AdapterContract
@@ -61,15 +63,15 @@ module ChatSDK
 
         def capability_args(cap)
           case cap
-          when :edit_messages then { channel_id: "C1", message_id: "M1", message: PostableMessage.new(text: "t") }
-          when :delete_messages then { channel_id: "C1", message_id: "M1" }
-          when :ephemeral_messages then { channel_id: "C1", user_id: "U1", message: PostableMessage.new(text: "t") }
-          when :file_uploads then { channel_id: "C1", io: StringIO.new(""), filename: "f.txt" }
-          when :reactions then { channel_id: "C1", message_id: "M1", emoji: "thumbsup" }
-          when :modals then { trigger_id: "T1", modal: Cards::Node.new(:modal) }
-          when :typing_indicator then { channel_id: "C1" }
-          when :direct_messages then { user_id: "U1" }
-          when :message_history then { channel_id: "C1" }
+          when :edit_messages then {channel_id: "C1", message_id: "M1", message: PostableMessage.new(text: "t")}
+          when :delete_messages then {channel_id: "C1", message_id: "M1"}
+          when :ephemeral_messages then {channel_id: "C1", user_id: "U1", message: PostableMessage.new(text: "t")}
+          when :file_uploads then {channel_id: "C1", io: StringIO.new(""), filename: "f.txt"}
+          when :reactions then {channel_id: "C1", message_id: "M1", emoji: "thumbsup"}
+          when :modals then {trigger_id: "T1", modal: Cards::Node.new(:modal)}
+          when :typing_indicator then {channel_id: "C1"}
+          when :direct_messages then {user_id: "U1"}
+          when :message_history then {channel_id: "C1"}
           else {}
           end
         end

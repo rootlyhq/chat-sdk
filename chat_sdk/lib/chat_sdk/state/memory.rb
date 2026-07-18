@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module State
     class Memory < Base
@@ -25,7 +27,7 @@ module ChatSDK
         @mutex.synchronize do
           expire_if_needed(key)
           return false if @locks.key?(key)
-          @locks[key] = { owner: owner, expires_at: Time.now.to_f + ttl }
+          @locks[key] = {owner: owner, expires_at: Time.now.to_f + ttl}
           true
         end
       end
@@ -40,7 +42,7 @@ module ChatSDK
 
       def force_lock(key, owner:, ttl:)
         @mutex.synchronize do
-          @locks[key] = { owner: owner, expires_at: Time.now.to_f + ttl }
+          @locks[key] = {owner: owner, expires_at: Time.now.to_f + ttl}
           true
         end
       end

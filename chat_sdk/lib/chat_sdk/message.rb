@@ -1,10 +1,12 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class Message
     attr_reader :id, :text, :author, :thread_id, :channel_id,
-                :platform, :attachments, :raw, :timestamp
+      :platform, :attachments, :raw, :timestamp
 
     def initialize(id:, text:, author:, thread_id:, channel_id:, platform:,
-                   attachments: [], raw: nil, timestamp: nil)
+      attachments: [], raw: nil, timestamp: nil)
       @id = id
       @text = text
       @author = author
@@ -19,7 +21,7 @@ module ChatSDK
     def ==(other)
       other.is_a?(Message) && id == other.id && platform == other.platform
     end
-    alias eql? ==
+    alias_method :eql?, :==
 
     def hash
       [id, platform].hash

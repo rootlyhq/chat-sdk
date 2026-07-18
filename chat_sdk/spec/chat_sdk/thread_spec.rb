@@ -1,11 +1,13 @@
+# frozen_string_literal: true
+
 require_relative "../../../spec/spec_helper"
 require "chat_sdk/testing"
 
 RSpec.describe ChatSDK::Thread do
   let(:adapter) { ChatSDK::Testing::FakeAdapter.new }
   let(:state) { ChatSDK::State::Memory.new }
-  let(:bot) { ChatSDK::Chat.new(user_name: "test-bot", adapters: { test: adapter }, state: state) }
-  let(:thread) { ChatSDK::Thread.new(id: "T123", channel_id: "C123", adapter: adapter, chat: bot) }
+  let(:bot) { ChatSDK::Chat.new(user_name: "test-bot", adapters: {test: adapter}, state: state) }
+  let(:thread) { described_class.new(id: "T123", channel_id: "C123", adapter: adapter, chat: bot) }
 
   describe "#subscribe / #subscribed?" do
     it "subscribes and checks" do
@@ -37,8 +39,8 @@ RSpec.describe ChatSDK::Thread do
 
   describe "#state / #set_state" do
     it "stores and retrieves state" do
-      thread.set_state({ count: 1 })
-      expect(thread.state).to eq({ count: 1 })
+      thread.set_state({count: 1})
+      expect(thread.state).to eq({count: 1})
     end
   end
 
@@ -50,7 +52,7 @@ RSpec.describe ChatSDK::Thread do
 
   describe "equality" do
     it "equals thread with same id and channel" do
-      other = ChatSDK::Thread.new(id: "T123", channel_id: "C123", adapter: adapter, chat: bot)
+      other = described_class.new(id: "T123", channel_id: "C123", adapter: adapter, chat: bot)
       expect(thread).to eq(other)
     end
   end

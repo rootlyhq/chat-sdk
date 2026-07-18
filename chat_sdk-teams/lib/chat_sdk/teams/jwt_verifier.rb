@@ -53,7 +53,7 @@ module ChatSDK
           next unless key_data["kty"] == "RSA"
 
           rsa_key = build_rsa_key(key_data)
-          { kid: key_data["kid"], key: rsa_key }
+          {kid: key_data["kid"], key: rsa_key}
         end.compact
 
         @jwks_fetched_at = Time.now

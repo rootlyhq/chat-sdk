@@ -138,7 +138,7 @@ module ChatSDK
         action = {
           "type" => "Action.Submit",
           "title" => node.attributes[:text],
-          "data" => { "action" => node.attributes[:id] }
+          "data" => {"action" => node.attributes[:id]}
         }
         action["data"]["value"] = node.attributes[:value] if node.attributes[:value]
         if node.attributes[:style] == :primary

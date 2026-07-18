@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../../../spec/spec_helper"
 
 RSpec.describe ChatSDK::Dispatcher do
@@ -5,7 +7,7 @@ RSpec.describe ChatSDK::Dispatcher do
   let(:state) { ChatSDK::State::Memory.new }
 
   def build_bot(**options)
-    ChatSDK::Chat.new(user_name: "test-bot", adapters: { test: adapter }, state: state, **options)
+    ChatSDK::Chat.new(user_name: "test-bot", adapters: {test: adapter}, state: state, **options)
   end
 
   def make_mention(text: "hello", message_id: "evt_#{rand(10000..99999)}", thread_id: "T1", channel_id: "C1")

@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Webhook
     class Endpoint
@@ -20,13 +22,13 @@ module ChatSDK
         events = adapter.parse_events(request || env)
         events.each { |event| chat.dispatch(event, adapter_name: adapter_name) }
 
-        [200, { "content-type" => "text/plain" }, [""]]
+        [200, {"content-type" => "text/plain"}, [""]]
       rescue ChatSDK::SignatureVerificationError => e
         ChatSDK::Log.warn("Signature verification failed: #{e.message}")
-        [401, { "content-type" => "text/plain" }, ["Unauthorized"]]
+        [401, {"content-type" => "text/plain"}, ["Unauthorized"]]
       rescue => e
         ChatSDK::Log.error("Webhook error: #{e.message}")
-        [200, { "content-type" => "text/plain" }, [""]]
+        [200, {"content-type" => "text/plain"}, [""]]
       end
     end
   end

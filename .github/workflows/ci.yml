@@ -14,13 +14,29 @@ permissions:
   contents: read
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    name: Lint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@e5517072e87f198d9533967ae13d97c11b604005 # v1.99.0
+        with:
+          ruby-version: "4.0.6"
+          bundler-cache: true
+
+      - name: RuboCop
+        run: bundle exec rubocop
+
   test:
     runs-on: ubuntu-latest
 
     strategy:
       fail-fast: false
       matrix:
-        ruby: ["3.3", "3.4", "4.0"]
+        ruby: ["3.3", "3.4", "4.0.6"]
         gem:
           - chat_sdk
           - chat_sdk-slack
@@ -48,7 +64,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ruby: ["3.3", "3.4", "4.0"]
+        ruby: ["3.3", "3.4", "4.0.6"]
 
     services:
       redis:
@@ -80,7 +96,7 @@ jobs:
 
   build-and-test:
     runs-on: ubuntu-latest
-    needs: [test, test-state-redis]
+    needs: [lint, test, test-state-redis]
     if: ${{ !cancelled() }}
     name: build-and-test (Summary)
     steps:

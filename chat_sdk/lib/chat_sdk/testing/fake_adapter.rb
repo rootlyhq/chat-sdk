@@ -1,13 +1,15 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Testing
     class FakeAdapter < Adapter::Base
       capabilities :edit_messages, :delete_messages, :ephemeral_messages,
-                   :file_uploads, :reactions, :modals, :typing_indicator,
-                   :streaming_edit, :threads, :direct_messages, :message_history
+        :file_uploads, :reactions, :modals, :typing_indicator,
+        :streaming_edit, :threads, :direct_messages, :message_history
 
       attr_reader :posted_messages, :edited_messages, :deleted_messages,
-                  :ephemeral_messages_sent, :reactions_added, :reactions_removed,
-                  :files_uploaded, :modals_opened, :typing_started, :dm_channels
+        :ephemeral_messages_sent, :reactions_added, :reactions_removed,
+        :files_uploaded, :modals_opened, :typing_started, :dm_channels
 
       def initialize
         reset!

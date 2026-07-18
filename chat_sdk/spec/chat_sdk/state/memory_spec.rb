@@ -1,8 +1,6 @@
-require_relative "../../../../spec/spec_helper"
-require "chat_sdk/testing"
+# frozen_string_literal: true
 
-# Force autoload of shared examples
-ChatSDK::Testing::StateContract
+require_relative "../../../../spec/spec_helper"
 
 RSpec.describe ChatSDK::State::Memory do
   subject { described_class.new }

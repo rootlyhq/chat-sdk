@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class Dispatcher
     def initialize(chat:, config:, state:, registry:)
@@ -41,8 +43,6 @@ module ChatSDK
         event.message.id
       elsif event.respond_to?(:raw) && event.raw.is_a?(Hash)
         event.raw[:event_id] || event.raw["event_id"]
-      else
-        nil
       end
     end
 

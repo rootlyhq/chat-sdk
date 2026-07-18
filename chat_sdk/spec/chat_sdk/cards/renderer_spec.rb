@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../../../../spec/spec_helper"
 
 RSpec.describe ChatSDK::Cards::Renderer do

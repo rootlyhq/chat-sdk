@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class Config
     DEFAULTS = {
@@ -9,7 +11,7 @@ module ChatSDK
     }.freeze
 
     attr_reader :user_name, :adapters, :state, :on_lock_conflict,
-                :dedupe_ttl, :streaming_update_interval, :handler_executor, :log_level
+      :dedupe_ttl, :streaming_update_interval, :handler_executor, :log_level
 
     def initialize(user_name:, adapters:, state:, **options)
       raise ConfigurationError, "user_name is required" if user_name.nil? || user_name.empty?

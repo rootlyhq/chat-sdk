@@ -4,8 +4,8 @@ module ChatSDK
   module GChat
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :ephemeral_messages,
-                   :threads, :direct_messages, :message_history,
-                   :reactions, :streaming_edit
+        :threads, :direct_messages, :message_history,
+        :reactions, :streaming_edit
 
       attr_reader :client
 
@@ -50,7 +50,7 @@ module ChatSDK
         request_body = build_message_body(msg)
 
         if thread_id
-          request_body[:thread] = { name: "spaces/#{channel_id}/threads/#{thread_id}" }
+          request_body[:thread] = {name: "spaces/#{channel_id}/threads/#{thread_id}"}
         end
 
         result = @client.create_message(
@@ -82,10 +82,10 @@ module ChatSDK
         require_capability!(:ephemeral_messages)
         msg = ChatSDK::PostableMessage.from(message)
         request_body = build_message_body(msg)
-        request_body[:private_message_viewer] = { name: "users/#{user_id}" }
+        request_body[:private_message_viewer] = {name: "users/#{user_id}"}
 
         if thread_id
-          request_body[:thread] = { name: "spaces/#{channel_id}/threads/#{thread_id}" }
+          request_body[:thread] = {name: "spaces/#{channel_id}/threads/#{thread_id}"}
         end
 
         result = @client.create_message(
@@ -105,7 +105,7 @@ module ChatSDK
         @client.create_reaction(
           parent: "spaces/#{channel_id}/messages/#{message_id}",
           reaction: {
-            emoji: { unicode: emoji }
+            emoji: {unicode: emoji}
           }
         )
       end
@@ -122,8 +122,8 @@ module ChatSDK
       def open_dm(user_id)
         require_capability!(:direct_messages)
         result = @client.setup_space(
-          space: { space_type: "DIRECT_MESSAGE" },
-          memberships: [{ member: { name: "users/#{user_id}", type: "HUMAN" } }]
+          space: {space_type: "DIRECT_MESSAGE"},
+          memberships: [{member: {name: "users/#{user_id}", type: "HUMAN"}}]
         )
         extract_id(result.name)
       end

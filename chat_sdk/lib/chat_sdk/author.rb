@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class Author
     attr_reader :id, :name, :platform, :raw
@@ -17,7 +19,7 @@ module ChatSDK
     def ==(other)
       other.is_a?(Author) && id == other.id && platform == other.platform
     end
-    alias eql? ==
+    alias_method :eql?, :==
 
     def hash
       [id, platform].hash

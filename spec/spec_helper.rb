@@ -1,7 +1,11 @@
 # frozen_string_literal: true
 
 require "chat_sdk"
+require "chat_sdk/testing"
 require "webmock/rspec"
+
+ChatSDK::Testing::AdapterContract # rubocop:disable Lint/Void
+ChatSDK::Testing::StateContract # rubocop:disable Lint/Void
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|

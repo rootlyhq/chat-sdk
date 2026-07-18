@@ -1,8 +1,6 @@
-require_relative "../../../../spec/spec_helper"
-require "chat_sdk/testing"
+# frozen_string_literal: true
 
-# Force autoload of shared examples
-ChatSDK::Testing::AdapterContract
+require_relative "../../../../spec/spec_helper"
 
 RSpec.describe ChatSDK::Testing::FakeAdapter do
   subject { described_class.new }
@@ -11,7 +9,7 @@ RSpec.describe ChatSDK::Testing::FakeAdapter do
 
   describe "#simulate_mention" do
     it "dispatches a mention event" do
-      bot = ChatSDK::Testing.build_bot(adapters: { test: subject })
+      bot = ChatSDK::Testing.build_bot(adapters: {test: subject})
       received = nil
       bot.on_new_mention { |_thread, msg| received = msg.text }
       subject.simulate_mention(bot, text: "hello")
@@ -21,7 +19,7 @@ RSpec.describe ChatSDK::Testing::FakeAdapter do
 
   describe "#simulate_action" do
     it "dispatches an action event" do
-      bot = ChatSDK::Testing.build_bot(adapters: { test: subject })
+      bot = ChatSDK::Testing.build_bot(adapters: {test: subject})
       received_id = nil
       bot.on_action("btn:1") { |event| received_id = event.action_id }
       subject.simulate_action(bot, action_id: "btn:1")

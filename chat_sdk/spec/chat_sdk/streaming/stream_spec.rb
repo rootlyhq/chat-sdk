@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require_relative "../../../../spec/spec_helper"
 require "chat_sdk/testing"
 
@@ -121,7 +123,7 @@ RSpec.describe ChatSDK::Streaming::Stream do
     end
 
     it "posts single message at end instead of edits" do
-      stream = ChatSDK::Streaming::Stream.new(
+      stream = described_class.new(
         adapter: no_edit_adapter,
         channel_id: channel_id,
         thread_id: thread_id,
@@ -174,7 +176,7 @@ RSpec.describe ChatSDK::Streaming::Stream do
     end
 
     it "posts a single message at end when no placeholder used" do
-      stream = ChatSDK::Streaming::Stream.new(
+      stream = described_class.new(
         adapter: no_edit_adapter,
         channel_id: channel_id,
         thread_id: thread_id,

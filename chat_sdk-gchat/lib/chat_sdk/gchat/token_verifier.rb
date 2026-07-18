@@ -20,7 +20,7 @@ module ChatSDK
         issuer = payload["iss"] || payload["email"]
         unless issuer == EXPECTED_ISSUER
           raise ChatSDK::SignatureVerificationError,
-                "Unexpected issuer: #{issuer} (expected #{EXPECTED_ISSUER})"
+            "Unexpected issuer: #{issuer} (expected #{EXPECTED_ISSUER})"
         end
 
         payload

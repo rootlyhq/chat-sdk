@@ -70,8 +70,6 @@ module ChatSDK
 
         def parse_message_reaction(activity)
           conversation_id = activity.dig("conversation", "id")
-          activity_id = activity.dig("reactionsAdded")&.first ? activity["replyToId"] : activity["replyToId"]
-
           events = []
 
           (activity["reactionsAdded"] || []).each do |reaction|

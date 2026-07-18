@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class Channel
     attr_reader :id, :adapter, :chat
@@ -20,7 +22,7 @@ module ChatSDK
     def ==(other)
       other.is_a?(Channel) && id == other.id
     end
-    alias eql? ==
+    alias_method :eql?, :==
 
     def hash
       id.hash

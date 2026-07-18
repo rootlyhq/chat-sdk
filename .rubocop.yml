@@ -1,0 +1,91 @@
+inherit_from: .rubocop_todo.yml
+
+require:
+  - standard
+  - standard-performance
+  - rubocop-rspec
+
+inherit_gem:
+  standard: config/ruby-3.4.yml
+  standard-performance: config/base.yml
+
+AllCops:
+  NewCops: enable
+  SuggestExtensions: false
+  TargetRubyVersion: 3.4
+  Include:
+    - "chat_sdk/**/*.rb"
+    - "chat_sdk-slack/**/*.rb"
+    - "chat_sdk-teams/**/*.rb"
+    - "chat_sdk-gchat/**/*.rb"
+    - "chat_sdk-state-redis/**/*.rb"
+    - "spec/**/*.rb"
+  Exclude:
+    - "vendor/**/*"
+    - "examples/**/*"
+
+Layout/LineLength:
+  Max: 150
+
+Metrics/MethodLength:
+  Max: 40
+
+Metrics/ClassLength:
+  Max: 300
+
+Metrics/ModuleLength:
+  Max: 300
+
+Metrics/AbcSize:
+  Max: 40
+
+Metrics/BlockLength:
+  Exclude:
+    - "**/*_spec.rb"
+    - "**/*.gemspec"
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+  EnforcedStyle: always
+
+Style/TrailingCommaInArguments:
+  Enabled: false
+
+Style/TrailingCommaInArrayLiteral:
+  Enabled: false
+
+Style/TrailingCommaInHashLiteral:
+  Enabled: false
+
+RSpec/MultipleExpectations:
+  Enabled: false
+
+RSpec/ExampleLength:
+  Enabled: false
+
+RSpec/NestedGroups:
+  Max: 4
+
+RSpec/MultipleMemoizedHelpers:
+  Enabled: false
+
+RSpec/DescribeClass:
+  Enabled: false
+
+RSpec/ContextWording:
+  Enabled: false
+
+RSpec/NamedSubject:
+  Enabled: false
+
+RSpec/VerifiedDoubles:
+  Enabled: false
+
+RSpec/MessageSpies:
+  Enabled: false
+
+RSpec/SpecFilePathFormat:
+  Enabled: false
+
+RSpec/AnyInstance:
+  Enabled: false

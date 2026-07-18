@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   class Thread
     attr_reader :id, :channel_id, :adapter, :chat
@@ -86,7 +88,7 @@ module ChatSDK
     def ==(other)
       other.is_a?(ChatSDK::Thread) && id == other.id && channel_id == other.channel_id
     end
-    alias eql? ==
+    alias_method :eql?, :==
 
     def hash
       [id, channel_id].hash

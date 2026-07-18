@@ -1,9 +1,11 @@
+# frozen_string_literal: true
+
 require_relative "../../../spec/spec_helper"
 
 RSpec.describe ChatSDK::Chat do
   let(:adapter) { ChatSDK::Testing::FakeAdapter.new }
   let(:state) { ChatSDK::State::Memory.new }
-  let(:bot) { ChatSDK::Chat.new(user_name: "test-bot", adapters: { test: adapter }, state: state) }
+  let(:bot) { described_class.new(user_name: "test-bot", adapters: {test: adapter}, state: state) }
 
   describe "initialization" do
     it "creates with valid config" do
@@ -12,13 +14,13 @@ RSpec.describe ChatSDK::Chat do
 
     it "raises on missing user_name" do
       expect {
-        ChatSDK::Chat.new(user_name: "", adapters: { test: adapter }, state: state)
+        described_class.new(user_name: "", adapters: {test: adapter}, state: state)
       }.to raise_error(ChatSDK::ConfigurationError)
     end
 
     it "raises on missing adapters" do
       expect {
-        ChatSDK::Chat.new(user_name: "bot", adapters: {}, state: state)
+        described_class.new(user_name: "bot", adapters: {}, state: state)
       }.to raise_error(ChatSDK::ConfigurationError)
     end
   end
@@ -51,7 +53,10 @@ RSpec.describe ChatSDK::Chat do
 
     it "provides a thread with subscribe capability" do
       thread_ref = nil
-      bot.on_new_mention { |thread, _msg| thread_ref = thread; thread.subscribe }
+      bot.on_new_mention { |thread, _msg|
+        thread_ref = thread
+        thread.subscribe
+      }
       adapter.simulate_mention(bot, text: "hi")
       expect(thread_ref).to be_a(ChatSDK::Thread)
     end

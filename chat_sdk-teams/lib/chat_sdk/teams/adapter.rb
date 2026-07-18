@@ -4,7 +4,7 @@ module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
-                   :message_history, :reactions, :file_uploads, :streaming_edit
+        :message_history, :reactions, :file_uploads, :streaming_edit
 
       attr_reader :client
 
@@ -154,14 +154,16 @@ module ChatSDK
         require_capability!(:direct_messages)
         # To open a DM, we need a service URL. Use the first cached one.
         service_url = @service_urls.values.first
-        raise ChatSDK::PlatformError.new(
-          "No service URL available. A Teams activity must be received first.",
-          adapter_name: :teams
-        ) unless service_url
+        unless service_url
+          raise ChatSDK::PlatformError.new(
+            "No service URL available. A Teams activity must be received first.",
+            adapter_name: :teams
+          )
+        end
 
         payload = {
-          "bot" => { "id" => @app_id },
-          "members" => [{ "id" => user_id }],
+          "bot" => {"id" => @app_id},
+          "members" => [{"id" => user_id}],
           "isGroup" => false
         }
 
@@ -207,7 +209,7 @@ module ChatSDK
       private
 
       def build_activity(postable_message)
-        activity = { "type" => "message" }
+        activity = {"type" => "message"}
 
         if postable_message.card?
           card_json = @renderer.render(postable_message.card)

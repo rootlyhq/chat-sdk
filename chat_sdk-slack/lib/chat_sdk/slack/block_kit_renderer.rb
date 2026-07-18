@@ -19,24 +19,23 @@ module ChatSDK
       def render_node(node)
         case node.type
         when :text then render_text(node)
-        when :divider then { type: "divider" }
+        when :divider then {type: "divider"}
         when :image then render_image(node)
         when :fields then render_fields(node)
         when :section then render_section(node)
         when :actions then render_actions(node)
-        else nil
         end
       end
 
       def render_text(node)
         {
           type: "section",
-          text: { type: "mrkdwn", text: node.attributes[:content] }
+          text: {type: "mrkdwn", text: node.attributes[:content]}
         }
       end
 
       def render_image(node)
-        block = { type: "image", image_url: node.attributes[:url] }
+        block = {type: "image", image_url: node.attributes[:url]}
         block[:alt_text] = node.attributes[:alt] || " "
         block
       end
@@ -45,16 +44,16 @@ module ChatSDK
         {
           type: "section",
           fields: node.children.map do |field|
-            { type: "mrkdwn", text: "*#{field.attributes[:label]}*\n#{field.attributes[:value]}" }
+            {type: "mrkdwn", text: "*#{field.attributes[:label]}*\n#{field.attributes[:value]}"}
           end
         }
       end
 
       def render_section(node)
-        block = { type: "section" }
+        block = {type: "section"}
         text_children = node.children.select { |c| c.type == :text }
         if text_children.any?
-          block[:text] = { type: "mrkdwn", text: text_children.map { |t| t.attributes[:content] }.join("\n") }
+          block[:text] = {type: "mrkdwn", text: text_children.map { |t| t.attributes[:content] }.join("\n")}
         end
         block
       end
@@ -71,14 +70,13 @@ module ChatSDK
         when :button then render_button(node)
         when :link_button then render_link_button(node)
         when :select then render_select(node)
-        else nil
         end
       end
 
       def render_button(node)
         btn = {
           type: "button",
-          text: { type: "plain_text", text: node.attributes[:text] },
+          text: {type: "plain_text", text: node.attributes[:text]},
           action_id: node.attributes[:id]
         }
         btn[:value] = node.attributes[:value] if node.attributes[:value]
@@ -93,7 +91,7 @@ module ChatSDK
       def render_link_button(node)
         {
           type: "button",
-          text: { type: "plain_text", text: node.attributes[:text] },
+          text: {type: "plain_text", text: node.attributes[:text]},
           url: node.attributes[:url],
           action_id: "link_#{node.attributes[:url].hash.abs}"
         }
@@ -106,18 +104,18 @@ module ChatSDK
           options: node.children.map { |opt| render_option(opt) }
         }
         if node.attributes[:placeholder]
-          sel[:placeholder] = { type: "plain_text", text: node.attributes[:placeholder] }
+          sel[:placeholder] = {type: "plain_text", text: node.attributes[:placeholder]}
         end
         sel
       end
 
       def render_option(node)
         opt = {
-          text: { type: "plain_text", text: node.attributes[:text] },
+          text: {type: "plain_text", text: node.attributes[:text]},
           value: node.attributes[:value]
         }
         if node.attributes[:description]
-          opt[:description] = { type: "plain_text", text: node.attributes[:description] }
+          opt[:description] = {type: "plain_text", text: node.attributes[:description]}
         end
         opt
       end

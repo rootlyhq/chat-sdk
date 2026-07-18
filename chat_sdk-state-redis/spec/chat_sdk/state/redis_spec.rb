@@ -1,7 +1,6 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
-require "chat_sdk/testing"
 
 def redis_url
   ENV["REDIS_URL"] || "redis://localhost:6379"
@@ -10,16 +9,13 @@ end
 def redis_available?
   client = RedisClient.config(url: redis_url).new_client
   client.call("PING") == "PONG"
-rescue StandardError
+rescue
   false
 end
 
 RSpec.describe ChatSDK::State::Redis, if: redis_available? do
   subject { described_class.new(url: redis_url) }
 
-  before { subject.clear }
-
-  ChatSDK::Testing::StateContract # trigger autoload
   it_behaves_like "a chat_sdk state adapter"
 
   describe "Lua lock release" do

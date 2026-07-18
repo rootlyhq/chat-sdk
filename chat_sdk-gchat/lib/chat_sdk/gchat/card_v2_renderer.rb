@@ -6,7 +6,7 @@ module ChatSDK
       def render(node)
         case node.type
         when :card then render_card(node)
-        else { cards_v2: [{ card: { sections: [{ widgets: [render_widget(node)] }] } }] }
+        else {cards_v2: [{card: {sections: [{widgets: [render_widget(node)]}]}}]}
         end
       end
 
@@ -20,13 +20,13 @@ module ChatSDK
         card[:header] = header if header
         card[:sections] = sections unless sections.empty?
 
-        { cards_v2: [{ card: card }] }
+        {cards_v2: [{card: card}]}
       end
 
       def build_header(node)
         return nil unless node.attributes[:title]
 
-        header = { title: node.attributes[:title] }
+        header = {title: node.attributes[:title]}
         header[:subtitle] = node.attributes[:subtitle] if node.attributes[:subtitle]
         header
       end
@@ -38,11 +38,11 @@ module ChatSDK
         children.each do |child|
           case child.type
           when :divider
-            sections << { widgets: current_widgets } unless current_widgets.empty?
+            sections << {widgets: current_widgets} unless current_widgets.empty?
             current_widgets = []
-            sections << { widgets: [{ divider: {} }] }
+            sections << {widgets: [{divider: {}}]}
           when :section
-            sections << { widgets: current_widgets } unless current_widgets.empty?
+            sections << {widgets: current_widgets} unless current_widgets.empty?
             current_widgets = []
             section = {}
             section[:header] = child.attributes[:title] if child.attributes[:title]
@@ -53,7 +53,7 @@ module ChatSDK
           end
         end
 
-        sections << { widgets: current_widgets } unless current_widgets.empty?
+        sections << {widgets: current_widgets} unless current_widgets.empty?
         sections
       end
 
@@ -63,9 +63,8 @@ module ChatSDK
         when :fields then render_fields(node)
         when :image then render_image(node)
         when :actions then render_actions(node)
-        when :divider then { divider: {} }
+        when :divider then {divider: {}}
         when :select then render_select(node)
-        else nil
         end
       end
 
@@ -79,7 +78,7 @@ module ChatSDK
       end
 
       def render_text(node)
-        { textParagraph: { text: node.attributes[:content] } }
+        {textParagraph: {text: node.attributes[:content]}}
       end
 
       def render_fields(node)
@@ -92,9 +91,9 @@ module ChatSDK
       end
 
       def render_image(node)
-        img = { imageUrl: node.attributes[:url] }
+        img = {imageUrl: node.attributes[:url]}
         img[:altText] = node.attributes[:alt] if node.attributes[:alt]
-        { image: img }
+        {image: img}
       end
 
       def render_actions(node)
@@ -121,7 +120,7 @@ module ChatSDK
       end
 
       def render_button_list(buttons)
-        { buttonList: { buttons: buttons } }
+        {buttonList: {buttons: buttons}}
       end
 
       def render_action_element(node)
@@ -129,7 +128,6 @@ module ChatSDK
         when :button then render_button(node)
         when :link_button then render_link_button(node)
         when :select then nil # selects are rendered as their own widget
-        else nil
         end
       end
 
@@ -145,14 +143,14 @@ module ChatSDK
 
         if node.attributes[:value]
           btn[:onClick][:action][:parameters] = [
-            { key: "value", value: node.attributes[:value] }
+            {key: "value", value: node.attributes[:value]}
           ]
         end
 
         if node.attributes[:style] == :primary
-          btn[:color] = { red: 0.0, green: 0.53, blue: 0.87, alpha: 1.0 }
+          btn[:color] = {red: 0.0, green: 0.53, blue: 0.87, alpha: 1.0}
         elsif node.attributes[:style] == :danger
-          btn[:color] = { red: 0.87, green: 0.17, blue: 0.17, alpha: 1.0 }
+          btn[:color] = {red: 0.87, green: 0.17, blue: 0.17, alpha: 1.0}
         end
 
         btn
@@ -162,7 +160,7 @@ module ChatSDK
         {
           text: node.attributes[:text],
           onClick: {
-            openLink: { url: node.attributes[:url] }
+            openLink: {url: node.attributes[:url]}
           }
         }
       end
@@ -179,12 +177,11 @@ module ChatSDK
       end
 
       def render_select_option(node)
-        item = {
+        {
           text: node.attributes[:text],
           value: node.attributes[:value],
           selected: false
         }
-        item
       end
     end
   end

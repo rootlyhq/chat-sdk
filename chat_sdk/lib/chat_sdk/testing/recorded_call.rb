@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 module ChatSDK
   module Testing
     class RecordedCall
@@ -13,7 +15,7 @@ module ChatSDK
       end
 
       def to_h
-        { method: @method_name }.merge(@arguments)
+        {method: @method_name}.merge(@arguments)
       end
     end
   end
