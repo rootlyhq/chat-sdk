@@ -2,10 +2,22 @@ import Link from 'next/link';
 import { createHighlighter } from 'shiki';
 
 const platforms = [
-  { name: 'Slack', color: 'bg-[#4A154B]' },
-  { name: 'Teams', color: 'bg-[#6264A7]' },
-  { name: 'Google Chat', color: 'bg-[#00AC47]' },
-  { name: 'Mattermost', color: 'bg-[#0058CC]' },
+  {
+    name: 'Slack', color: '#4A154B',
+    icon: <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zm1.271 0a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zm0 1.271a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zm10.124 2.521a2.528 2.528 0 0 1 2.52-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.52V8.834zm-1.271 0a2.528 2.528 0 0 1-2.521 2.521 2.528 2.528 0 0 1-2.521-2.521V2.522A2.528 2.528 0 0 1 15.166 0a2.528 2.528 0 0 1 2.521 2.522v6.312zm-2.521 10.124a2.528 2.528 0 0 1 2.521 2.52A2.528 2.528 0 0 1 15.166 24a2.528 2.528 0 0 1-2.521-2.522v-2.52h2.521zm0-1.271a2.528 2.528 0 0 1-2.521-2.521 2.528 2.528 0 0 1 2.521-2.521h6.312A2.528 2.528 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.521h-6.312z"/></svg>,
+  },
+  {
+    name: 'Teams', color: '#6264A7',
+    icon: <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M20.625 8.073h-5.17V5.478a2.756 2.756 0 1 1 2.756-2.756c0 .627-.213 1.2-.567 1.66h2.98A1.354 1.354 0 0 1 22 5.737v.982a1.354 1.354 0 0 1-1.375 1.354zm-1.19 1.2H14.78v5.832a2.46 2.46 0 0 0 2.459 2.459h.33a2.46 2.46 0 0 0 2.46-2.46V9.868a.6.6 0 0 0-.594-.594zM11.2 4.26H2.4a1.2 1.2 0 0 0-1.2 1.2v9.6a1.2 1.2 0 0 0 1.2 1.2h3v3.48l3.48-3.48h2.32a1.2 1.2 0 0 0 1.2-1.2v-9.6a1.2 1.2 0 0 0-1.2-1.2z"/></svg>,
+  },
+  {
+    name: 'Google Chat', color: '#00AC47',
+    icon: <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10zm-10-6a6 6 0 1 0 0 12h4.5a1.5 1.5 0 0 0 1.5-1.5V12a6 6 0 0 0-6-6zm-2 4.5a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3zm4 0a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3z"/></svg>,
+  },
+  {
+    name: 'Mattermost', color: '#0058CC',
+    icon: <svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><path d="M12.081.001C7.692.067 3.636 2.587 1.736 6.541c-2.8 5.821-.343 12.797 5.478 15.597a11.99 11.99 0 0 0 10.152-.3A11.97 11.97 0 0 0 23.49 12.5c.1-3.206-1.07-6.34-3.255-8.69A11.93 11.93 0 0 0 12.081.002z"/></svg>,
+  },
 ];
 
 const features = [
@@ -162,7 +174,9 @@ export default async function HomePage() {
                 key={p.name}
                 className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm"
               >
-                <span className={`w-2.5 h-2.5 rounded-full ${p.color}`} />
+                <span className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: p.color }}>
+                  {p.icon}
+                </span>
                 <span className="text-sm font-medium">{p.name}</span>
               </div>
             ))}
