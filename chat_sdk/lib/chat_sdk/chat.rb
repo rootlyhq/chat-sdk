@@ -8,6 +8,7 @@ module ChatSDK
       @adapters = adapters
       @registry = EventRegistry.new
       @webhooks = {}
+      @dispatcher = Dispatcher.new(chat: self, config: @config, state: @state, registry: @registry)
 
       ChatSDK::Log.level = @config.log_level
     end
@@ -66,59 +67,10 @@ module ChatSDK
     # Event dispatch (called by webhook endpoints)
     def dispatch(event, adapter_name:)
       adp = adapter(adapter_name)
-
-      handlers = @registry.handlers_for(event)
-      return if handlers.empty?
-
-      thread = build_thread(event, adp)
-
-      handlers.each do |handler|
-        execute_handler(handler, event, thread)
-      end
-    rescue => e
-      ChatSDK::Log.error("Error dispatching event: #{e.message}")
-      ChatSDK::Log.debug(e.backtrace&.first(5)&.join("\n"))
+      @dispatcher.dispatch(event, adapter: adp, adapter_name: adapter_name)
     end
 
     private
-
-    def build_thread(event, adapter)
-      thread_id = extract_thread_id(event)
-      channel_id = extract_channel_id(event)
-      return nil unless thread_id && channel_id
-
-      ChatSDK::Thread.new(id: thread_id, channel_id: channel_id, adapter: adapter, chat: self)
-    end
-
-    def extract_thread_id(event)
-      return event.thread_id if event.respond_to?(:thread_id)
-      nil
-    end
-
-    def extract_channel_id(event)
-      return event.channel_id if event.respond_to?(:channel_id)
-      nil
-    end
-
-    def execute_handler(handler, event, thread)
-      case event.type
-      when :mention, :subscribed_message, :direct_message
-        handler.block.call(thread, event.message)
-      when :reaction, :action, :slash_command
-        add_thread_to_event(event, thread)
-        handler.block.call(event)
-      end
-    rescue => e
-      ChatSDK::Log.error("Handler error (#{event.type}): #{e.message}")
-      ChatSDK::Log.debug(e.backtrace&.first(5)&.join("\n"))
-    end
-
-    def add_thread_to_event(event, thread)
-      event.instance_variable_set(:@thread, thread)
-      unless event.respond_to?(:thread)
-        event.define_singleton_method(:thread) { @thread }
-      end
-    end
   end
 
   class WebhookAccessor
