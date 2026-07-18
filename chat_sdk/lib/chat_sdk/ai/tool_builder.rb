@@ -135,8 +135,7 @@ module ChatSDK
         }
       }.freeze
 
-      def initialize(chat:, preset: :messenger, require_approval: true)
-        @chat = chat
+      def initialize(preset: :messenger, require_approval: true)
         @preset = preset.to_sym
         @require_approval = require_approval
         raise ChatSDK::ConfigurationError, "Unknown preset: #{@preset}" unless PRESETS.key?(@preset)
@@ -149,119 +148,6 @@ module ChatSDK
           defn[:requires_approval] = @require_approval && !defn[:read_only]
           tools[name] = defn
         end
-      end
-
-      def execute(tool_name, arguments)
-        tool_name = tool_name.to_sym
-        raise ChatSDK::Error, "Unknown tool: #{tool_name}" unless TOOL_DEFINITIONS.key?(tool_name)
-
-        adapter_name = arguments[:adapter_name] || arguments["adapter_name"]
-        adapter = @chat.adapter(adapter_name.to_sym)
-
-        case tool_name
-        when :fetch_messages
-          fetch_messages(adapter, arguments)
-        when :fetch_thread
-          fetch_thread(adapter, arguments)
-        when :post_message
-          execute_post_message(adapter, arguments)
-        when :send_direct_message
-          execute_send_direct_message(adapter, arguments)
-        when :edit_message
-          execute_edit_message(adapter, arguments)
-        when :delete_message
-          execute_delete_message(adapter, arguments)
-        when :add_reaction
-          execute_add_reaction(adapter, arguments)
-        when :remove_reaction
-          execute_remove_reaction(adapter, arguments)
-        when :start_typing
-          execute_start_typing(adapter, arguments)
-        end
-      end
-
-      private
-
-      def arg(arguments, key)
-        arguments[key] || arguments[key.to_s]
-      end
-
-      def fetch_messages(adapter, arguments)
-        messages, _cursor = adapter.fetch_messages(
-          channel_id: arg(arguments, :channel_id),
-          thread_id: arg(arguments, :thread_id),
-          limit: arg(arguments, :limit) || 20
-        )
-        messages.map { |m| {id: m.id, text: m.text, author: m.author&.name, timestamp: m.timestamp} }
-      end
-
-      def fetch_thread(adapter, arguments)
-        messages, _cursor = adapter.fetch_messages(
-          channel_id: arg(arguments, :channel_id),
-          thread_id: arg(arguments, :thread_id)
-        )
-        messages.map { |m| {id: m.id, text: m.text, author: m.author&.name, timestamp: m.timestamp} }
-      end
-
-      def execute_post_message(adapter, arguments)
-        msg = ChatSDK::PostableMessage.new(text: arg(arguments, :text))
-        result = adapter.post_message(
-          channel_id: arg(arguments, :channel_id),
-          message: msg,
-          thread_id: arg(arguments, :thread_id)
-        )
-        {id: result.id, text: msg.text}
-      end
-
-      def execute_send_direct_message(adapter, arguments)
-        channel_id = adapter.open_dm(arg(arguments, :user_id))
-        msg = ChatSDK::PostableMessage.new(text: arg(arguments, :text))
-        result = adapter.post_message(channel_id: channel_id, message: msg)
-        {id: result.id, channel_id: channel_id}
-      end
-
-      def execute_edit_message(adapter, arguments)
-        msg = ChatSDK::PostableMessage.new(text: arg(arguments, :text))
-        adapter.edit_message(
-          channel_id: arg(arguments, :channel_id),
-          message_id: arg(arguments, :message_id),
-          message: msg
-        )
-        {success: true}
-      end
-
-      def execute_delete_message(adapter, arguments)
-        adapter.delete_message(
-          channel_id: arg(arguments, :channel_id),
-          message_id: arg(arguments, :message_id)
-        )
-        {success: true}
-      end
-
-      def execute_add_reaction(adapter, arguments)
-        adapter.add_reaction(
-          channel_id: arg(arguments, :channel_id),
-          message_id: arg(arguments, :message_id),
-          emoji: arg(arguments, :emoji)
-        )
-        {success: true}
-      end
-
-      def execute_remove_reaction(adapter, arguments)
-        adapter.remove_reaction(
-          channel_id: arg(arguments, :channel_id),
-          message_id: arg(arguments, :message_id),
-          emoji: arg(arguments, :emoji)
-        )
-        {success: true}
-      end
-
-      def execute_start_typing(adapter, arguments)
-        adapter.start_typing(
-          channel_id: arg(arguments, :channel_id),
-          thread_id: arg(arguments, :thread_id)
-        )
-        {success: true}
       end
     end
   end

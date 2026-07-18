@@ -19,7 +19,7 @@ module ChatSDK
         def convert_message(message, include_names: false)
           role = message.author&.bot? ? ROLE_ASSISTANT : ROLE_USER
 
-          content = message.text.dup
+          content = message.text
           if include_names && role == ROLE_USER && message.author
             content = "[#{message.author.name}]: #{content}"
           end
