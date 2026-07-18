@@ -25,31 +25,37 @@ const features = [
     icon: '⚡',
     title: 'Normalized Events',
     desc: 'Mentions, messages, reactions, actions, slash commands — one handler signature across every platform.',
+    href: '/docs/handling-events',
   },
   {
     icon: '💎',
     title: 'Cards DSL',
     desc: 'Ruby blocks that render as Slack Block Kit, Teams Adaptive Cards, or Google Chat Card V2.',
+    href: '/docs/cards',
   },
   {
     icon: '🤖',
     title: 'AI Ready',
     desc: 'Convert chat history to LLM format. Provider-agnostic tool definitions with approval gates.',
+    href: '/docs/ai',
   },
   {
     icon: '🌊',
     title: 'Streaming',
     desc: 'Progressive message editing with throttled updates. Pass any Enumerable from your LLM.',
+    href: '/docs/streaming',
   },
   {
     icon: '🔌',
     title: 'Pluggable Adapters',
     desc: 'Slack, Teams, Google Chat, Mattermost — or build your own with shared contract specs.',
+    href: '/adapters',
   },
   {
     icon: '🔒',
     title: 'Production State',
     desc: 'Distributed locks, message dedup, TTL storage. Memory for dev, Redis for prod.',
+    href: '/docs/state-adapters',
   },
 ];
 
@@ -211,14 +217,15 @@ export default async function HomePage() {
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {features.map((f) => (
-            <div
+            <Link
               key={f.title}
+              href={f.href}
               className="group p-6 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-colors bg-white dark:bg-gray-950"
             >
               <span className="text-2xl mb-3 block">{f.icon}</span>
-              <h3 className="font-semibold mb-1.5">{f.title}</h3>
+              <h3 className="font-semibold mb-1.5 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">{f.title}</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{f.desc}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </section>
