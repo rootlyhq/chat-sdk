@@ -1,131 +1,248 @@
 import Link from 'next/link';
 
+const platforms = [
+  { name: 'Slack', color: 'bg-[#4A154B]' },
+  { name: 'Teams', color: 'bg-[#6264A7]' },
+  { name: 'Google Chat', color: 'bg-[#00AC47]' },
+  { name: 'Mattermost', color: 'bg-[#0058CC]' },
+];
+
+const features = [
+  {
+    icon: '⚡',
+    title: 'Normalized Events',
+    desc: 'Mentions, messages, reactions, actions, slash commands — one handler signature across every platform.',
+  },
+  {
+    icon: '💎',
+    title: 'Cards DSL',
+    desc: 'Ruby blocks that render as Slack Block Kit, Teams Adaptive Cards, or Google Chat Card V2.',
+  },
+  {
+    icon: '🤖',
+    title: 'AI Ready',
+    desc: 'Convert chat history to LLM format. Provider-agnostic tool definitions with approval gates.',
+  },
+  {
+    icon: '🌊',
+    title: 'Streaming',
+    desc: 'Progressive message editing with throttled updates. Pass any Enumerable from your LLM.',
+  },
+  {
+    icon: '🔌',
+    title: 'Pluggable Adapters',
+    desc: 'Slack, Teams, Google Chat, Mattermost — or build your own with shared contract specs.',
+  },
+  {
+    icon: '🔒',
+    title: 'Production State',
+    desc: 'Distributed locks, message dedup, TTL storage. Memory for dev, Redis for prod.',
+  },
+];
+
+const codeBot = `bot = ChatSDK::Chat.new(
+  user_name: "rootly-bot",
+  adapters: {
+    slack: ChatSDK::Slack::Adapter.new,
+    teams: ChatSDK::Teams::Adapter.new
+  },
+  state: ChatSDK::State::Redis.new
+)`;
+
+const codeHandler = `bot.on_new_mention do |thread, message|
+  thread.subscribe
+  thread.post("Hello! I'm listening.")
+end`;
+
+const codeCard = `thread.post(ChatSDK.card(title: "Incident #4821") do
+  text "Database CPU at 98%"
+  fields do
+    field "Service", "postgres-primary"
+    field "On-call", "@quentin"
+  end
+  actions do
+    button "Ack", id: "incident:ack", style: :primary
+    button "Resolve", id: "incident:resolve", style: :danger
+  end
+end)`;
+
+const codeAI = `# Convert chat history → LLM messages
+ai_msgs = ChatSDK::AI.to_ai_messages(thread.messages)
+
+# Stream LLM response back to chat
+thread.post_ai_stream(llm.chat(ai_msgs))`;
+
+function CodeBlock({ title, code, accent = false }: { title: string; code: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-2xl overflow-hidden ${accent ? 'ring-1 ring-red-500/20' : 'ring-1 ring-gray-200 dark:ring-gray-800'}`}>
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-red-400/80" />
+          <span className="w-3 h-3 rounded-full bg-yellow-400/80" />
+          <span className="w-3 h-3 rounded-full bg-green-400/80" />
+        </div>
+        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 font-mono">{title}</span>
+      </div>
+      <pre className="bg-gray-950 text-gray-100 p-5 text-[13px] leading-relaxed overflow-x-auto">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
 export default function HomePage() {
   return (
-    <main className="flex flex-col items-center px-4">
+    <main className="flex flex-col items-center">
       {/* Hero */}
-      <section className="max-w-4xl w-full py-24 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 mb-6 text-sm font-medium rounded-full bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300 border border-red-200 dark:border-red-800">
-          <span className="inline-block w-2 h-2 rounded-full bg-red-500" />
-          Beta — under active development
+      <section className="relative w-full overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-red-50/50 via-transparent to-transparent dark:from-red-950/20 dark:via-transparent" />
+        <div className="relative max-w-5xl mx-auto px-6 pt-28 pb-20 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 mb-8 text-xs font-medium rounded-full bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+            </span>
+            Beta — under active development
+          </div>
+
+          <h1 className="text-5xl sm:text-7xl font-extrabold tracking-tight mb-6 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-600 dark:from-white dark:via-gray-200 dark:to-gray-400 bg-clip-text text-transparent">
+            Chat SDK for Ruby
+          </h1>
+
+          <p className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
+            Build bots that work across every chat platform.
+            One API, normalized events, cards DSL, streaming — write once, deploy to Slack, Teams, Google Chat, and more.
+          </p>
+
+          <div className="flex gap-4 justify-center mb-16">
+            <Link
+              href="/docs/getting-started"
+              className="group px-7 py-3.5 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-all shadow-lg shadow-red-500/25 hover:shadow-red-500/40"
+            >
+              Get Started
+              <span className="inline-block ml-1 transition-transform group-hover:translate-x-0.5">→</span>
+            </Link>
+            <Link
+              href="https://github.com/rootlyhq/chat-sdk"
+              className="px-7 py-3.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            >
+              GitHub
+            </Link>
+          </div>
+
+          {/* Platform pills */}
+          <div className="flex flex-wrap gap-3 justify-center">
+            {platforms.map((p) => (
+              <div
+                key={p.name}
+                className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm"
+              >
+                <span className={`w-2.5 h-2.5 rounded-full ${p.color}`} />
+                <span className="text-sm font-medium">{p.name}</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-sm text-gray-400">
+              <span className="text-sm">+ more adapters</span>
+            </div>
+          </div>
         </div>
-        <h1 className="text-5xl sm:text-6xl font-bold tracking-tight mb-6">
-          One SDK.<br />
-          <span className="text-red-600 dark:text-red-400">Every chat platform.</span>
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-8">
-          Build chat bots in Ruby that work across Slack, Teams, Google Chat, and Mattermost.
-          Normalized events, cards DSL, streaming, and pluggable adapters — write once, deploy everywhere.
+      </section>
+
+      {/* Code examples — stacked */}
+      <section className="max-w-4xl w-full px-6 mb-24">
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="space-y-6">
+            <CodeBlock title="config.rb — setup" code={codeBot} accent />
+            <CodeBlock title="handlers.rb — events" code={codeHandler} />
+          </div>
+          <div className="space-y-6">
+            <CodeBlock title="cards.rb — rich messages" code={codeCard} />
+            <CodeBlock title="ai.rb — LLM integration" code={codeAI} />
+          </div>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="max-w-5xl w-full px-6 mb-24">
+        <h2 className="text-3xl font-bold text-center mb-4">Everything you need</h2>
+        <p className="text-center text-gray-500 dark:text-gray-400 mb-12 max-w-xl mx-auto">
+          A complete framework for multi-platform chat bots — from webhook ingestion to LLM streaming.
         </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {features.map((f) => (
+            <div
+              key={f.title}
+              className="group p-6 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-colors bg-white dark:bg-gray-950"
+            >
+              <span className="text-2xl mb-3 block">{f.icon}</span>
+              <h3 className="font-semibold mb-1.5">{f.title}</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Escape hatches */}
+      <section className="max-w-4xl w-full px-6 mb-24">
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+          <div className="p-8 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+            <h2 className="text-2xl font-bold mb-3">Three tiers of control</h2>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">Use the normalized API or drop down when you need platform-specific access.</p>
+            <div className="grid md:grid-cols-3 gap-4">
+              {[
+                { tier: '1', label: 'Normalized', code: 'thread.post("hello")', desc: 'Cross-platform, zero config' },
+                { tier: '2', label: 'Adapter', code: 'bot.adapter(:slack).post_message(...)', desc: 'Platform-aware, still normalized format' },
+                { tier: '3', label: 'Raw Client', code: 'bot.adapter(:slack).client.chat_postMessage(...)', desc: 'Full native API access' },
+              ].map((t) => (
+                <div key={t.tier} className="p-4 rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="w-6 h-6 rounded-full bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-center">{t.tier}</span>
+                    <span className="font-semibold text-sm">{t.label}</span>
+                  </div>
+                  <code className="text-xs text-gray-600 dark:text-gray-400 block mb-2 font-mono">{t.code}</code>
+                  <p className="text-xs text-gray-400">{t.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Install CTA */}
+      <section className="max-w-3xl w-full px-6 mb-24 text-center">
+        <h2 className="text-3xl font-bold mb-4">Start building</h2>
+        <p className="text-gray-500 dark:text-gray-400 mb-8">Add to your Gemfile and go.</p>
+        <div className="inline-block rounded-xl bg-gray-950 text-gray-100 px-8 py-4 text-left font-mono text-sm mb-8">
+          <span className="text-gray-500">$</span> gem install chat_sdk chat_sdk-slack
+        </div>
         <div className="flex gap-4 justify-center">
           <Link
             href="/docs/getting-started"
-            className="px-6 py-3 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 transition-colors"
+            className="px-6 py-3 rounded-xl bg-red-600 text-white font-semibold hover:bg-red-700 transition-all"
           >
-            Get Started
+            Read the docs
           </Link>
           <Link
-            href="https://github.com/rootlyhq/chat-sdk"
-            className="px-6 py-3 rounded-lg border border-gray-300 dark:border-gray-700 font-medium hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
+            href="https://rubygems.org/gems/chat_sdk"
+            className="px-6 py-3 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
           >
-            GitHub
+            RubyGems
           </Link>
         </div>
       </section>
 
-      {/* Code example */}
-      <section className="max-w-3xl w-full mb-20">
-        <pre className="rounded-xl bg-gray-950 text-gray-100 p-6 text-sm overflow-x-auto leading-relaxed">
-          <code>{`gem "chat_sdk"
-gem "chat_sdk-slack"
-
-bot = ChatSDK::Chat.new(
-  user_name: "mybot",
-  adapters: { slack: ChatSDK::Slack::Adapter.new },
-  state: ChatSDK::State::Memory.new
-)
-
-bot.on_new_mention do |thread, message|
-  thread.subscribe
-  thread.post("Hello! I'm listening.")
-end
-
-bot.on_action("incident:ack") do |event|
-  event.thread.post("Acknowledged ✓")
-end`}</code>
-        </pre>
-      </section>
-
-      {/* Features grid */}
-      <section className="max-w-5xl w-full grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
-        {[
-          {
-            title: 'Normalized Events',
-            desc: 'Mentions, messages, reactions, actions, slash commands — same handler signature regardless of platform.',
-          },
-          {
-            title: 'Cards DSL',
-            desc: 'Ruby blocks instead of JSX. One card renders as Block Kit, Adaptive Cards, or Card V2 automatically.',
-          },
-          {
-            title: 'AI Ready',
-            desc: 'Convert message history to LLM format. Provider-agnostic tool definitions with approval gates.',
-          },
-          {
-            title: 'Streaming',
-            desc: 'Progressive message editing with throttled updates. Pass any Enumerable from your LLM.',
-          },
-          {
-            title: 'Pluggable State',
-            desc: 'Memory for development, Redis for production. Distributed locks, deduplication, TTL storage.',
-          },
-          {
-            title: 'Escape Hatches',
-            desc: 'Three tiers: normalized → adapter contract → raw platform client. Never locked in.',
-          },
-        ].map((feature) => (
-          <div
-            key={feature.title}
-            className="p-6 rounded-xl border border-gray-200 dark:border-gray-800"
-          >
-            <h3 className="font-semibold mb-2">{feature.title}</h3>
-            <p className="text-sm text-muted-foreground">{feature.desc}</p>
-          </div>
-        ))}
-      </section>
-
-      {/* Adapter logos / badges */}
-      <section className="max-w-3xl w-full text-center mb-20">
-        <h2 className="text-2xl font-bold mb-6">Platform Adapters</h2>
-        <div className="flex flex-wrap gap-3 justify-center">
-          {['Slack', 'Teams', 'Google Chat', 'Mattermost'].map((name) => (
-            <span
-              key={name}
-              className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 text-sm font-medium"
-            >
-              {name}
-            </span>
-          ))}
-          <span className="px-4 py-2 rounded-lg bg-gray-100 dark:bg-gray-900 text-sm font-medium text-muted-foreground">
-            + more coming
-          </span>
-        </div>
-      </section>
-
-      {/* Footer CTA */}
-      <section className="max-w-2xl w-full text-center pb-20">
-        <p className="text-muted-foreground mb-4">
-          Built by{' '}
-          <a href="https://rootly.com" className="font-medium underline">
-            Rootly
-          </a>
-          . MIT licensed. Ruby port of{' '}
-          <a href="https://chat-sdk.dev" className="font-medium underline">
-            chat-sdk.dev
-          </a>
-          .
-        </p>
-      </section>
+      {/* Footer */}
+      <footer className="w-full border-t border-gray-200 dark:border-gray-800 py-8 text-center text-sm text-gray-400">
+        Built by{' '}
+        <a href="https://rootly.com" className="font-medium text-gray-600 dark:text-gray-300 hover:underline">
+          Rootly
+        </a>
+        {' · '}MIT Licensed{' · '}
+        Ruby port of{' '}
+        <a href="https://chat-sdk.dev" className="font-medium text-gray-600 dark:text-gray-300 hover:underline">
+          chat-sdk.dev
+        </a>
+      </footer>
     </main>
   );
 }
