@@ -4,6 +4,7 @@ module ChatSDK
   module Events
     class Reaction < Base
       attr_reader :emoji, :user_id, :message_id, :thread_id, :channel_id, :added
+      attr_accessor :thread
 
       def initialize(emoji:, user_id:, message_id:, thread_id:, channel_id:, added: true, **kwargs)
         super(type: :reaction, **kwargs)

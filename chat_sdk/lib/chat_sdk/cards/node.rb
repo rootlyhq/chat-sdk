@@ -25,14 +25,10 @@ module ChatSDK
       def collect_text(nodes = [self])
         nodes.flat_map do |node|
           case node.type
-          when :card
-            collect_text(node.children)
           when :text
             [node.attributes[:content]]
           when :field
             ["#{node.attributes[:label]}: #{node.attributes[:value]}"]
-          when :section
-            collect_text(node.children)
           when :button, :link_button
             [node.attributes[:text]]
           else

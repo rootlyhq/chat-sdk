@@ -3,6 +3,8 @@
 module ChatSDK
   module GChat
     class Adapter < ChatSDK::Adapter::Base
+      include ChatSDK::GChat::ResourceName
+
       capabilities :edit_messages, :delete_messages, :ephemeral_messages,
         :threads, :direct_messages, :message_history,
         :reactions, :streaming_edit
@@ -228,11 +230,6 @@ module ChatSDK
           platform: :gchat,
           raw: msg
         )
-      end
-
-      def extract_id(resource_name)
-        return resource_name unless resource_name.is_a?(String)
-        resource_name.split("/").last || resource_name
       end
     end
   end

@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    name: Build and publish gems
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@003a5c4d8d6321bd302e38f6f0ec593f77f06600 # v1.319.0
+        with:
+          ruby-version: "4.0.6"
+          bundler-cache: true
+
+      - name: Run specs
+        run: bundle exec rspec chat_sdk/spec chat_sdk-slack/spec chat_sdk-teams/spec chat_sdk-gchat/spec chat_sdk-mattermost/spec
+
+      - name: Verify version matches tag
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          GEM_VERSION=$(ruby -r ./chat_sdk/lib/chat_sdk/version.rb -e 'puts ChatSDK::VERSION')
+          if [ "$TAG_VERSION" != "$GEM_VERSION" ]; then
+            echo "Tag v${TAG_VERSION} does not match ChatSDK::VERSION ${GEM_VERSION}"
+            exit 1
+          fi
+          echo "VERSION=${GEM_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Configure RubyGems OIDC
+        uses: rubygems/configure-rubygems-credentials@dc5a8d8553e6ee01fc26761a49e99e733d17954a # v2.1.0
+        with:
+          role-to-assume: rg_oidc_akr_h5zt1b2vxjpbh39dv1r1
+
+      - name: Build all gems
+        run: |
+          for dir in chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-state-redis; do
+            (cd "$dir" && gem build *.gemspec)
+          done
+
+      - name: Publish to RubyGems
+        run: |
+          for dir in chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-state-redis; do
+            echo "Publishing ${dir}..."
+            (cd "$dir" && gem push *.gem)
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@c95fe1489396fe8a9eb87c0abf8c5b922c329f01 # v2.2.1
+        with:
+          generate_release_notes: true
+          files: |
+            chat_sdk/*.gem
+            chat_sdk-slack/*.gem
+            chat_sdk-teams/*.gem
+            chat_sdk-gchat/*.gem
+            chat_sdk-mattermost/*.gem
+            chat_sdk-state-redis/*.gem

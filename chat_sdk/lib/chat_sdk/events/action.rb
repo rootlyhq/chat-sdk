@@ -4,6 +4,7 @@ module ChatSDK
   module Events
     class Action < Base
       attr_reader :action_id, :value, :user, :thread_id, :channel_id, :trigger_id
+      attr_accessor :thread
 
       def initialize(action_id:, thread_id:, channel_id:, value: nil, user: nil, trigger_id: nil, **kwargs)
         super(type: :action, **kwargs)

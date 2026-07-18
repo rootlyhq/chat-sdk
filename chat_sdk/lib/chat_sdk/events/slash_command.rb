@@ -4,6 +4,7 @@ module ChatSDK
   module Events
     class SlashCommand < Base
       attr_reader :command, :text, :user_id, :channel_id, :trigger_id
+      attr_accessor :thread
 
       def initialize(command:, user_id:, channel_id:, text: "", trigger_id: nil, **kwargs)
         super(type: :slash_command, **kwargs)

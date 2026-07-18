@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "rack/utils"
+
 module ChatSDK
   module Mattermost
     class Adapter < ChatSDK::Adapter::Base
@@ -40,7 +42,7 @@ module ChatSDK
         return true unless @webhook_token
 
         token = payload["token"]
-        unless token && secure_compare(token, @webhook_token)
+        unless token && Rack::Utils.secure_compare(token, @webhook_token)
           raise ChatSDK::SignatureVerificationError, "Invalid webhook token"
         end
 
@@ -123,14 +125,12 @@ module ChatSDK
         file_result = @client.upload_file(channel_id: channel_id, io: io, filename: filename)
         file_ids = file_result.dig("file_infos")&.map { |fi| fi["id"] } || []
 
-        body = {"channel_id" => channel_id, "message" => comment || "", "file_ids" => file_ids}
-        body["root_id"] = thread_id if thread_id
-
         @client.create_post(
           channel_id: channel_id,
           message: comment || "",
           root_id: thread_id,
-          props: nil
+          props: nil,
+          file_ids: file_ids
         )
       end
 
@@ -220,18 +220,6 @@ module ChatSDK
         else
           msg.text
         end
-      end
-
-      private
-
-      def secure_compare(a, b)
-        return false unless a.bytesize == b.bytesize
-
-        l = a.unpack("C*")
-        r = b.unpack("C*")
-        result = 0
-        l.zip(r) { |x, y| result |= x ^ y }
-        result.zero?
       end
     end
   end

@@ -66,8 +66,7 @@ module ChatSDK
       end
 
       def delete(key)
-        @client.call("DEL", kv_key(key))
-        @client.call("DEL", lock_key(key))
+        @client.call("DEL", kv_key(key), lock_key(key))
       end
 
       def set_if_absent(key, value, ttl: nil)

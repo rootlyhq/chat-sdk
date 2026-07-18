@@ -12,8 +12,6 @@ module ChatSDK
             parse_block_actions(payload)
           when "view_submission"
             parse_view_submission(payload)
-          when "slash_commands"
-            parse_slash_command(payload)
           else
             # Slash commands come as form-encoded, not wrapped in type
             if payload["command"]

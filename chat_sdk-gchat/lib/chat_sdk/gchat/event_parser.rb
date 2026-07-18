@@ -3,6 +3,8 @@
 module ChatSDK
   module GChat
     class EventParser
+      extend ChatSDK::GChat::ResourceName
+
       class << self
         def parse(payload)
           type = payload["type"]
@@ -95,11 +97,6 @@ module ChatSDK
         def bot_mentioned?(msg_data)
           annotations = msg_data["annotations"] || []
           annotations.any? { |a| a["type"] == "USER_MENTION" && a.dig("userMention", "type") == "MENTION" }
-        end
-
-        def extract_id(resource_name)
-          return resource_name unless resource_name.is_a?(String)
-          resource_name.split("/").last || resource_name
         end
       end
     end

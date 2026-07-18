@@ -20,11 +20,6 @@ module ChatSDK
         authorized_request(:post, url, activity)
       end
 
-      def reply_to_activity(service_url:, conversation_id:, activity_id:, activity:)
-        url = "#{service_url.chomp("/")}/v3/conversations/#{conversation_id}/activities/#{activity_id}"
-        authorized_request(:put, url, activity)
-      end
-
       def update_activity(service_url:, conversation_id:, activity_id:, activity:)
         url = "#{service_url.chomp("/")}/v3/conversations/#{conversation_id}/activities/#{activity_id}"
         authorized_request(:put, url, activity)
@@ -48,12 +43,7 @@ module ChatSDK
       def fetch_token
         return @access_token if @access_token && @token_expires_at && Time.now < @token_expires_at
 
-        conn = Faraday.new do |f|
-          f.request :url_encoded
-          f.adapter :net_http
-        end
-
-        response = conn.post(TOKEN_URL, {
+        response = token_connection.post(TOKEN_URL, {
           grant_type: "client_credentials",
           client_id: @app_id,
           client_secret: @app_password,
@@ -77,19 +67,27 @@ module ChatSDK
 
       private
 
-      def authorized_request(method, url, body = nil)
-        token = fetch_token
+      def token_connection
+        @token_connection ||= Faraday.new do |f|
+          f.request :url_encoded
+          f.adapter :net_http
+        end
+      end
 
-        conn = Faraday.new do |f|
-          f.request :json if body
+      def api_connection
+        @api_connection ||= Faraday.new do |f|
+          f.request :json
           f.response :json
           f.adapter :net_http
         end
+      end
 
-        response = conn.public_send(method, url) do |req|
+      def authorized_request(method, url, body = nil)
+        token = fetch_token
+
+        response = api_connection.public_send(method, url) do |req|
           req.headers["Authorization"] = "Bearer #{token}"
-          req.headers["Content-Type"] = "application/json" if body
-          req.body = JSON.generate(body) if body && !method.to_s.start_with?("get")
+          req.body = body if body && !method.to_s.start_with?("get")
         end
 
         unless response.success?

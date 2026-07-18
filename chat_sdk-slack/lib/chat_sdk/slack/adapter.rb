@@ -82,13 +82,7 @@ module ChatSDK
         params = {channel: channel_id}
         params[:thread_ts] = thread_id if thread_id
 
-        if msg.card?
-          rendered = @renderer.render(msg.card)
-          params[:blocks] = rendered
-          params[:text] = msg.text || msg.card.fallback_text
-        else
-          params[:text] = msg.text
-        end
+        apply_message_params(params, msg)
 
         result = @client.chat_postMessage(**params)
 
@@ -107,12 +101,7 @@ module ChatSDK
         msg = ChatSDK::PostableMessage.from(message)
         params = {channel: channel_id, ts: message_id}
 
-        if msg.card?
-          params[:blocks] = @renderer.render(msg.card)
-          params[:text] = msg.text || msg.card.fallback_text
-        else
-          params[:text] = msg.text
-        end
+        apply_message_params(params, msg)
 
         @client.chat_update(**params)
       end
@@ -126,12 +115,7 @@ module ChatSDK
         params = {channel: channel_id, user: user_id}
         params[:thread_ts] = thread_id if thread_id
 
-        if msg.card?
-          params[:blocks] = @renderer.render(msg.card)
-          params[:text] = msg.text || msg.card.fallback_text
-        else
-          params[:text] = msg.text
-        end
+        apply_message_params(params, msg)
 
         @client.chat_postEphemeral(**params)
       end
@@ -189,6 +173,15 @@ module ChatSDK
       end
 
       private
+
+      def apply_message_params(params, msg)
+        if msg.card?
+          params[:blocks] = @renderer.render(msg.card)
+          params[:text] = msg.text || msg.card.fallback_text
+        else
+          params[:text] = msg.text
+        end
+      end
 
       def parse_body(body, content_type)
         if content_type&.include?("application/json")

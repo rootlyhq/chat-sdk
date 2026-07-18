@@ -11,10 +11,11 @@ module ChatSDK
       end
 
       # Posts
-      def create_post(channel_id:, message:, root_id: nil, props: nil)
+      def create_post(channel_id:, message:, root_id: nil, props: nil, file_ids: nil)
         body = {"channel_id" => channel_id, "message" => message}
         body["root_id"] = root_id if root_id
         body["props"] = props if props
+        body["file_ids"] = file_ids if file_ids
         request(:post, "/api/v4/posts", body)
       end
 

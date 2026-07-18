@@ -60,27 +60,13 @@ module ChatSDK
       lock_key = "chat_sdk:lock:#{thread_key}"
       return true if @state.acquire_lock(lock_key, owner: lock_owner, ttl: 30)
 
-      case @config.on_lock_conflict
-      when :drop
-        ChatSDK::Log.debug("Lock conflict, dropping event for #{thread_key}")
-        false
-      when :force
-        @state.force_lock(lock_key, owner: lock_owner, ttl: 30)
-        true
-      else
-        if @config.on_lock_conflict.respond_to?(:call)
-          policy = @config.on_lock_conflict.call(thread_key, event)
-          case policy
-          when :force
-            @state.force_lock(lock_key, owner: lock_owner, ttl: 30)
-            true
-          else
-            false
-          end
-        else
-          false
-        end
-      end
+      policy = @config.on_lock_conflict
+      policy = policy.call(thread_key, event) if policy.respond_to?(:call)
+
+      return false unless policy == :force
+
+      @state.force_lock(lock_key, owner: lock_owner, ttl: 30)
+      true
     end
 
     def release_lock(thread_key)
@@ -109,10 +95,7 @@ module ChatSDK
     end
 
     def add_thread_to_event(event, thread)
-      event.instance_variable_set(:@thread, thread)
-      unless event.respond_to?(:thread)
-        event.define_singleton_method(:thread) { @thread }
-      end
+      event.thread = thread if event.respond_to?(:thread=)
     end
   end
 end
