@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
+require "rack"
 
 RSpec.describe ChatSDK::GChat::Adapter do
   subject { described_class.new(project_number: project_number) }

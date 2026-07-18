@@ -2,6 +2,7 @@
 
 require_relative "../../spec_helper"
 require "openssl"
+require "rack"
 
 RSpec.describe ChatSDK::Slack::Adapter do
   subject { described_class.new(bot_token: bot_token, signing_secret: signing_secret) }

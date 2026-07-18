@@ -16,6 +16,8 @@ end
 RSpec.describe ChatSDK::State::Redis, if: redis_available? do
   subject { described_class.new(url: redis_url) }
 
+  before { subject.clear }
+
   it_behaves_like "a chat_sdk state adapter"
 
   describe "Lua lock release" do
