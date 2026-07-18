@@ -9,7 +9,7 @@ module ChatSDK
     def loader
       @loader ||= begin
         loader = Zeitwerk::Loader.for_gem(warn_on_extra_files: false)
-        loader.inflector.inflect("chat_sdk" => "ChatSDK")
+        loader.inflector.inflect("chat_sdk" => "ChatSDK", "ai" => "AI")
         loader.ignore("#{__dir__}/chat_sdk/version.rb")
         loader.ignore("#{__dir__}/chat_sdk/errors.rb")
         loader.setup

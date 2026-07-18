@@ -1,0 +1,82 @@
+# Message Conversion
+
+`ChatSDK::AI.to_ai_messages` converts an array of `ChatSDK::Message` objects into the provider-agnostic `{role, content}` format used by most LLMs.
+
+## Basic Usage
+
+```ruby
+messages, _ = adapter.fetch_messages(channel_id: "C123", thread_id: "T456")
+ai_messages = ChatSDK::AI.to_ai_messages(messages)
+```
+
+## Output Format
+
+Each message becomes a hash with `:role` and `:content`:
+
+```ruby
+{ role: "user", content: "Hello there" }
+{ role: "assistant", content: "Hi! How can I help?" }
+```
+
+- Messages from authors where `author.bot?` is `true` get role `"assistant"`
+- All other messages get role `"user"`
+
+## Options
+
+### `include_names:`
+
+Prefixes user messages with the author's name, useful for multi-user conversations:
+
+```ruby
+ChatSDK::AI.to_ai_messages(messages, include_names: true)
+# => [{ role: "user", content: "[Alice]: Hello" }]
+```
+
+Assistant messages are never prefixed.
+
+### Transform Block
+
+Pass a block to customize each converted message. The block receives the converted hash and the original `ChatSDK::Message`:
+
+```ruby
+ChatSDK::AI.to_ai_messages(messages) do |msg, original|
+  # Add metadata
+  msg[:metadata] = { id: original.id, channel: original.channel_id }
+  msg
+end
+```
+
+Return `nil` from the block to filter out a message:
+
+```ruby
+ChatSDK::AI.to_ai_messages(messages) do |msg, original|
+  original.timestamp > 1.hour.ago ? msg : nil
+end
+```
+
+## Sorting and Filtering
+
+Messages are automatically:
+
+1. **Sorted** by `timestamp` (falls back to `id` when timestamp is nil)
+2. **Filtered** to remove messages with nil or blank text
+
+## Attachments
+
+Messages with attachments produce multipart content arrays:
+
+```ruby
+# Image attachment
+{ role: "user", content: [
+  { type: "text", text: "Check this out" },
+  { type: "image", url: "https://...", media_type: "image/png" }
+]}
+
+# File attachment
+{ role: "user", content: [
+  { type: "text", text: "See attached" },
+  { type: "file", url: "https://...", filename: "report.pdf", media_type: "application/pdf" }
+]}
+```
+
+Attachment hashes should include `:url` and either `:mime_type` or `:content_type`. Non-hash attachments are converted to text parts via `to_s`.

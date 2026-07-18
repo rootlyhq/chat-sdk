@@ -61,6 +61,10 @@ module ChatSDK
       adapter.remove_reaction(channel_id: channel_id, message_id: message_id, emoji: emoji)
     end
 
+    def post_ai_stream(enumerable, placeholder: "Thinking...")
+      ChatSDK::AI::StreamHandler.stream_to_thread(self, enumerable, placeholder: placeholder)
+    end
+
     def upload(io:, filename:, comment: nil)
       adapter.upload_file(channel_id: channel_id, io: io, filename: filename, thread_id: id, comment: comment)
     end

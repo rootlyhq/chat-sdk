@@ -57,6 +57,12 @@
 - [Redis State](docs/adapters/state-redis.md)
 - [Memory State](docs/adapters/state-memory.md)
 
+## AI
+
+- [AI Overview](docs/ai.md)
+- [Message Conversion](docs/ai/to-ai-messages.md)
+- [Agent Tools](docs/ai/agent-tools.md)
+
 ## Contributing
 
 - [Building Adapters](docs/contributing/building-adapters.md)
