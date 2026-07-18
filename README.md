@@ -3,6 +3,8 @@
 [![CI](https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000)](LICENSE)
 
+> **Beta** — This SDK is experimental and under active development. APIs may change between minor versions. Not recommended for production use yet.
+
 Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, and more. **Write your bot logic once, deploy everywhere.** Ruby port of [chat-sdk.dev](https://chat-sdk.dev).
 
 ## Installation
