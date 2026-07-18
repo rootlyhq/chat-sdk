@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "erb"
+
 module ChatSDK
   module Discord
     class ApiClient
@@ -54,24 +56,13 @@ module ChatSDK
         request(:get, path)
       end
 
-      # Typing
-      def trigger_typing(channel_id)
-        request(:post, "#{API_PREFIX}/channels/#{channel_id}/typing")
-      end
-
       # File upload
       def upload_file(channel_id, io, filename)
-        conn = Faraday.new(url: BASE_URL) do |f|
-          f.request :multipart
-          f.response :json
-          f.adapter :net_http
-        end
-
         payload = {
           "file[0]" => Faraday::Multipart::FilePart.new(io, "application/octet-stream", filename)
         }
 
-        response = conn.post("#{API_PREFIX}/channels/#{channel_id}/messages", payload) do |req|
+        response = upload_connection.post("#{API_PREFIX}/channels/#{channel_id}/messages", payload) do |req|
           req.headers["Authorization"] = "Bot #{@bot_token}"
         end
 
@@ -83,6 +74,14 @@ module ChatSDK
       def connection
         @connection ||= Faraday.new(url: BASE_URL) do |f|
           f.request :json
+          f.response :json
+          f.adapter :net_http
+        end
+      end
+
+      def upload_connection
+        @upload_connection ||= Faraday.new(url: BASE_URL) do |f|
+          f.request :multipart
           f.response :json
           f.adapter :net_http
         end

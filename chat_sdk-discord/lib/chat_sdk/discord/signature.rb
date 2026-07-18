@@ -3,8 +3,7 @@
 module ChatSDK
   module Discord
     module Signature
-      def self.verify!(public_key_hex, signature_hex, timestamp, body)
-        verify_key = Ed25519::VerifyKey.new([public_key_hex].pack("H*"))
+      def self.verify!(verify_key, signature_hex, timestamp, body)
         signature = [signature_hex].pack("H*")
         message = "#{timestamp}#{body}"
         verify_key.verify(signature, message)

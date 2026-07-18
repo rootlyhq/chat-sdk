@@ -1,7 +1,5 @@
 # frozen_string_literal: true
 
-require "erb"
-
 module ChatSDK
   module Discord
     class Adapter < ChatSDK::Adapter::Base
@@ -19,6 +17,8 @@ module ChatSDK
 
         @client = ApiClient.new(bot_token: @bot_token)
         @renderer = EmbedRenderer.new
+        @verify_key = Ed25519::VerifyKey.new([@public_key].pack("H*")) if @public_key
+        @dm_channels = {}
       end
 
       def name
@@ -30,7 +30,7 @@ module ChatSDK
         body = rack_request.body.read
         rack_request.body.rewind
 
-        unless @public_key
+        unless @verify_key
           raise ChatSDK::ConfigurationError, "Discord public_key required for signature verification"
         end
 
@@ -41,7 +41,7 @@ module ChatSDK
           raise ChatSDK::SignatureVerificationError, "Missing Discord signature headers"
         end
 
-        Signature.verify!(@public_key, signature, timestamp, body)
+        Signature.verify!(@verify_key, signature, timestamp, body)
       end
 
       def ack_response(rack_request)
@@ -71,17 +71,7 @@ module ChatSDK
 
       # Outbound
       def post_message(channel_id:, message:, thread_id: nil)
-        msg = ChatSDK::PostableMessage.from(message)
-
-        content = msg.text || msg.card&.fallback_text || ""
-        embeds = nil
-        components = nil
-
-        if msg.card?
-          rendered = @renderer.render(msg.card)
-          embeds = rendered["embeds"]
-          components = rendered["components"]
-        end
+        content, embeds, components = prepare_message_payload(message)
 
         result = @client.create_message(
           channel_id,
@@ -102,18 +92,7 @@ module ChatSDK
       end
 
       def edit_message(channel_id:, message_id:, message:)
-        require_capability!(:edit_messages)
-        msg = ChatSDK::PostableMessage.from(message)
-
-        content = msg.text || msg.card&.fallback_text || ""
-        embeds = nil
-        components = nil
-
-        if msg.card?
-          rendered = @renderer.render(msg.card)
-          embeds = rendered["embeds"]
-          components = rendered["components"]
-        end
+        content, embeds, components = prepare_message_payload(message)
 
         @client.edit_message(
           channel_id,
@@ -125,67 +104,35 @@ module ChatSDK
       end
 
       def delete_message(channel_id:, message_id:)
-        require_capability!(:delete_messages)
         @client.delete_message(channel_id, message_id)
       end
 
-      def post_ephemeral(channel_id:, user_id:, message:, thread_id: nil)
-        super # raises NotSupportedError
-      end
-
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
-        require_capability!(:file_uploads)
         @client.upload_file(channel_id, io, filename)
       end
 
       def add_reaction(channel_id:, message_id:, emoji:)
-        require_capability!(:reactions)
         @client.add_reaction(channel_id, message_id, emoji)
       end
 
       def remove_reaction(channel_id:, message_id:, emoji:)
-        require_capability!(:reactions)
         @client.remove_reaction(channel_id, message_id, emoji)
       end
 
       def open_dm(user_id)
-        require_capability!(:direct_messages)
-        result = @client.create_dm(user_id)
-        result["id"]
+        @dm_channels[user_id] ||= @client.create_dm(user_id)["id"]
       end
 
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
-        require_capability!(:message_history)
-
         messages_data = @client.get_messages(channel_id, limit: limit, before: cursor)
         messages_data = [] unless messages_data.is_a?(Array)
 
-        messages = messages_data.map do |msg|
-          ChatSDK::Message.new(
-            id: msg["id"],
-            text: msg["content"] || "",
-            author: ChatSDK::Author.new(
-              id: msg.dig("author", "id") || "unknown",
-              name: msg.dig("author", "username") || "unknown",
-              platform: :discord
-            ),
-            thread_id: msg["id"],
-            channel_id: channel_id,
-            platform: :discord,
-            raw: msg
-          )
+        messages = messages_data.map do |data|
+          parse_discord_message(data, channel_id)
         end
 
         next_cursor = messages_data.any? ? messages_data.last["id"] : nil
         [messages, next_cursor]
-      end
-
-      def open_modal(trigger_id:, modal:)
-        super # raises NotSupportedError
-      end
-
-      def start_typing(channel_id:, thread_id: nil)
-        super # raises NotSupportedError
       end
 
       def mention(user_id)
@@ -193,12 +140,42 @@ module ChatSDK
       end
 
       def render(postable_message)
-        msg = ChatSDK::PostableMessage.from(postable_message)
-        if msg.card?
-          @renderer.render(msg.card)
+        if postable_message.card?
+          @renderer.render(postable_message.card)
         else
-          msg.text
+          postable_message.text
         end
+      end
+
+      private
+
+      def prepare_message_payload(message)
+        msg = ChatSDK::PostableMessage.from(message)
+        content = msg.text || msg.card&.fallback_text || ""
+        embeds = nil
+        components = nil
+        if msg.card?
+          rendered = @renderer.render(msg.card)
+          embeds = rendered["embeds"]
+          components = rendered["components"]
+        end
+        [content, embeds, components]
+      end
+
+      def parse_discord_message(data, channel_id)
+        ChatSDK::Message.new(
+          id: data["id"],
+          text: data["content"] || "",
+          author: ChatSDK::Author.new(
+            id: data.dig("author", "id") || "unknown",
+            name: data.dig("author", "username") || "unknown",
+            platform: :discord
+          ),
+          thread_id: data["id"],
+          channel_id: channel_id,
+          platform: :discord,
+          raw: data
+        )
       end
     end
   end
