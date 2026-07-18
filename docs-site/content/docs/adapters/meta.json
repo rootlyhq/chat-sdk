@@ -5,6 +5,7 @@
     "teams",
     "gchat",
     "mattermost",
+    "discord",
     "state-memory",
     "state-redis"
   ]

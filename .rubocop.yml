@@ -19,6 +19,7 @@ AllCops:
     - "chat_sdk-teams/**/*.rb"
     - "chat_sdk-gchat/**/*.rb"
     - "chat_sdk-mattermost/**/*.rb"
+    - "chat_sdk-discord/**/*.rb"
     - "chat_sdk-state-redis/**/*.rb"
     - "spec/**/*.rb"
   Exclude:

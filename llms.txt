@@ -54,6 +54,7 @@
 - [Microsoft Teams](docs/adapters/teams.md)
 - [Google Chat](docs/adapters/gchat.md)
 - [Mattermost](docs/adapters/mattermost.md)
+- [Discord](docs/adapters/discord.md)
 - [Redis State](docs/adapters/state-redis.md)
 - [Memory State](docs/adapters/state-memory.md)
 

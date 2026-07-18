@@ -5,7 +5,7 @@
 
 > **Beta** — This SDK is experimental and under active development. APIs may change between minor versions. Not recommended for production use yet.
 
-Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, and more. **Write your bot logic once, deploy everywhere.**
+Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, Discord, and more. **Write your bot logic once, deploy everywhere.**
 
 Inspired by and built upon the API design of [Vercel's Chat SDK](https://chat-sdk.dev) (TypeScript). This is an independent Ruby implementation — not a fork — with idiomatic Ruby patterns, a block-based cards DSL, and adapters tailored for the Ruby ecosystem.
 
@@ -19,6 +19,7 @@ gem "chat_sdk-slack"
 gem "chat_sdk-teams"
 gem "chat_sdk-gchat"
 gem "chat_sdk-mattermost"
+gem "chat_sdk-discord"
 gem "chat_sdk-state-redis"
 ```
 
@@ -122,23 +123,24 @@ bot.adapter(:slack).client.chat_postMessage(channel: "#ops", text: "raw")
 
 ## Adapters
 
-| Feature | Slack | Teams | GChat | Mattermost |
-|---------|:-----:|:-----:|:-----:|:----------:|
-| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ |
-| Ephemeral | ✓ | ✗ | ✓ | ✓ |
-| Reactions | ✓ | ✓ | ✓ | ✓ |
-| File uploads | ✓ | ✓ | ✗ | ✓ |
-| Modals | ✓ | ✗ | ✗ | ✗ |
-| Streaming | ✓ | ✓ | ✓ | ✓ |
-| DMs | ✓ | ✓ | ✓ | ✓ |
-| History | ✓ | ✓ | ✓ | ✓ |
-| Typing | ✓ | ✗ | ✗ | ✓ |
+| Feature | Slack | Teams | GChat | Mattermost | Discord |
+|---------|:-----:|:-----:|:-----:|:----------:|:-------:|
+| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Ephemeral | ✓ | ✗ | ✓ | ✓ | ✗ |
+| Reactions | ✓ | ✓ | ✓ | ✓ | ✓ |
+| File uploads | ✓ | ✓ | ✗ | ✓ | ✓ |
+| Modals | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Streaming | ✓ | ✓ | ✓ | ✓ | ✓ |
+| DMs | ✓ | ✓ | ✓ | ✓ | ✓ |
+| History | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Typing | ✓ | ✗ | ✗ | ✓ | ✗ |
 
 Platform clients:
 - **Slack** — wraps [slack-ruby-client](https://github.com/slack-ruby/slack-ruby-client)
 - **Teams** — raw Faraday client (no Ruby Bot Framework SDK exists)
 - **GChat** — wraps [google-apps-chat-v1](https://github.com/googleapis/google-cloud-ruby)
 - **Mattermost** — raw Faraday client wrapping the Mattermost REST API
+- **Discord** — raw Faraday client wrapping the Discord REST API v10 with Ed25519 signature verification
 
 ## AI Coding Agents
 

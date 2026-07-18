@@ -1,0 +1,97 @@
+---
+title: Discord Adapter
+description: Discord REST API v10 adapter with Ed25519 signature verification and embed rendering via the chat_sdk-discord gem.
+---
+
+The Discord adapter (`chat_sdk-discord`) integrates with Discord via its REST API v10 and Interactions endpoint with Ed25519 signature verification.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk"
+gem "chat_sdk-discord"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/discord"
+
+discord = ChatSDK::Discord::Adapter.new(
+  bot_token: ENV["DISCORD_BOT_TOKEN"],           # Bot token from Discord Developer Portal
+  public_key: ENV["DISCORD_PUBLIC_KEY"],          # For Ed25519 signature verification
+  application_id: ENV["DISCORD_APPLICATION_ID"]   # Application ID
+)
+```
+
+`bot_token` is required. `public_key` is required for signature verification. `application_id` is optional but recommended.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DISCORD_BOT_TOKEN` | Bot token from the Discord Developer Portal |
+| `DISCORD_PUBLIC_KEY` | Application public key for verifying interaction signatures |
+| `DISCORD_APPLICATION_ID` | Application ID from the Discord Developer Portal |
+
+## Discord Setup
+
+1. Create an application in the [Discord Developer Portal](https://discord.com/developers/applications).
+2. Create a bot user under the Bot section and copy the bot token.
+3. Copy the public key from the General Information page.
+4. Set the Interactions Endpoint URL to your webhook endpoint (e.g., `https://your-app.com/webhooks/discord`).
+5. Register slash commands via the Discord API or Developer Portal.
+6. Invite the bot to your server with appropriate permissions.
+
+## Webhook URL
+
+```
+https://your-domain.com/webhooks/discord
+```
+
+```ruby
+map "/webhooks/discord" do
+  run bot.webhooks[:discord]
+end
+```
+
+## Capabilities
+
+| Capability | Supported | Notes |
+|------------|-----------|-------|
+| `edit_messages` | Yes | |
+| `delete_messages` | Yes | |
+| `ephemeral_messages` | No | Raises `NotSupportedError` |
+| `file_uploads` | Yes | Multipart upload |
+| `reactions` | Yes | URL-encoded emoji |
+| `modals` | No | Raises `NotSupportedError` |
+| `typing_indicator` | No | Raises `NotSupportedError` |
+| `streaming_edit` | Yes | |
+| `threads` | Yes | |
+| `direct_messages` | Yes | Creates DM channels via `/users/@me/channels` |
+| `message_history` | Yes | Paginated channel message retrieval |
+
+## Signature Verification
+
+Discord requires Ed25519 signature verification for all interaction requests. The adapter uses the `ed25519` gem to verify signatures using the `X-Signature-Ed25519` and `X-Signature-Timestamp` headers.
+
+## Cards Rendering
+
+Cards are rendered as Discord embeds with interactive components (buttons, select menus). Components are wrapped in action rows as required by the Discord API.
+
+## Direct Client Access
+
+```ruby
+discord_adapter = bot.adapter(:discord)
+client = discord_adapter.client  # ApiClient
+```
+
+## Mention Formatting
+
+Discord mentions use the `<@user_id>` format:
+
+```ruby
+discord_adapter.mention("123456789")  # => "<@123456789>"
+```

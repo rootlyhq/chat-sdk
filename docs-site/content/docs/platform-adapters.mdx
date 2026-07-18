@@ -9,19 +9,19 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat | Mattermost |
-|---------|-------|-------|-------|------------|
-| Post | yes | yes | yes | yes |
-| Edit | yes | yes | yes | yes |
-| Delete | yes | yes | yes | yes |
-| Ephemeral | yes | no | yes | yes |
-| Reactions | yes | yes | yes | yes |
-| Files | yes | yes | no | yes |
-| Modals | yes | no | no | no |
-| Streaming | yes | yes | yes | yes |
-| DMs | yes | yes | yes | yes |
-| History | yes | yes | yes | yes |
-| Typing | yes | no | no | yes |
+| Feature | Slack | Teams | GChat | Mattermost | Discord |
+|---------|-------|-------|-------|------------|---------|
+| Post | yes | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes | yes |
+| Delete | yes | yes | yes | yes | yes |
+| Ephemeral | yes | no | yes | yes | no |
+| Reactions | yes | yes | yes | yes | yes |
+| Files | yes | yes | no | yes | yes |
+| Modals | yes | no | no | no | no |
+| Streaming | yes | yes | yes | yes | yes |
+| DMs | yes | yes | yes | yes | yes |
+| History | yes | yes | yes | yes | yes |
+| Typing | yes | no | no | yes | no |
 
 ## Official Adapters
 
@@ -29,6 +29,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Microsoft Teams](adapters/teams) -- `gem "chat_sdk-teams"` -- Bot Framework adapter with Adaptive Cards.
 - [Google Chat](adapters/gchat) -- `gem "chat_sdk-gchat"` -- Google Chat API adapter with Card v2.
 - [Mattermost](adapters/mattermost) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
+- [Discord](adapters/discord) -- `gem "chat_sdk-discord"` -- Discord REST API v10 adapter with Ed25519 verification and embed rendering.
 
 ## Checking Capabilities at Runtime
 
