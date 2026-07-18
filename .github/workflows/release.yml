@@ -25,7 +25,7 @@ jobs:
           bundler-cache: true
 
       - name: Run specs
-        run: bundle exec rspec chat_sdk/spec chat_sdk-slack/spec chat_sdk-teams/spec chat_sdk-gchat/spec chat_sdk-mattermost/spec
+        run: bundle exec rspec chat_sdk/spec chat_sdk-slack/spec chat_sdk-teams/spec chat_sdk-gchat/spec chat_sdk-mattermost/spec chat_sdk-discord/spec
 
       - name: Verify version matches tag
         run: |
@@ -38,7 +38,7 @@ jobs:
 
       - name: Build all gems
         run: |
-          for dir in chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-state-redis; do
+          for dir in chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-discord chat_sdk-state-redis; do
             (cd "$dir" && gem build *.gemspec)
           done
 
@@ -65,6 +65,8 @@ jobs:
             oidc_role: rg_oidc_akr_tqje224vokp6nmhyc5xk
           - gem: chat_sdk-mattermost
             oidc_role: rg_oidc_akr_rggsmpj2soty2ssvpwvp
+          - gem: chat_sdk-discord
+            oidc_role: rg_oidc_akr_1snzvyj4dc59dmw5he9g
           - gem: chat_sdk-state-redis
             oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
 
