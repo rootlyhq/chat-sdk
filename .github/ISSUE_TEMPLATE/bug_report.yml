@@ -1,0 +1,62 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in the Chat SDK
+title: "I want to report a bug..."
+labels: ["bug", "needs-triage"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Create a Chat instance with '...'
+        2. Register a handler with '...'
+        3. Send a webhook request '...'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: code-sample
+    attributes:
+      label: Code Sample
+      render: ruby
+
+  - type: input
+    id: version
+    attributes:
+      label: ChatSDK Version
+      placeholder: e.g., 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: ruby-version
+    attributes:
+      label: Ruby Version
+      placeholder: e.g., 4.0.6
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform Adapter
+      multiple: true
+      options:
+        - Slack
+        - Microsoft Teams
+        - Google Chat
+        - Other
