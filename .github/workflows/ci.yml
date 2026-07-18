@@ -42,6 +42,7 @@ jobs:
           - chat_sdk-slack
           - chat_sdk-teams
           - chat_sdk-gchat
+          - chat_sdk-mattermost
 
     name: "${{ matrix.gem }} / Ruby ${{ matrix.ruby }}"
 

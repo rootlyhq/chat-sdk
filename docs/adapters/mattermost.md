@@ -1,0 +1,103 @@
+# Mattermost Adapter
+
+The Mattermost adapter (`chat_sdk-mattermost`) integrates with Mattermost via its REST API and outgoing webhooks.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk"
+gem "chat_sdk-mattermost"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/mattermost"
+
+mattermost = ChatSDK::Mattermost::Adapter.new(
+  base_url: ENV["MATTERMOST_BASE_URL"],           # Mattermost server URL
+  bot_token: ENV["MATTERMOST_BOT_TOKEN"],          # Bot access token
+  webhook_token: ENV["MATTERMOST_WEBHOOK_TOKEN"],  # For verifying inbound webhooks (optional)
+  bot_user_id: ENV["MATTERMOST_BOT_USER_ID"]       # Bot's user ID (needed for reactions/DMs)
+)
+```
+
+`base_url` and `bot_token` are required. `webhook_token` and `bot_user_id` are optional but recommended.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MATTERMOST_BASE_URL` | Mattermost server URL (e.g., `https://mattermost.example.com`) |
+| `MATTERMOST_BOT_TOKEN` | Bot account access token |
+| `MATTERMOST_WEBHOOK_TOKEN` | Token for verifying outgoing webhook payloads |
+| `MATTERMOST_BOT_USER_ID` | Bot's user ID (required for reactions and DMs) |
+
+## Mattermost Setup
+
+1. Create a bot account in **System Console > Integrations > Bot Accounts**.
+2. Note the bot's access token and user ID.
+3. Create an outgoing webhook in **Main Menu > Integrations > Outgoing Webhooks**.
+4. Configure the callback URL to your webhook endpoint (e.g., `https://your-app.com/webhooks/mattermost`).
+5. Note the webhook token for request verification.
+
+## Webhook URL
+
+```
+https://your-domain.com/webhooks/mattermost
+```
+
+```ruby
+map "/webhooks/mattermost" do
+  run bot.webhooks[:mattermost]
+end
+```
+
+## Capabilities
+
+| Capability | Supported | Notes |
+|------------|-----------|-------|
+| `edit_messages` | Yes | |
+| `delete_messages` | Yes | |
+| `ephemeral_messages` | Yes | Via `/api/v4/posts/ephemeral` |
+| `file_uploads` | Yes | Multipart upload via `/api/v4/files` |
+| `reactions` | Yes | Requires `bot_user_id` |
+| `modals` | No | Raises `NotSupportedError` |
+| `typing_indicator` | Yes | Via `/api/v4/users/me/typing` |
+| `streaming_edit` | Yes | |
+| `threads` | Yes | Uses `root_id` |
+| `direct_messages` | Yes | Creates DM channels; requires `bot_user_id` |
+| `message_history` | Yes | Paginated channel/thread post retrieval |
+
+## Interactive Messages
+
+Mattermost supports interactive message attachments with buttons and select menus. When a user clicks a button or selects an option, Mattermost POSTs to the integration URL with action context.
+
+Configure an integration URL on your `AttachmentRenderer`:
+
+```ruby
+renderer = ChatSDK::Mattermost::AttachmentRenderer.new(
+  integration_url: "https://your-app.com/webhooks/mattermost/actions"
+)
+```
+
+## Cards Rendering
+
+Cards are rendered as Mattermost message attachments (Slack-compatible format). They are sent in the `props.attachments` field of posts.
+
+## Direct Client Access
+
+```ruby
+mattermost_adapter = bot.adapter(:mattermost)
+client = mattermost_adapter.client  # ApiClient
+```
+
+## Mention Formatting
+
+Mattermost mentions use the `@username` format:
+
+```ruby
+mattermost_adapter.mention("alice")  # => "@alice"
+```

@@ -6,25 +6,26 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat |
-|---------|-------|-------|-------|
-| Post | yes | yes | yes |
-| Edit | yes | yes | yes |
-| Delete | yes | yes | yes |
-| Ephemeral | yes | no | yes |
-| Reactions | yes | yes | yes |
-| Files | yes | yes | no |
-| Modals | yes | no | no |
-| Streaming | yes | yes | yes |
-| DMs | yes | yes | yes |
-| History | yes | yes | yes |
-| Typing | yes | no | no |
+| Feature | Slack | Teams | GChat | Mattermost |
+|---------|-------|-------|-------|------------|
+| Post | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes |
+| Delete | yes | yes | yes | yes |
+| Ephemeral | yes | no | yes | yes |
+| Reactions | yes | yes | yes | yes |
+| Files | yes | yes | no | yes |
+| Modals | yes | no | no | no |
+| Streaming | yes | yes | yes | yes |
+| DMs | yes | yes | yes | yes |
+| History | yes | yes | yes | yes |
+| Typing | yes | no | no | yes |
 
 ## Official Adapters
 
 - [Slack](adapters/slack.md) -- `gem "chat_sdk-slack"` -- Full-featured adapter using the Slack Web API and Block Kit.
 - [Microsoft Teams](adapters/teams.md) -- `gem "chat_sdk-teams"` -- Bot Framework adapter with Adaptive Cards.
 - [Google Chat](adapters/gchat.md) -- `gem "chat_sdk-gchat"` -- Google Chat API adapter with Card v2.
+- [Mattermost](adapters/mattermost.md) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
 
 ## Checking Capabilities at Runtime
 

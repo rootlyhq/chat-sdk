@@ -3,7 +3,7 @@
 [![CI](https://github.com/rootlyhq/rootly-chat-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/rootlyhq/rootly-chat-sdk/actions/workflows/ci.yml)
 [![MIT License](https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000)](LICENSE)
 
-Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, and more. **Write your bot logic once, deploy everywhere.** Ruby port of [chat-sdk.dev](https://chat-sdk.dev).
+Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, and more. **Write your bot logic once, deploy everywhere.** Ruby port of [chat-sdk.dev](https://chat-sdk.dev).
 
 ## Installation
 
@@ -14,6 +14,7 @@ gem "chat_sdk"
 gem "chat_sdk-slack"
 gem "chat_sdk-teams"
 gem "chat_sdk-gchat"
+gem "chat_sdk-mattermost"
 gem "chat_sdk-state-redis"
 ```
 
@@ -117,22 +118,23 @@ bot.adapter(:slack).client.chat_postMessage(channel: "#ops", text: "raw")
 
 ## Adapters
 
-| Feature | Slack | Teams | GChat |
-|---------|:-----:|:-----:|:-----:|
-| Post/Edit/Delete | ✓ | ✓ | ✓ |
-| Ephemeral | ✓ | ✗ | ✓ |
-| Reactions | ✓ | ✓ | ✓ |
-| File uploads | ✓ | ✓ | ✗ |
-| Modals | ✓ | ✗ | ✗ |
-| Streaming | ✓ | ✓ | ✓ |
-| DMs | ✓ | ✓ | ✓ |
-| History | ✓ | ✓ | ✓ |
-| Typing | ✓ | ✗ | ✗ |
+| Feature | Slack | Teams | GChat | Mattermost |
+|---------|:-----:|:-----:|:-----:|:----------:|
+| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ |
+| Ephemeral | ✓ | ✗ | ✓ | ✓ |
+| Reactions | ✓ | ✓ | ✓ | ✓ |
+| File uploads | ✓ | ✓ | ✗ | ✓ |
+| Modals | ✓ | ✗ | ✗ | ✗ |
+| Streaming | ✓ | ✓ | ✓ | ✓ |
+| DMs | ✓ | ✓ | ✓ | ✓ |
+| History | ✓ | ✓ | ✓ | ✓ |
+| Typing | ✓ | ✗ | ✗ | ✓ |
 
 Platform clients:
 - **Slack** — wraps [slack-ruby-client](https://github.com/slack-ruby/slack-ruby-client)
 - **Teams** — raw Faraday client (no Ruby Bot Framework SDK exists)
 - **GChat** — wraps [google-apps-chat-v1](https://github.com/googleapis/google-cloud-ruby)
+- **Mattermost** — raw Faraday client wrapping the Mattermost REST API
 
 ## AI Coding Agents
 

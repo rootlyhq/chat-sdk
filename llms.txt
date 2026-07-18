@@ -53,6 +53,7 @@
 - [Slack](docs/adapters/slack.md)
 - [Microsoft Teams](docs/adapters/teams.md)
 - [Google Chat](docs/adapters/gchat.md)
+- [Mattermost](docs/adapters/mattermost.md)
 - [Redis State](docs/adapters/state-redis.md)
 - [Memory State](docs/adapters/state-memory.md)
 
