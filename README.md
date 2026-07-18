@@ -159,6 +159,10 @@ Full documentation is available in the [docs/](docs/) directory.
 
 See [CONTRIBUTING.md](.github/CONTRIBUTING.md) for guidance. For security vulnerabilities, see [SECURITY.md](.github/SECURITY.md).
 
+## Acknowledgments
+
+Thanks to the [Vercel](https://vercel.com) team for creating the original [Chat SDK](https://github.com/vercel/chat) (MIT). Their elegant API design — normalized events, pluggable adapters, cards abstraction, and streaming model — is what made this Ruby port possible. We're grateful for their work and the open source community around it.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
