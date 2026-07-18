@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { createHighlighter } from 'shiki';
 
 const platforms = [
   { name: 'Slack', color: 'bg-[#4A154B]' },
@@ -40,21 +41,31 @@ const features = [
   },
 ];
 
-const codeBot = `bot = ChatSDK::Chat.new(
+const codeSnippets = [
+  {
+    title: 'config.rb — setup',
+    accent: true,
+    code: `bot = ChatSDK::Chat.new(
   user_name: "rootly-bot",
   adapters: {
     slack: ChatSDK::Slack::Adapter.new,
     teams: ChatSDK::Teams::Adapter.new
   },
   state: ChatSDK::State::Redis.new
-)`;
-
-const codeHandler = `bot.on_new_mention do |thread, message|
+)`,
+  },
+  {
+    title: 'handlers.rb — events',
+    accent: false,
+    code: `bot.on_new_mention do |thread, message|
   thread.subscribe
   thread.post("Hello! I'm listening.")
-end`;
-
-const codeCard = `thread.post(ChatSDK.card(title: "Incident #4821") do
+end`,
+  },
+  {
+    title: 'cards.rb — rich messages',
+    accent: false,
+    code: `thread.post(ChatSDK.card(title: "Incident #4821") do
   text "Database CPU at 98%"
   fields do
     field "Service", "postgres-primary"
@@ -64,33 +75,34 @@ const codeCard = `thread.post(ChatSDK.card(title: "Incident #4821") do
     button "Ack", id: "incident:ack", style: :primary
     button "Resolve", id: "incident:resolve", style: :danger
   end
-end)`;
-
-const codeAI = `# Convert chat history → LLM messages
+end)`,
+  },
+  {
+    title: 'ai.rb — LLM integration',
+    accent: false,
+    code: `# Convert chat history → LLM messages
 ai_msgs = ChatSDK::AI.to_ai_messages(thread.messages)
 
 # Stream LLM response back to chat
-thread.post_ai_stream(llm.chat(ai_msgs))`;
+thread.post_ai_stream(llm.chat(ai_msgs))`,
+  },
+];
 
-function CodeBlock({ title, code, accent = false }: { title: string; code: string; accent?: boolean }) {
-  return (
-    <div className={`rounded-2xl overflow-hidden ${accent ? 'ring-1 ring-red-500/20' : 'ring-1 ring-gray-200 dark:ring-gray-800'}`}>
-      <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
-        <div className="flex gap-1.5">
-          <span className="w-3 h-3 rounded-full bg-red-400/80" />
-          <span className="w-3 h-3 rounded-full bg-yellow-400/80" />
-          <span className="w-3 h-3 rounded-full bg-green-400/80" />
-        </div>
-        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 font-mono">{title}</span>
-      </div>
-      <pre className="bg-gray-950 text-gray-100 p-5 text-[13px] leading-relaxed overflow-x-auto">
-        <code>{code}</code>
-      </pre>
-    </div>
-  );
+async function getHighlighter() {
+  return createHighlighter({
+    themes: ['github-dark'],
+    langs: ['ruby'],
+  });
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const highlighter = await getHighlighter();
+
+  const highlighted = codeSnippets.map((s) => ({
+    ...s,
+    html: highlighter.codeToHtml(s.code, { lang: 'ruby', theme: 'github-dark' }),
+  }));
+
   return (
     <main className="flex flex-col items-center">
       {/* Hero */}
@@ -152,12 +164,14 @@ export default function HomePage() {
       <section className="max-w-4xl w-full px-6 mb-24">
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-6">
-            <CodeBlock title="config.rb — setup" code={codeBot} accent />
-            <CodeBlock title="handlers.rb — events" code={codeHandler} />
+            {highlighted.slice(0, 2).map((s) => (
+              <CodeBlock key={s.title} title={s.title} html={s.html} accent={s.accent} />
+            ))}
           </div>
           <div className="space-y-6">
-            <CodeBlock title="cards.rb — rich messages" code={codeCard} />
-            <CodeBlock title="ai.rb — LLM integration" code={codeAI} />
+            {highlighted.slice(2, 4).map((s) => (
+              <CodeBlock key={s.title} title={s.title} html={s.html} accent={s.accent} />
+            ))}
           </div>
         </div>
       </section>
@@ -244,5 +258,24 @@ export default function HomePage() {
         </a>
       </footer>
     </main>
+  );
+}
+
+function CodeBlock({ title, html, accent = false }: { title: string; html: string; accent?: boolean }) {
+  return (
+    <div className={`rounded-2xl overflow-hidden ${accent ? 'ring-1 ring-red-500/20' : 'ring-1 ring-gray-200 dark:ring-gray-800'}`}>
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-100 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex gap-1.5">
+          <span className="w-3 h-3 rounded-full bg-red-400/80" />
+          <span className="w-3 h-3 rounded-full bg-yellow-400/80" />
+          <span className="w-3 h-3 rounded-full bg-green-400/80" />
+        </div>
+        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 font-mono">{title}</span>
+      </div>
+      <div
+        className="[&_pre]:!bg-gray-950 [&_pre]:!p-5 [&_pre]:!m-0 [&_pre]:text-[13px] [&_pre]:leading-relaxed [&_pre]:overflow-x-auto [&_code]:!bg-transparent"
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+    </div>
   );
 }
