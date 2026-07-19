@@ -1,11 +1,9 @@
-import Link from 'next/link';
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Adapters',
-  description: 'Platform and state adapters for ChatSDK Ruby',
-};
+import Link from 'next/link';
+import { useState, type ReactNode } from 'react';
+
+// metadata moved to layout.tsx since this is a client component
 
 type Feature = 'yes' | 'no' | 'partial';
 
@@ -276,52 +274,121 @@ function FeatureBadge({ status }: { status: Feature }) {
   return <span className="text-gray-300 dark:text-gray-600">&#10005;</span>;
 }
 
+function AdapterCard({ adapter }: { adapter: Adapter }) {
+  return (
+    <Link
+      href={`/docs/adapters/${adapter.slug}`}
+      className="group flex flex-col p-5 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-all hover:shadow-md bg-white dark:bg-gray-950"
+    >
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: adapter.color }}>
+            {adapter.icon}
+          </div>
+          <h3 className="font-semibold text-lg group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
+            {adapter.name}
+          </h3>
+        </div>
+        {adapter.official && (
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+            Official
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 flex-1">{adapter.tagline}</p>
+      <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+        <code className="text-xs text-gray-400">{adapter.gem}</code>
+      </div>
+    </Link>
+  );
+}
+
+function BuildYourOwnCard({ emoji, text }: { emoji: string; text: string }) {
+  return (
+    <Link
+      href="/docs/contributing/building-adapters"
+      className="group flex flex-col items-center justify-center p-5 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 hover:border-red-500/30 transition-all text-center"
+    >
+      <span className="text-2xl mb-2">{emoji}</span>
+      <h3 className="font-semibold mb-1 group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">Build your own</h3>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{text}</p>
+    </Link>
+  );
+}
+
+type FilterTab = 'all' | 'platform' | 'state';
+
 export default function AdaptersPage() {
+  const [tab, setTab] = useState<FilterTab>('all');
+  const [search, setSearch] = useState('');
   const platformAdapters = adapters.filter((a) => a.type === 'platform');
-  const stateAdapters = adapters.filter((a) => a.type === 'state');
+
+  const filtered = adapters.filter((a) => {
+    if (tab !== 'all' && a.type !== tab) return false;
+    if (search && !a.name.toLowerCase().includes(search.toLowerCase()) && !a.gem.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+  const fp = filtered.filter((a) => a.type === 'platform');
+  const fs = filtered.filter((a) => a.type === 'state');
 
   return (
     <main className="max-w-5xl mx-auto px-6 py-16">
       <h1 className="text-4xl font-bold mb-3">Adapters</h1>
-      <p className="text-lg text-gray-500 dark:text-gray-400 mb-12">
-        Connect ChatSDK to your chat platforms and state backends.
+      <p className="text-lg text-gray-500 dark:text-gray-400 mb-8">
+        Published under <code className="text-xs">chat_sdk-*</code> and maintained by Rootly.
       </p>
 
-      {/* Platform adapters */}
-      <h2 className="text-2xl font-bold mb-2">Platform Adapters</h2>
-      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Published under <code className="text-xs">chat_sdk-*</code> and maintained by Rootly.</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-16">
-        {platformAdapters.map((adapter) => (
-          <Link
-            key={adapter.slug}
-            href={`/docs/adapters/${adapter.slug}`}
-            className="group flex flex-col p-5 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-all hover:shadow-md bg-white dark:bg-gray-950"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: adapter.color }}
-                >
-                  {adapter.icon}
-                </div>
-                <h3 className="font-semibold text-lg group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                  {adapter.name}
-                </h3>
-              </div>
-              {adapter.official && (
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                  Official
-                </span>
-              )}
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 flex-1">{adapter.tagline}</p>
-            <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
-              <code className="text-xs text-gray-400">{adapter.gem}</code>
-            </div>
-          </Link>
-        ))}
+      {/* Filter bar */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-8">
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+          {(['all', 'platform', 'state'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`px-5 py-2 text-sm font-medium transition-colors ${
+                tab === t
+                  ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              {t === 'all' ? 'All' : t === 'platform' ? 'Platform' : 'State'}
+            </button>
+          ))}
+        </div>
+        <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Search adapters..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full px-4 py-2 text-sm rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:border-red-500/50"
+          />
+        </div>
       </div>
+
+      {fp.length > 0 && (
+        <>
+          <h2 className="text-2xl font-bold mb-6">Platform Adapters</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+            {fp.map((a) => <AdapterCard key={a.slug} adapter={a} />)}
+            {!search && <BuildYourOwnCard emoji="🔌" text="Extend ChatSDK with shared contract specs and the adapter base class." />}
+          </div>
+        </>
+      )}
+
+      {fs.length > 0 && (
+        <>
+          <h2 className="text-2xl font-bold mb-6">State Backends</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+            {fs.map((a) => <AdapterCard key={a.slug} adapter={a} />)}
+            {!search && <BuildYourOwnCard emoji="🗄️" text="Implement the State::Base interface with shared contract specs." />}
+          </div>
+        </>
+      )}
+
+      {filtered.length === 0 && (
+        <p className="text-center text-gray-500 dark:text-gray-400 py-12">No adapters match your search.</p>
+      )}
 
       {/* Feature matrix */}
       <h2 className="text-2xl font-bold mb-6">Feature Matrix</h2>
@@ -353,55 +420,6 @@ export default function AdaptersPage() {
             ))}
           </tbody>
         </table>
-      </div>
-
-      {/* State adapters */}
-      <h2 className="text-2xl font-bold mb-6">State Adapters</h2>
-      <div className="grid gap-4 md:grid-cols-2 mb-16">
-        {stateAdapters.map((adapter) => (
-          <Link
-            key={adapter.slug}
-            href={`/docs/adapters/${adapter.slug}`}
-            className="group p-6 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-all hover:shadow-md bg-white dark:bg-gray-950"
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ backgroundColor: adapter.color }}
-              >
-                {adapter.icon}
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-semibold group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-                    {adapter.name}
-                  </h3>
-                  {adapter.official && (
-                    <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                      Official
-                    </span>
-                  )}
-                </div>
-                <code className="text-xs text-gray-400">{adapter.gem}</code>
-              </div>
-            </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{adapter.tagline}</p>
-          </Link>
-        ))}
-      </div>
-
-      {/* Build your own CTA */}
-      <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center bg-gray-50/50 dark:bg-gray-900/50">
-        <h3 className="font-semibold text-lg mb-2">Build your own adapter</h3>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-          Extend ChatSDK with shared contract specs and the adapter base class.
-        </p>
-        <Link
-          href="/docs/contributing/building-adapters"
-          className="inline-flex items-center gap-1 text-sm font-medium text-red-600 dark:text-red-400 hover:underline"
-        >
-          Read the guide <span>→</span>
-        </Link>
       </div>
     </main>
   );
