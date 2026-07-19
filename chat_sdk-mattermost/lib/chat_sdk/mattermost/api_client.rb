@@ -2,11 +2,9 @@
 
 module ChatSDK
   module Mattermost
-    class ApiClient
-      attr_reader :base_url
-
+    class ApiClient < ChatSDK::ApiClient::Base
       def initialize(base_url:, bot_token:)
-        @base_url = base_url.chomp("/")
+        @base_url_value = base_url.chomp("/")
         @bot_token = bot_token
       end
 
@@ -63,21 +61,12 @@ module ChatSDK
 
       # Files
       def upload_file(channel_id:, io:, filename:)
-        conn = Faraday.new(url: @base_url) do |f|
-          f.request :multipart
-          f.response :json
-          f.adapter :net_http
-        end
-
         payload = {
           files: Faraday::Multipart::FilePart.new(io, "application/octet-stream", filename),
           channel_id: channel_id
         }
 
-        response = conn.post("/api/v4/files", payload) do |req|
-          req.headers["Authorization"] = "Bearer #{@bot_token}"
-        end
-
+        response = upload_connection.post("/api/v4/files", payload)
         handle_response(response)
       end
 
@@ -88,43 +77,28 @@ module ChatSDK
 
       private
 
-      def connection
-        @connection ||= Faraday.new(url: @base_url) do |f|
-          f.request :json
-          f.response :json
-          f.adapter :net_http
-        end
+      def base_url
+        @base_url_value
       end
 
-      def request(method, path, body = nil)
-        response = connection.public_send(method, path) do |req|
-          req.headers["Authorization"] = "Bearer #{@bot_token}"
-          req.body = body if body && method != :get
-        end
-
-        handle_response(response)
+      def adapter_name
+        :mattermost
       end
 
-      def handle_response(response)
-        return response.body if response.success?
+      def configure_auth(faraday)
+        faraday.headers["Authorization"] = "Bearer #{@bot_token}"
+      end
 
-        if response.status == 429
-          retry_after = response.headers["Retry-After"]&.to_i
-          raise ChatSDK::RateLimitedError.new(
-            "Mattermost API rate limited",
-            retry_after: retry_after,
-            status: response.status,
-            body: response.body,
-            adapter_name: :mattermost
-          )
-        end
+      def extract_success_body(response)
+        response.body
+      end
 
-        raise ChatSDK::PlatformError.new(
-          "Mattermost API error: #{response.status}",
-          status: response.status,
-          body: response.body,
-          adapter_name: :mattermost
-        )
+      def extract_retry_after(response)
+        response.headers["Retry-After"]&.to_i
+      end
+
+      def extract_error_message(response)
+        response.status.to_s
       end
     end
   end

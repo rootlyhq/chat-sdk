@@ -4,7 +4,7 @@ require "erb"
 
 module ChatSDK
   module Discord
-    class ApiClient
+    class ApiClient < ChatSDK::ApiClient::Base
       BASE_URL = "https://discord.com"
       API_PREFIX = "/api/v10"
 
@@ -62,60 +62,35 @@ module ChatSDK
           "file[0]" => Faraday::Multipart::FilePart.new(io, "application/octet-stream", filename)
         }
 
-        response = upload_connection.post("#{API_PREFIX}/channels/#{channel_id}/messages", payload) do |req|
-          req.headers["Authorization"] = "Bot #{@bot_token}"
-        end
-
+        response = upload_connection.post("#{API_PREFIX}/channels/#{channel_id}/messages", payload)
         handle_response(response)
       end
 
       private
 
-      def connection
-        @connection ||= Faraday.new(url: BASE_URL) do |f|
-          f.request :json
-          f.response :json
-          f.adapter :net_http
-        end
+      def base_url
+        BASE_URL
       end
 
-      def upload_connection
-        @upload_connection ||= Faraday.new(url: BASE_URL) do |f|
-          f.request :multipart
-          f.response :json
-          f.adapter :net_http
-        end
+      def adapter_name
+        :discord
       end
 
-      def request(method, path, body = nil)
-        response = connection.public_send(method, path) do |req|
-          req.headers["Authorization"] = "Bot #{@bot_token}"
-          req.body = body if body && method != :get
-        end
-
-        handle_response(response)
+      def configure_auth(faraday)
+        faraday.headers["Authorization"] = "Bot #{@bot_token}"
       end
 
-      def handle_response(response)
-        return response.body if response.success?
+      def extract_success_body(response)
+        response.body
+      end
 
-        if response.status == 429
-          retry_after = response.body.is_a?(Hash) ? response.body["retry_after"]&.to_i : nil
-          raise ChatSDK::RateLimitedError.new(
-            "Discord API rate limited",
-            retry_after: retry_after,
-            status: response.status,
-            body: response.body,
-            adapter_name: :discord
-          )
-        end
+      def extract_retry_after(response)
+        body = response.body
+        body.is_a?(Hash) ? body["retry_after"]&.to_i : nil
+      end
 
-        raise ChatSDK::PlatformError.new(
-          "Discord API error: #{response.status}",
-          status: response.status,
-          body: response.body,
-          adapter_name: :discord
-        )
+      def extract_error_message(response)
+        response.status.to_s
       end
     end
   end

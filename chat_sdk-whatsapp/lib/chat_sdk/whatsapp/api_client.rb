@@ -2,7 +2,7 @@
 
 module ChatSDK
   module WhatsApp
-    class ApiClient
+    class ApiClient < ChatSDK::ApiClient::Base
       BASE_URL = "https://graph.facebook.com/v21.0"
 
       def initialize(access_token, phone_number_id)
@@ -43,52 +43,25 @@ module ChatSDK
 
       private
 
-      def connection
-        @connection ||= build_connection { |f| f.request :json }
-      end
-
       def media_connection
         @media_connection ||= build_connection { |f| f.request :multipart }
       end
 
-      def build_connection
-        Faraday.new(url: BASE_URL) do |f|
-          yield f
-          f.response :json
-          f.adapter :net_http
-          f.headers["Authorization"] = "Bearer #{@access_token}"
-        end
+      def base_url
+        BASE_URL
       end
 
-      def request(method, path, body = nil)
-        response = connection.public_send(method, path) do |req|
-          req.body = body if body && method != :get
-        end
-
-        handle_response(response)
+      def adapter_name
+        :whatsapp
       end
 
-      def handle_response(response)
+      def configure_auth(faraday)
+        faraday.headers["Authorization"] = "Bearer #{@access_token}"
+      end
+
+      def extract_error_message(response)
         body = response.body
-        return body.is_a?(Hash) ? body : {} if response.success?
-
-        if response.status == 429
-          raise ChatSDK::RateLimitedError.new(
-            "WhatsApp API rate limited",
-            retry_after: nil,
-            status: response.status,
-            body: body,
-            adapter_name: :whatsapp
-          )
-        end
-
-        error_message = body.is_a?(Hash) ? body.dig("error", "message") : response.status
-        raise ChatSDK::PlatformError.new(
-          "WhatsApp API error: #{error_message}",
-          status: response.status,
-          body: body,
-          adapter_name: :whatsapp
-        )
+        body.is_a?(Hash) ? body.dig("error", "message") : response.status.to_s
       end
     end
   end

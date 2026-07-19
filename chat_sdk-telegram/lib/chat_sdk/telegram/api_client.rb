@@ -2,7 +2,7 @@
 
 module ChatSDK
   module Telegram
-    class ApiClient
+    class ApiClient < ChatSDK::ApiClient::Base
       BASE_URL = "https://api.telegram.org"
 
       def initialize(bot_token)
@@ -56,28 +56,31 @@ module ChatSDK
         "/bot#{@bot_token}/#{method}"
       end
 
-      def connection
-        @connection ||= Faraday.new(url: BASE_URL) do |f|
-          f.request :json
-          f.response :json
-          f.adapter :net_http
-        end
+      def base_url
+        BASE_URL
       end
 
-      def upload_connection
-        @upload_connection ||= Faraday.new(url: BASE_URL) do |f|
-          f.request :multipart
-          f.response :json
-          f.adapter :net_http
-        end
+      def adapter_name
+        :telegram
+      end
+
+      def configure_auth(_faraday)
+        # Telegram uses token in URL path, no auth headers needed
       end
 
       def request(method, api_method, body = nil)
-        response = connection.public_send(method, api_path(api_method)) do |req|
-          req.body = body if body && method != :get
+        retries = 0
+        begin
+          response = connection.public_send(method, api_path(api_method)) do |req|
+            req.body = body if body && method != :get
+          end
+          handle_response(response)
+        rescue ChatSDK::RateLimitedError => e
+          retries += 1
+          raise if retries > MAX_RETRIES
+          sleep(e.retry_after || (2**retries * 0.5))
+          retry
         end
-
-        handle_response(response)
       end
 
       def handle_response(response)
@@ -88,23 +91,31 @@ module ChatSDK
         end
 
         if response.status == 429
-          retry_after = body.is_a?(Hash) ? body.dig("parameters", "retry_after")&.to_i : nil
           raise ChatSDK::RateLimitedError.new(
-            "Telegram API rate limited",
-            retry_after: retry_after,
+            "#{adapter_name} API rate limited",
+            retry_after: extract_retry_after(response),
             status: response.status,
             body: body,
-            adapter_name: :telegram
+            adapter_name: adapter_name
           )
         end
 
-        description = body.is_a?(Hash) ? body["description"] : response.status
         raise ChatSDK::PlatformError.new(
-          "Telegram API error: #{description}",
+          "#{adapter_name} API error: #{extract_error_message(response)}",
           status: response.status,
           body: body,
-          adapter_name: :telegram
+          adapter_name: adapter_name
         )
+      end
+
+      def extract_retry_after(response)
+        body = response.body
+        body.is_a?(Hash) ? body.dig("parameters", "retry_after")&.to_i : nil
+      end
+
+      def extract_error_message(response)
+        body = response.body
+        body.is_a?(Hash) ? body["description"] : response.status.to_s
       end
     end
   end
