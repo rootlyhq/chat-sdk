@@ -66,10 +66,118 @@ thread.post_ai_stream(llm_chunks, placeholder: "Thinking...")
 ChatSDK::AI::StreamHandler.stream_to_thread(thread, llm_chunks)
 ```
 
+## Using with RubyLLM
+
+[RubyLLM](https://rubyllm.com) is a popular Ruby gem that provides a single interface for OpenAI, Anthropic, Google Gemini, AWS Bedrock, and 10+ other providers. It pairs naturally with ChatSDK.
+
+### Basic: synchronous response
+
+```ruby
+require "ruby_llm"
+
+RubyLLM.configure do |config|
+  config.openai_api_key = ENV["OPENAI_API_KEY"]
+end
+
+bot.on_new_mention do |thread, message|
+  # Convert chat history to LLM format
+  history = ChatSDK::AI.to_ai_messages(thread.messages, include_names: true)
+
+  # Chat with the LLM
+  chat = RubyLLM.chat(model: "gpt-4.1")
+  history.each { |msg| chat.add_message(role: msg[:role], content: msg[:content]) }
+  response = chat.complete
+
+  thread.post(response.content)
+end
+```
+
+### Streaming: progressive message updates
+
+```ruby
+bot.on_new_mention do |thread, message|
+  history = ChatSDK::AI.to_ai_messages(thread.messages)
+
+  chat = RubyLLM.chat(model: "claude-sonnet-4-20250514")
+
+  # Stream chunks directly to the chat thread
+  chunks = Enumerator.new do |y|
+    chat.stream(message.text) { |chunk| y << chunk.content if chunk.content }
+  end
+
+  thread.post_ai_stream(chunks, placeholder: "Thinking...")
+end
+```
+
+The bot posts "Thinking..." immediately, then progressively edits the message as tokens arrive from the LLM.
+
+### With Anthropic gem directly
+
+```ruby
+require "anthropic"
+
+client = Anthropic::Client.new(api_key: ENV["ANTHROPIC_API_KEY"])
+
+bot.on_new_mention do |thread, message|
+  history = ChatSDK::AI.to_ai_messages(thread.messages)
+
+  # Stream via Enumerator
+  chunks = Enumerator.new do |y|
+    client.messages.create(
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      messages: history,
+      stream: proc { |event|
+        y << event.dig("delta", "text") if event["type"] == "content_block_delta"
+      }
+    )
+  end
+
+  thread.post_ai_stream(chunks, placeholder: "Thinking...")
+end
+```
+
+### With OpenAI gem directly
+
+```ruby
+require "openai"
+
+client = OpenAI::Client.new(access_token: ENV["OPENAI_API_KEY"])
+
+bot.on_new_mention do |thread, message|
+  history = ChatSDK::AI.to_ai_messages(thread.messages)
+
+  chunks = Enumerator.new do |y|
+    client.chat(
+      parameters: {
+        model: "gpt-4.1",
+        messages: history,
+        stream: proc { |chunk|
+          content = chunk.dig("choices", 0, "delta", "content")
+          y << content if content
+        }
+      }
+    )
+  end
+
+  thread.post_ai_stream(chunks, placeholder: "Thinking...")
+end
+```
+
+### Key pattern
+
+All integrations follow the same 3-step pattern:
+
+1. **Convert history**: `ChatSDK::AI.to_ai_messages(thread.messages)` → standard `{role, content}` format
+2. **Call your LLM**: any gem, any provider — wrap streaming in an `Enumerator` that yields string chunks
+3. **Stream to chat**: `thread.post_ai_stream(chunks)` — handles throttled progressive edits automatically
+
+ChatSDK doesn't care which LLM you use. It just needs an `Enumerable` of strings.
+
 ## Provider-Agnostic Example
 
 ```ruby
-chat.on_new_mention do |thread, message|
+bot.on_new_mention do |thread, message|
   # 1. Fetch conversation history
   messages, _ = thread.messages
 
