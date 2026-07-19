@@ -81,36 +81,20 @@ module ChatSDK
           "SELECT value FROM chat_sdk_cache WHERE key_prefix = $1 AND cache_key = $2 AND (expires_at IS NULL OR expires_at > NOW())",
           [@key_prefix, key]
         )
-        if result.ntuples > 0
-          JSON.parse(result[0]["value"])
-        else
-          # Clean up expired entry if it exists
-          @conn.exec_params(
-            "DELETE FROM chat_sdk_cache WHERE key_prefix = $1 AND cache_key = $2 AND expires_at IS NOT NULL AND expires_at <= NOW()",
-            [@key_prefix, key]
-          )
-          nil
-        end
+        return JSON.parse(result[0]["value"]) if result.ntuples > 0
+
+        nil
       end
 
       def set(key, value, ttl: nil)
         serialized = JSON.generate(value)
-        if ttl
-          ttl_seconds = ttl.to_f
-          @conn.exec_params(
-            "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-            "VALUES ($1, $2, $3::jsonb, NOW() + INTERVAL '#{ttl_seconds} seconds') " \
-            "ON CONFLICT (key_prefix, cache_key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at",
-            [@key_prefix, key, serialized]
-          )
-        else
-          @conn.exec_params(
-            "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-            "VALUES ($1, $2, $3::jsonb, NULL) " \
-            "ON CONFLICT (key_prefix, cache_key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at",
-            [@key_prefix, key, serialized]
-          )
-        end
+        expires = ttl ? "NOW() + INTERVAL '#{ttl.to_f} seconds'" : "NULL"
+        @conn.exec_params(
+          "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
+          "VALUES ($1, $2, $3::jsonb, #{expires}) " \
+          "ON CONFLICT (key_prefix, cache_key) DO UPDATE SET value = EXCLUDED.value, expires_at = EXCLUDED.expires_at",
+          [@key_prefix, key, serialized]
+        )
         value
       end
 
@@ -127,25 +111,16 @@ module ChatSDK
 
       def set_if_absent(key, value, ttl: nil)
         serialized = JSON.generate(value)
-        # First delete expired entry
         @conn.exec_params(
           "DELETE FROM chat_sdk_cache WHERE key_prefix = $1 AND cache_key = $2 AND expires_at IS NOT NULL AND expires_at < NOW()",
           [@key_prefix, key]
         )
-        result = if ttl
-          ttl_seconds = ttl.to_f
-          @conn.exec_params(
-            "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-            "VALUES ($1, $2, $3::jsonb, NOW() + INTERVAL '#{ttl_seconds} seconds') ON CONFLICT DO NOTHING",
-            [@key_prefix, key, serialized]
-          )
-        else
-          @conn.exec_params(
-            "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-            "VALUES ($1, $2, $3::jsonb, NULL) ON CONFLICT DO NOTHING",
-            [@key_prefix, key, serialized]
-          )
-        end
+        expires = ttl ? "NOW() + INTERVAL '#{ttl.to_f} seconds'" : "NULL"
+        result = @conn.exec_params(
+          "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
+          "VALUES ($1, $2, $3::jsonb, #{expires}) ON CONFLICT DO NOTHING",
+          [@key_prefix, key, serialized]
+        )
         result.cmd_tuples > 0
       end
 
