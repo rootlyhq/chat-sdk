@@ -15,6 +15,6 @@ Gem::Specification.new do |spec|
   spec.files         = Dir["lib/**/*", "LICENSE", "README.md"]
   spec.require_paths = ["lib"]
   spec.add_dependency "chat_sdk", "~> 0.1"
-  spec.add_dependency "slack-ruby-client", "~> 2.0"
+  spec.add_dependency "slack-ruby-client", ">= 2.0"
   spec.metadata["rubygems_mfa_required"] = "true"
 end
