@@ -59,6 +59,7 @@
 - [Twilio SMS/MMS](docs/adapters/twilio.md)
 - [Redis State](docs/adapters/state-redis.md)
 - [PostgreSQL State](docs/adapters/state-pg.md)
+- [MySQL State](docs/adapters/state-mysql.md)
 - [Memory State](docs/adapters/state-memory.md)
 
 ## AI

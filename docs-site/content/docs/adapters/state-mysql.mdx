@@ -1,0 +1,87 @@
+---
+title: MySQL State Adapter
+description: MySQL-backed state storage with auto-migration and JSON for production deployments.
+---
+
+The MySQL state adapter (`chat_sdk-state-mysql`) stores all state data in MySQL tables, making it suitable for production deployments where you already use MySQL and want to avoid adding Redis as a dependency.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk-state-mysql"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk/state/mysql"
+
+# From URL
+state = ChatSDK::State::Mysql.new(url: "mysql2://root@localhost/myapp")
+
+# From environment variable (falls back to mysql2://root@localhost/chat_sdk_dev)
+state = ChatSDK::State::Mysql.new
+
+# With a pre-existing Mysql2 connection
+conn = Mysql2::Client.new("mysql2://root@localhost/myapp")
+state = ChatSDK::State::Mysql.new(connection: conn)
+
+# With a custom key prefix (for multi-tenant isolation)
+state = ChatSDK::State::Mysql.new(key_prefix: "myapp")
+
+# Disable auto-migration (if you manage schema yourself)
+state = ChatSDK::State::Mysql.new(auto_migrate: false)
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `MYSQL_URL` | MySQL connection URL (primary) |
+| `DATABASE_URL` | MySQL connection URL (fallback) |
+
+## Tables
+
+The adapter auto-creates three tables on first use:
+
+| Table | Purpose |
+|-------|---------|
+| `chat_sdk_subscriptions` | Subscribed thread IDs per key prefix |
+| `chat_sdk_locks` | Distributed processing locks with expiration |
+| `chat_sdk_cache` | JSON key-value store with optional TTL |
+
+All tables use `ENGINE=InnoDB DEFAULT CHARSET=utf8mb4` and composite primary keys with `key_prefix` for multi-tenant isolation.
+
+## When to Use
+
+Use MySQL state when:
+
+- You already run MySQL and want to avoid adding Redis
+- You need state to survive process restarts
+- You want JSON storage for structured state data
+- You need multi-tenant isolation via key prefixes
+
+## Atomic Operations
+
+- Locks use `INSERT IGNORE` for safe acquisition and owner-verified `DELETE` for release.
+- `set_if_absent` uses `INSERT IGNORE` to prevent race conditions.
+- `set` uses `INSERT ... ON DUPLICATE KEY UPDATE` for upsert semantics.
+- TTL-based expiration is checked at read time and cleaned up via `cleanup_expired`.
+
+## Cleanup
+
+```ruby
+state = ChatSDK::State::Mysql.new
+state.clear            # Deletes all state for this key prefix
+state.cleanup_expired  # Removes expired cache entries and locks
+```
+
+Use `clear` with caution in production -- this removes all subscriptions, locks, and stored state for the key prefix.
+
+## Direct Connection Access
+
+```ruby
+state = ChatSDK::State::Mysql.new
+mysql_conn = state.conn  # Mysql2::Client instance
+```

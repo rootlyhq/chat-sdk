@@ -12,6 +12,7 @@ gem "chat_sdk-telegram", path: "chat_sdk-telegram"
 gem "chat_sdk-twilio", path: "chat_sdk-twilio"
 gem "chat_sdk-state-redis", path: "chat_sdk-state-redis"
 gem "chat_sdk-state-pg", path: "chat_sdk-state-pg"
+gem "chat_sdk-state-mysql", path: "chat_sdk-state-mysql"
 
 group :development, :test do
   gem "rspec", "~> 3.13"

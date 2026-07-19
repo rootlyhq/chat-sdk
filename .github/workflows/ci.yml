@@ -60,6 +60,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      mysql:
+        image: mysql:8
+        ports:
+          - 3306:3306
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: chat_sdk_test
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     name: "Ruby ${{ matrix.ruby }}"
 
@@ -78,6 +90,7 @@ jobs:
         env:
           REDIS_URL: redis://localhost:6379
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/chat_sdk_test
+          MYSQL_URL: mysql2://root:root@127.0.0.1:3306/chat_sdk_test
 
   build-and-test:
     runs-on: ubuntu-latest

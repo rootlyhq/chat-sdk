@@ -42,6 +42,7 @@
     "adapters/state-memory",
     "adapters/state-redis",
     "adapters/state-pg",
+    "adapters/state-mysql",
     "---Contributing---",
     "...contributing"
   ]

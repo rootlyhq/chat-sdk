@@ -25,7 +25,7 @@ jobs:
           bundler-cache: true
 
       - name: Run specs
-        run: bundle exec rspec chat_sdk/spec chat_sdk-slack/spec chat_sdk-teams/spec chat_sdk-gchat/spec chat_sdk-mattermost/spec chat_sdk-discord/spec chat_sdk-telegram/spec chat_sdk-twilio/spec chat_sdk-state-pg/spec
+        run: bundle exec rspec chat_sdk/spec chat_sdk-slack/spec chat_sdk-teams/spec chat_sdk-gchat/spec chat_sdk-mattermost/spec chat_sdk-discord/spec chat_sdk-telegram/spec chat_sdk-twilio/spec chat_sdk-state-pg/spec chat_sdk-state-mysql/spec
 
       - name: Verify version matches tag
         run: |
@@ -38,7 +38,7 @@ jobs:
 
       - name: Build all gems
         run: |
-          for dir in chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-discord chat_sdk-telegram chat_sdk-twilio chat_sdk-state-redis chat_sdk-state-pg; do
+          for dir in chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-discord chat_sdk-telegram chat_sdk-twilio chat_sdk-state-redis chat_sdk-state-pg chat_sdk-state-mysql; do
             (cd "$dir" && gem build *.gemspec)
           done
 

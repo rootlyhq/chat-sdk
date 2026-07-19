@@ -29,6 +29,7 @@ gem "chat_sdk-telegram"
 gem "chat_sdk-twilio"
 gem "chat_sdk-state-redis"
 gem "chat_sdk-state-pg"
+gem "chat_sdk-state-mysql"
 ```
 
 ## Usage
