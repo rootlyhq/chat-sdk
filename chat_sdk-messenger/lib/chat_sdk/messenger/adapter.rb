@@ -128,7 +128,7 @@ module ChatSDK
 
       def parse_messenger_message(data, channel_id)
         ChatSDK::Message.new(
-          id: data["message_id"] || data.dig("message_id"),
+          id: data["message_id"],
           text: "",
           author: ChatSDK::Author.new(
             id: "bot",
