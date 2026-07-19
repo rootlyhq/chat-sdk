@@ -1,14 +1,12 @@
 import { Controller } from "@hotwired/stimulus"
 import { createConsumer } from "@rails/actioncable"
 
-// Stimulus controller for the ChatSDK web chat UI.
-// Connects to ChatChannel via ActionCable and renders messages in real time.
 export default class extends Controller {
   static targets = ["messages", "input"]
-  static values  = { channel: { type: String, default: "default" } }
+  static values = { channel: { type: String, default: "default" } }
 
   connect() {
-    this.userId = "guest-" + Math.random().toString(36).substring(2, 8)
+    this.userId = "guest-" + Math.random().toString(36).substr(2, 6)
     this.consumer = createConsumer()
     this.subscription = this.consumer.subscriptions.create(
       { channel: "ChatChannel", channel_id: this.channelValue },
@@ -32,8 +30,8 @@ export default class extends Controller {
     if (!text) return
 
     this.subscription.send({
-      message:   text,
-      user_id:   this.userId,
+      message: text,
+      user_id: this.userId,
       user_name: "Guest"
     })
     this.inputTarget.value = ""

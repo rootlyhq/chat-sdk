@@ -1,26 +1,29 @@
-<div id="chat-container"
-     class="flex flex-col h-[600px] max-w-2xl mx-auto border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden bg-white dark:bg-gray-950"
+<div class="flex flex-col h-screen max-w-2xl mx-auto"
      data-controller="chat"
      data-chat-channel-value="<%= @channel_id %>">
 
-  <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2">
-    <span class="text-lg">&#x1F48E;</span>
-    <h2 class="font-semibold text-gray-900 dark:text-gray-100">ChatSDK</h2>
-    <span class="text-xs text-gray-400">Beta</span>
+  <!-- Header -->
+  <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2 bg-white dark:bg-gray-950">
+    <span class="text-lg">💎</span>
+    <h1 class="font-semibold">ChatSDK Demo</h1>
+    <span class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400">Beta</span>
   </div>
 
+  <!-- Messages -->
   <div id="messages"
-       class="flex-1 overflow-y-auto p-4 space-y-3"
-       data-chat-target="messages">
+       data-chat-target="messages"
+       class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900">
+    <p class="text-center text-sm text-gray-400">Send a message to start chatting. Try "deploy" for a card.</p>
   </div>
 
-  <form class="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2"
-        data-action="submit->chat#send">
+  <!-- Input -->
+  <form data-action="submit->chat#send"
+        class="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2 bg-white dark:bg-gray-950">
     <input type="text"
            data-chat-target="input"
            placeholder="Type a message..."
-           class="flex-1 px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:border-red-500/50"
-           autocomplete="off" />
+           autocomplete="off"
+           class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50" />
     <button type="submit"
             class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
       Send
