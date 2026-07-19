@@ -89,12 +89,20 @@ module ChatSDK
 
       def set(key, value, ttl: nil)
         serialized = JSON.generate(value)
-        expires = ttl ? "DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND)" : "NULL"
-        @conn.query(
-          "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-          "VALUES (#{quote(@key_prefix)}, #{quote(key)}, #{quote(serialized)}, #{expires}) " \
-          "ON DUPLICATE KEY UPDATE value = VALUES(value), expires_at = VALUES(expires_at)"
-        )
+        stmt = if ttl
+          @conn.prepare(
+            "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
+            "VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND)) " \
+            "ON DUPLICATE KEY UPDATE value = VALUES(value), expires_at = VALUES(expires_at)"
+          )
+        else
+          @conn.prepare(
+            "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
+            "VALUES (?, ?, ?, NULL) " \
+            "ON DUPLICATE KEY UPDATE value = VALUES(value), expires_at = VALUES(expires_at)"
+          )
+        end
+        stmt.execute(@key_prefix, key, serialized)
         value
       end
 
@@ -115,11 +123,18 @@ module ChatSDK
           "DELETE FROM chat_sdk_cache WHERE key_prefix = ? AND cache_key = ? AND expires_at IS NOT NULL AND expires_at < NOW()"
         )
         del_stmt.execute(@key_prefix, key)
-        expires = ttl ? "DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND)" : "NULL"
-        @conn.query(
-          "INSERT IGNORE INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-          "VALUES (#{quote(@key_prefix)}, #{quote(key)}, #{quote(serialized)}, #{expires})"
-        )
+        stmt = if ttl
+          @conn.prepare(
+            "INSERT IGNORE INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
+            "VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND))"
+          )
+        else
+          @conn.prepare(
+            "INSERT IGNORE INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
+            "VALUES (?, ?, ?, NULL)"
+          )
+        end
+        stmt.execute(@key_prefix, key, serialized)
         @conn.affected_rows > 0
       end
 
@@ -146,10 +161,6 @@ module ChatSDK
       end
 
       private
-
-      def quote(value)
-        "'#{@conn.escape(value.to_s)}'"
-      end
 
       def connect(url)
         Mysql2::Client.new(url)
