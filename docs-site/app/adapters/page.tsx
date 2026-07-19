@@ -69,6 +69,14 @@ function TelegramIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function TwilioIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
+      <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 20.4a8.4 8.4 0 1 1 0-16.8 8.4 8.4 0 0 1 0 16.8zm3.6-11.4a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0zm0 6a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0zm-6 0a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0zm0-6a2.4 2.4 0 1 1-4.8 0 2.4 2.4 0 0 1 4.8 0z" />
+    </svg>
+  );
+}
+
 function RedisIcon({ size = 20 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
@@ -170,6 +178,20 @@ const adapters: Adapter[] = [
       post: 'yes', edit: 'yes', delete: 'yes', ephemeral: 'no',
       reactions: 'yes', files: 'yes', modals: 'no', streaming: 'yes',
       dms: 'yes', history: 'no', typing: 'yes',
+    },
+  },
+  {
+    name: 'Twilio',
+    slug: 'twilio',
+    gem: 'chat_sdk-twilio',
+    type: 'platform',
+    tagline: 'SMS/MMS adapter with HMAC-SHA1 signature verification',
+    color: '#F22F46',
+    icon: <TwilioIcon />,
+    features: {
+      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
+      reactions: 'no', files: 'no', modals: 'no', streaming: 'no',
+      dms: 'yes', history: 'no', typing: 'no',
     },
   },
   {

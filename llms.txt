@@ -56,6 +56,7 @@
 - [Mattermost](docs/adapters/mattermost.md)
 - [Discord](docs/adapters/discord.md)
 - [Telegram](docs/adapters/telegram.md)
+- [Twilio SMS/MMS](docs/adapters/twilio.md)
 - [Redis State](docs/adapters/state-redis.md)
 - [Memory State](docs/adapters/state-memory.md)
 

@@ -1,0 +1,101 @@
+---
+title: Twilio Adapter
+description: Twilio SMS/MMS adapter with HMAC-SHA1 signature verification via the chat_sdk-twilio gem.
+---
+
+The Twilio adapter (`chat_sdk-twilio`) integrates with Twilio for SMS and MMS messaging with HMAC-SHA1 webhook signature verification.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk"
+gem "chat_sdk-twilio"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/twilio"
+
+twilio = ChatSDK::Twilio::Adapter.new(
+  account_sid: ENV["TWILIO_ACCOUNT_SID"],                   # Your Twilio Account SID
+  auth_token: ENV["TWILIO_AUTH_TOKEN"],                      # Your Twilio Auth Token
+  phone_number: ENV["TWILIO_PHONE_NUMBER"],                  # Your Twilio phone number
+  messaging_service_sid: ENV["TWILIO_MESSAGING_SERVICE_SID"], # Or use a Messaging Service
+  webhook_url: "https://your-app.com/webhooks/twilio"        # For signature verification
+)
+```
+
+`account_sid` and `auth_token` are required. Either `phone_number` or `messaging_service_sid` must be provided.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `TWILIO_ACCOUNT_SID` | Your Twilio Account SID |
+| `TWILIO_AUTH_TOKEN` | Your Twilio Auth Token |
+| `TWILIO_PHONE_NUMBER` | Your Twilio phone number (E.164 format) |
+| `TWILIO_MESSAGING_SERVICE_SID` | Twilio Messaging Service SID (alternative to phone number) |
+
+## Twilio Setup
+
+1. Create a [Twilio account](https://www.twilio.com/try-twilio).
+2. Purchase a phone number from the Twilio console.
+3. Navigate to **Phone Numbers > Manage > Active Numbers** and select your number.
+4. Under **Messaging**, set the webhook URL for "A message comes in" to your app's webhook endpoint.
+5. Set the HTTP method to POST and format to `application/x-www-form-urlencoded`.
+
+## Webhook URL
+
+```
+https://your-domain.com/webhooks/twilio
+```
+
+```ruby
+map "/webhooks/twilio" do
+  run bot.webhooks[:twilio]
+end
+```
+
+## Capabilities
+
+| Capability | Supported | Notes |
+|------------|-----------|-------|
+| `direct_messages` | Yes | SMS is inherently point-to-point |
+| `file_uploads` | No | Twilio MMS requires public MediaUrl; binary upload not supported |
+| `edit_messages` | No | Raises `NotSupportedError` |
+| `delete_messages` | No | Raises `NotSupportedError` |
+| `ephemeral_messages` | No | Raises `NotSupportedError` |
+| `reactions` | No | Raises `NotSupportedError` |
+| `modals` | No | Raises `NotSupportedError` |
+| `typing_indicator` | No | Raises `NotSupportedError` |
+| `streaming_edit` | No | Raises `NotSupportedError` |
+| `threads` | No | Raises `NotSupportedError` |
+| `message_history` | No | Raises `NotSupportedError` |
+
+## Webhook Verification
+
+The adapter verifies incoming webhooks using Twilio's HMAC-SHA1 signature validation. The `X-Twilio-Signature` header is compared against a computed signature using your Auth Token, the full webhook URL, and the POST parameters.
+
+Pass `webhook_url` in the constructor to ensure the correct URL is used for verification (important if your app sits behind a reverse proxy).
+
+## Cards Rendering
+
+Cards are rendered as plain text fallback since SMS does not support rich formatting. The core `Cards::Renderer` is used.
+
+## Direct Client Access
+
+```ruby
+twilio_adapter = bot.adapter(:twilio)
+client = twilio_adapter.client  # ApiClient
+```
+
+## Mention Formatting
+
+SMS has no mention syntax. `mention(user_id)` returns the phone number as-is:
+
+```ruby
+twilio_adapter.mention("+15559876543")  # => "+15559876543"
+```
