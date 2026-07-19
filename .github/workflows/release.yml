@@ -72,7 +72,7 @@ jobs:
           - gem: chat_sdk-twilio
             oidc_role: rg_oidc_akr_81n5kemct5cmdwrx21e1
           - gem: chat_sdk-messenger
-            oidc_role: "" # OIDC role not yet configured
+            oidc_role: rg_oidc_akr_348j7rrrtrz6knkt2bzm
           - gem: chat_sdk-state-redis
             oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
           - gem: chat_sdk-state-pg
