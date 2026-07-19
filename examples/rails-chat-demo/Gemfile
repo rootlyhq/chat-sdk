@@ -1,0 +1,18 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+gem "rails", "~> 8.0"
+gem "puma", ">= 5"
+gem "propshaft"
+gem "turbo-rails"
+gem "stimulus-rails"
+gem "tailwindcss-rails"
+
+# ChatSDK
+gem "chat_sdk"
+# gem "chat_sdk-slack"  # Uncomment for Slack integration
+
+group :development do
+  gem "web-console"
+end
