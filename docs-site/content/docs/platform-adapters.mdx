@@ -9,19 +9,19 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio | Messenger |
-|---------|-------|-------|-------|------------|---------|----------|--------|-----------|
-| Post | yes | yes | yes | yes | yes | yes | yes | yes |
-| Edit | yes | yes | yes | yes | yes | yes | no | no |
-| Delete | yes | yes | yes | yes | yes | yes | no | no |
-| Ephemeral | yes | no | yes | yes | no | no | no | no |
-| Reactions | yes | yes | yes | yes | yes | yes | no | no |
-| Files | yes | yes | no | yes | yes | yes | no | yes |
-| Modals | yes | no | no | no | no | no | no | no |
-| Streaming | yes | yes | yes | yes | yes | yes | no | no |
-| DMs | yes | yes | yes | yes | yes | yes | yes | yes |
-| History | yes | yes | yes | yes | yes | no | no | no |
-| Typing | yes | no | no | yes | no | yes | no | yes |
+| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio | Messenger | WhatsApp |
+|---------|-------|-------|-------|------------|---------|----------|--------|-----------|----------|
+| Post | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes | yes | yes | no | no | no |
+| Delete | yes | yes | yes | yes | yes | yes | no | no | no |
+| Ephemeral | yes | no | yes | yes | no | no | no | no | no |
+| Reactions | yes | yes | yes | yes | yes | yes | no | no | yes |
+| Files | yes | yes | no | yes | yes | yes | no | yes | yes |
+| Modals | yes | no | no | no | no | no | no | no | no |
+| Streaming | yes | yes | yes | yes | yes | yes | no | no | no |
+| DMs | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| History | yes | yes | yes | yes | yes | no | no | no | no |
+| Typing | yes | no | no | yes | no | yes | no | yes | no |
 
 ## Official Adapters
 
@@ -33,6 +33,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Telegram](adapters/telegram) -- `gem "chat_sdk-telegram"` -- Telegram Bot API adapter with webhook secret token verification and inline keyboard rendering.
 - [Twilio](adapters/twilio) -- `gem "chat_sdk-twilio"` -- Twilio SMS/MMS adapter with HMAC-SHA1 signature verification.
 - [Messenger](adapters/messenger) -- `gem "chat_sdk-messenger"` -- Facebook Messenger adapter with HMAC-SHA256 verification and Generic/Button template rendering.
+- [WhatsApp](adapters/whatsapp) -- `gem "chat_sdk-whatsapp"` -- WhatsApp Business Cloud API adapter with HMAC-SHA256 verification and interactive message rendering.
 
 ## Checking Capabilities at Runtime
 

@@ -22,6 +22,13 @@ PATH
       faraday (~> 2.0)
 
 PATH
+  remote: chat_sdk-messenger
+  specs:
+    chat_sdk-messenger (0.2.1)
+      chat_sdk (~> 0.1)
+      faraday (~> 2.0)
+
+PATH
   remote: chat_sdk-slack
   specs:
     chat_sdk-slack (0.2.1)
@@ -68,6 +75,13 @@ PATH
   remote: chat_sdk-twilio
   specs:
     chat_sdk-twilio (0.2.1)
+      chat_sdk (~> 0.1)
+      faraday (~> 2.0)
+
+PATH
+  remote: chat_sdk-whatsapp
+  specs:
+    chat_sdk-whatsapp (0.2.1)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
@@ -321,6 +335,7 @@ DEPENDENCIES
   chat_sdk-discord!
   chat_sdk-gchat!
   chat_sdk-mattermost!
+  chat_sdk-messenger!
   chat_sdk-slack!
   chat_sdk-state-mysql!
   chat_sdk-state-pg!
@@ -328,6 +343,7 @@ DEPENDENCIES
   chat_sdk-teams!
   chat_sdk-telegram!
   chat_sdk-twilio!
+  chat_sdk-whatsapp!
   rack-test (~> 2.1)
   rake (~> 13.0)
   rspec (~> 3.13)

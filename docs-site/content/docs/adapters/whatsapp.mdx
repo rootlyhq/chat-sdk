@@ -1,0 +1,128 @@
+---
+title: WhatsApp Adapter
+description: WhatsApp Business Cloud API adapter with HMAC-SHA256 signature verification and interactive message rendering via the chat_sdk-whatsapp gem.
+---
+
+The WhatsApp adapter (`chat_sdk-whatsapp`) integrates with the WhatsApp Business Cloud API with HMAC-SHA256 webhook signature verification, interactive button messages, and emoji reactions.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk"
+gem "chat_sdk-whatsapp"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/whatsapp"
+
+whatsapp = ChatSDK::WhatsApp::Adapter.new(
+  access_token: ENV["WHATSAPP_ACCESS_TOKEN"],       # Permanent or temporary access token
+  app_secret: ENV["WHATSAPP_APP_SECRET"],            # Facebook App Secret
+  phone_number_id: ENV["WHATSAPP_PHONE_NUMBER_ID"],  # WhatsApp Phone Number ID
+  verify_token: ENV["WHATSAPP_VERIFY_TOKEN"]         # Webhook verify token
+)
+```
+
+`access_token` and `phone_number_id` are required. `app_secret` is needed for webhook signature verification. `verify_token` is needed for the webhook verification handshake.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `WHATSAPP_ACCESS_TOKEN` | Permanent or temporary access token from Meta Developer Console |
+| `WHATSAPP_APP_SECRET` | Your Facebook App Secret (for webhook signature verification) |
+| `WHATSAPP_PHONE_NUMBER_ID` | Phone Number ID from WhatsApp Business settings |
+| `WHATSAPP_VERIFY_TOKEN` | Custom token for webhook subscription verification |
+
+## WhatsApp Business Setup
+
+1. Create a [Meta App](https://developers.facebook.com/apps/) in the Developer Console.
+2. Add the WhatsApp product to your app.
+3. In **WhatsApp > Getting Started**, note your Phone Number ID and generate a temporary access token (or set up a System User for a permanent token).
+4. In **WhatsApp > Configuration**, set your webhook callback URL and verify token.
+5. Subscribe to the `messages` webhook field.
+6. Copy your App Secret from **Settings > Basic**.
+
+## Webhook URL
+
+```
+https://your-domain.com/webhooks/whatsapp
+```
+
+```ruby
+map "/webhooks/whatsapp" do
+  run bot.webhooks[:whatsapp]
+end
+```
+
+The adapter handles both the GET verification handshake (returns `hub.challenge`) and POST message webhooks.
+
+## Capabilities
+
+| Capability | Supported | Notes |
+|------------|-----------|-------|
+| `direct_messages` | Yes | WhatsApp is inherently 1:1 DM via phone number |
+| `file_uploads` | Yes | Upload media then send with media ID |
+| `reactions` | Yes | Emoji reactions on messages |
+| `edit_messages` | No | Raises `NotSupportedError` |
+| `delete_messages` | No | Raises `NotSupportedError` |
+| `ephemeral_messages` | No | Raises `NotSupportedError` |
+| `typing_indicator` | No | Raises `NotSupportedError` |
+| `modals` | No | Raises `NotSupportedError` |
+| `streaming_edit` | No | Raises `NotSupportedError` |
+| `threads` | No | Raises `NotSupportedError` |
+| `message_history` | No | Raises `NotSupportedError` |
+
+## Webhook Verification
+
+The adapter verifies incoming POST webhooks using Meta's HMAC-SHA256 signature validation. The `X-Hub-Signature-256` header is compared against a computed signature using your App Secret and the raw request body.
+
+For GET requests, the adapter handles the webhook subscription handshake by verifying `hub.verify_token` and returning `hub.challenge`.
+
+## Interactive Messages
+
+Cards are rendered as WhatsApp interactive messages:
+
+- **Button Message**: When the card has a title and up to 3 buttons. Supports header, body text, and reply buttons.
+- **Fallback**: Plain text for cards that exceed 3 buttons or have only link buttons (WhatsApp reply buttons cannot contain URLs).
+
+Reply button titles are truncated to 20 characters per WhatsApp's limit.
+
+## Reactions
+
+Send and remove emoji reactions on messages:
+
+```ruby
+# Add a reaction
+whatsapp_adapter.add_reaction(
+  channel_id: "15551234567",
+  message_id: "wamid.abc123",
+  emoji: "\u{1F44D}"
+)
+
+# Remove a reaction (empty emoji)
+whatsapp_adapter.remove_reaction(
+  channel_id: "15551234567",
+  message_id: "wamid.abc123",
+  emoji: "\u{1F44D}"
+)
+```
+
+## Direct Client Access
+
+```ruby
+whatsapp_adapter = bot.adapter(:whatsapp)
+client = whatsapp_adapter.client  # ApiClient
+```
+
+## Mention Formatting
+
+WhatsApp has no mention syntax. `mention(user_id)` returns the phone number as-is:
+
+```ruby
+whatsapp_adapter.mention("+15551234567")  # => "+15551234567"
+```
