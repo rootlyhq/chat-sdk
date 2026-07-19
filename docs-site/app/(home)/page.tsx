@@ -173,16 +173,10 @@ export default async function HomePage() {
               Get Started
               <span className="inline-block ml-1 transition-transform group-hover:translate-x-0.5">→</span>
             </Link>
-            <Link
-              href="https://github.com/rootlyhq/chat-sdk"
-              className="px-7 py-3.5 rounded-xl border border-gray-300 dark:border-gray-700 font-semibold hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors"
-            >
-              GitHub
-            </Link>
           </div>
 
           {/* Platform pills */}
-          <div className="flex flex-wrap gap-3 justify-center">
+          <div className="flex flex-wrap gap-3 justify-center max-w-2xl mx-auto">
             {platforms.map((p) => (
               <div
                 key={p.name}
