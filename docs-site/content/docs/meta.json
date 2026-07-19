@@ -17,6 +17,7 @@
     "---Architecture---",
     "platform-adapters",
     "state-adapters",
+    "instrumentation",
     "---Messaging---",
     "streaming",
     "direct-messages",

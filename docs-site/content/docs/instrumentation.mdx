@@ -1,0 +1,141 @@
+---
+title: Instrumentation
+description: Subscribe to internal SDK events for monitoring, logging, and metrics collection.
+---
+
+ChatSDK emits instrumentation events at key points in the dispatch pipeline and outbound API calls. Subscribe to these events to collect metrics, log activity, or integrate with observability tools — with zero external dependencies.
+
+## Subscribing to Events
+
+```ruby
+ChatSDK::Instrumentation.subscribe("handler.chat_sdk") do |event_name, payload|
+  puts "#{event_name}: #{payload[:handler_type]} took #{payload[:duration]}s"
+end
+```
+
+The block receives:
+- `event_name` — the event string (e.g. `"handler.chat_sdk"`)
+- `payload` — a hash with event-specific data plus `:duration` (seconds as Float)
+
+## Available Events
+
+### dispatch.chat_sdk
+
+Fired for every inbound event entering the dispatch pipeline.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `adapter` | `Symbol` | Adapter name (e.g. `:slack`) |
+| `event_type` | `Symbol` | Event type (`:mention`, `:action`, etc.) |
+| `duration` | `Float` | Total dispatch time in seconds |
+| `error` | `Exception` | Present only if dispatch raised |
+
+### dedupe.chat_sdk
+
+Fired after each deduplication check.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `adapter` | `Symbol` | Adapter name |
+| `event_id` | `String` | The event/message ID checked |
+| `duplicate` | `Boolean` | `true` if this event was already processed |
+
+### lock.chat_sdk
+
+Fired after each lock acquisition attempt.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `key` | `String` | Thread lock key |
+| `acquired` | `Boolean` | Whether the lock was obtained |
+| `policy` | `Symbol` | Conflict policy applied (`:drop`, `:force`, or `nil`) |
+
+### handler.chat_sdk
+
+Fired for each handler invocation.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `handler_type` | `Symbol` | Event type the handler processes |
+| `duration` | `Float` | Handler execution time in seconds |
+| `error` | `Exception` | Present only if the handler raised |
+
+### api\_request.chat\_sdk
+
+Fired for every outbound API call through `ChatSDK::ApiClient::Base`.
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `adapter` | `Symbol` | Adapter name |
+| `method` | `Symbol` | HTTP method (`:get`, `:post`, etc.) |
+| `path` | `String` | API endpoint path |
+| `duration` | `Float` | Request time in seconds |
+| `error` | `Exception` | Present only if the request raised |
+
+### rate\_limited.chat\_sdk
+
+Fired when an API call receives a 429 response (before retry).
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `adapter` | `Symbol` | Adapter name |
+| `retry_after` | `Integer` | Seconds to wait (from API response, or `nil`) |
+| `attempt` | `Integer` | Retry attempt number (1-based) |
+
+## Examples
+
+### StatsD Metrics
+
+```ruby
+ChatSDK::Instrumentation.subscribe("handler.chat_sdk") do |_, payload|
+  StatsD.timing("chat_sdk.handler.#{payload[:handler_type]}", payload[:duration] * 1000)
+end
+
+ChatSDK::Instrumentation.subscribe("api_request.chat_sdk") do |_, payload|
+  StatsD.timing("chat_sdk.api.#{payload[:adapter]}.#{payload[:method]}", payload[:duration] * 1000)
+end
+
+ChatSDK::Instrumentation.subscribe("rate_limited.chat_sdk") do |_, payload|
+  StatsD.increment("chat_sdk.rate_limited.#{payload[:adapter]}")
+end
+```
+
+### Structured Logging
+
+```ruby
+ChatSDK::Instrumentation.subscribe("dispatch.chat_sdk") do |_, payload|
+  Rails.logger.info({
+    event: "chat_sdk.dispatch",
+    adapter: payload[:adapter],
+    type: payload[:event_type],
+    duration_ms: (payload[:duration] * 1000).round(1)
+  }.to_json)
+end
+```
+
+### ActiveSupport::Notifications Bridge
+
+```ruby
+ChatSDK::Instrumentation.subscribe("handler.chat_sdk") do |name, payload|
+  ActiveSupport::Notifications.instrument(name, payload)
+end
+```
+
+## Unsubscribing
+
+```ruby
+block = ChatSDK::Instrumentation.subscribe("handler.chat_sdk") { |_, p| ... }
+
+# Later:
+ChatSDK::Instrumentation.unsubscribe("handler.chat_sdk", block)
+```
+
+## Testing
+
+Use `ChatSDK::Instrumentation.reset!` in test teardown to clear all subscribers:
+
+```ruby
+RSpec.configure do |config|
+  config.after { ChatSDK::Instrumentation.reset! }
+end
+```
