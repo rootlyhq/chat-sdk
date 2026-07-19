@@ -90,7 +90,8 @@ module ChatSDK
 
       def render(postable_message)
         if postable_message.card?
-          Cards::Renderer.new.render(postable_message.card)
+          @text_renderer ||= Cards::Renderer.new
+          @text_renderer.render(postable_message.card)
         else
           postable_message.text
         end
