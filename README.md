@@ -1,7 +1,12 @@
-# ChatSDK Ruby
+<p align="center">
+  <img src="banner.png" alt="ChatSDK Ruby — One Ruby gem. Every channel." width="100%">
+</p>
 
-[![CI](https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml)
-[![MIT License](https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000)](LICENSE)
+<p align="center">
+  <a href="https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml"><img src="https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000" alt="MIT License"></a>
+  <a href="https://rubygems.org/gems/chat_sdk"><img src="https://img.shields.io/gem/v/chat_sdk?style=flat-square&color=CC342D" alt="Gem Version"></a>
+</p>
 
 > **Beta** — This SDK is experimental and under active development. APIs may change between minor versions. Not recommended for production use yet.
 
