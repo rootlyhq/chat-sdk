@@ -75,6 +75,8 @@ jobs:
             oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
           - gem: chat_sdk-state-pg
             oidc_role: rg_oidc_akr_99vhvwzcqrdwq9bsxhya
+          - gem: chat_sdk-state-mysql
+            oidc_role: rg_oidc_akr_2t4724ngfqoyzgc5z1nv
 
     name: "Publish ${{ matrix.gem }}"
 
