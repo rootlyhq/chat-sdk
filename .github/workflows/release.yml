@@ -67,7 +67,8 @@ jobs:
             oidc_role: rg_oidc_akr_rggsmpj2soty2ssvpwvp
           - gem: chat_sdk-discord
             oidc_role: rg_oidc_akr_1snzvyj4dc59dmw5he9g
-          # chat_sdk-telegram: oidc_role to be configured before first publish
+          - gem: chat_sdk-telegram
+            oidc_role: rg_oidc_akr_xqh9csbd15and36ywggh
           - gem: chat_sdk-state-redis
             oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
 
