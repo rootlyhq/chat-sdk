@@ -293,9 +293,9 @@ RSpec.describe ChatSDK::Twilio::Adapter do
   end
 
   describe "#upload_file" do
-    it "raises PlatformError explaining binary upload is not supported" do
+    it "raises NotSupportedError since file_uploads is not a declared capability" do
       expect { subject.upload_file(channel_id: "+15559876543", io: StringIO.new("data"), filename: "test.txt") }
-        .to raise_error(ChatSDK::PlatformError, /MediaUrl/)
+        .to raise_error(ChatSDK::NotSupportedError)
     end
   end
 
@@ -381,8 +381,8 @@ RSpec.describe ChatSDK::Twilio::Adapter do
       expect(subject.supports?(:direct_messages)).to be true
     end
 
-    it "supports file_uploads capability" do
-      expect(subject.supports?(:file_uploads)).to be true
+    it "does not support file_uploads capability" do
+      expect(subject.supports?(:file_uploads)).to be false
     end
   end
 

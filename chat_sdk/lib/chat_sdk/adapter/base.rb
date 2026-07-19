@@ -89,6 +89,14 @@ module ChatSDK
         Cards::Renderer.new.render(postable_message.card)
       end
 
+      protected
+
+      def read_json_body(rack_request)
+        body = rack_request.body.read
+        rack_request.body.rewind
+        JSON.parse(body)
+      end
+
       private
 
       def require_capability!(cap)

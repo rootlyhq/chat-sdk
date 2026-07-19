@@ -37,10 +37,7 @@ module ChatSDK
       end
 
       def parse_events(rack_request)
-        body = rack_request.body.read
-        rack_request.body.rewind
-
-        activity = JSON.parse(body)
+        activity = read_json_body(rack_request)
 
         # Cache the service URL for this conversation
         if activity["serviceUrl"] && activity.dig("conversation", "id")

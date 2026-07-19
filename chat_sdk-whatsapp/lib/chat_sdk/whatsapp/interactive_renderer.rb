@@ -3,6 +3,8 @@
 module ChatSDK
   module WhatsApp
     class InteractiveRenderer
+      include ChatSDK::Cards::TextHelpers
+
       def render(node)
         case node.type
         when :card then render_card(node)
@@ -75,26 +77,6 @@ module ChatSDK
         buttons
       end
 
-      def collect_text_parts(node)
-        parts = []
-        node.children.each do |child|
-          case child.type
-          when :text
-            parts << child.attributes[:content]
-          when :divider
-            parts << "---"
-          when :fields
-            child.children.each do |field|
-              parts << "#{field.attributes[:label]}: #{field.attributes[:value]}"
-            end
-          when :section
-            parts << child.attributes[:title] if child.attributes[:title]
-            parts.concat(collect_text_parts(child))
-          end
-        end
-        parts
-      end
-
       def render_single(node)
         case node.type
         when :text
@@ -102,12 +84,6 @@ module ChatSDK
         else
           {text: node.fallback_text}
         end
-      end
-
-      def truncate(text, max)
-        return "" unless text
-
-        (text.length > max) ? "#{text[0..max - 4]}..." : text
       end
     end
   end

@@ -5,7 +5,7 @@ require "rack/utils"
 module ChatSDK
   module Twilio
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :direct_messages, :file_uploads
+      capabilities :direct_messages
 
       attr_reader :client
 
@@ -70,14 +70,6 @@ module ChatSDK
         )
 
         parse_twilio_message(result, channel_id)
-      end
-
-      def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil) # rubocop:disable Lint/UnusedMethodArgument
-        raise ChatSDK::PlatformError.new(
-          "Twilio MMS requires a publicly accessible MediaUrl. Binary upload is not supported. " \
-          "Host the file at a public URL and send it as a message with the URL included.",
-          adapter_name: :twilio
-        )
       end
 
       def open_dm(user_id)

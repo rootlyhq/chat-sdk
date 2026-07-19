@@ -1,11 +1,10 @@
 # frozen_string_literal: true
 
-require "openssl"
-require "rack/utils"
-
 module ChatSDK
   module Messenger
     class Adapter < ChatSDK::Adapter::Base
+      include ChatSDK::Adapter::MetaVerification
+
       capabilities :typing_indicator, :direct_messages, :file_uploads
 
       attr_reader :client
@@ -28,42 +27,15 @@ module ChatSDK
 
       # Inbound
       def verify_request!(rack_request)
-        signature = rack_request.get_header("HTTP_X_HUB_SIGNATURE_256")
-
-        unless signature
-          raise ChatSDK::SignatureVerificationError, "Missing Facebook signature header"
-        end
-
-        body = rack_request.body.read
-        rack_request.body.rewind
-
-        expected = "sha256=#{OpenSSL::HMAC.hexdigest("SHA256", @app_secret, body)}"
-
-        unless Rack::Utils.secure_compare(signature, expected)
-          raise ChatSDK::SignatureVerificationError, "Invalid Facebook signature"
-        end
-
-        true
+        verify_meta_signature!(rack_request, secret: @app_secret, platform_name: "Facebook")
       end
 
       def ack_response(rack_request)
-        return nil unless rack_request.get?
-
-        params = rack_request.params
-        mode = params["hub.mode"]
-        token = params["hub.verify_token"]
-        challenge = params["hub.challenge"]
-
-        if mode == "subscribe" && token == @verify_token
-          [200, {}, [challenge.to_s]]
-        end
+        meta_ack_response(rack_request, verify_token: @verify_token)
       end
 
       def parse_events(rack_request)
-        body = rack_request.body.read
-        rack_request.body.rewind
-
-        payload = JSON.parse(body)
+        payload = read_json_body(rack_request)
         EventParser.parse(payload)
       rescue JSON::ParserError
         []

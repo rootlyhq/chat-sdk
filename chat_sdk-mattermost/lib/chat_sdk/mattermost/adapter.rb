@@ -50,10 +50,7 @@ module ChatSDK
       end
 
       def parse_events(rack_request)
-        body = rack_request.body.read
-        rack_request.body.rewind
-
-        payload = JSON.parse(body)
+        payload = read_json_body(rack_request)
         EventParser.parse(payload, bot_user_id: @bot_user_id)
       rescue JSON::ParserError
         []
