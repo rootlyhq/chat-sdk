@@ -39,11 +39,14 @@ module ChatSDK
       def request(method, path, body = nil)
         retries = 0
         begin
-          response = connection.public_send(method, path) do |req|
-            req.body = body if body && method != :get
+          ChatSDK::Instrumentation.instrument("api_request.chat_sdk", adapter: adapter_name, method: method, path: path) do
+            response = connection.public_send(method, path) do |req|
+              req.body = body if body && method != :get
+            end
+            handle_response(response)
           end
-          handle_response(response)
         rescue ChatSDK::RateLimitedError => e
+          ChatSDK::Instrumentation.instrument("rate_limited.chat_sdk", adapter: adapter_name, retry_after: e.retry_after, attempt: retries + 1)
           retries += 1
           raise if retries > MAX_RETRIES
           sleep(e.retry_after || (2**retries * 0.5))
