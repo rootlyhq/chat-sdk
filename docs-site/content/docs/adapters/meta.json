@@ -9,6 +9,7 @@
     "telegram",
     "twilio",
     "state-memory",
-    "state-redis"
+    "state-redis",
+    "state-pg"
   ]
 }

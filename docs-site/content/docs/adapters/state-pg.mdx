@@ -1,0 +1,86 @@
+---
+title: PostgreSQL State Adapter
+description: PostgreSQL-backed state storage with auto-migration and JSONB for production deployments.
+---
+
+The PostgreSQL state adapter (`chat_sdk-state-pg`) stores all state data in PostgreSQL tables, making it suitable for production deployments where you already use PostgreSQL and want to avoid adding Redis as a dependency.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk-state-pg"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk/state/pg"
+
+# From URL
+state = ChatSDK::State::Pg.new(url: "postgresql://localhost/myapp")
+
+# From environment variable (falls back to postgresql://localhost/chat_sdk_dev)
+state = ChatSDK::State::Pg.new
+
+# With a pre-existing PG connection
+conn = PG.connect("postgresql://localhost/myapp")
+state = ChatSDK::State::Pg.new(connection: conn)
+
+# With a custom key prefix (for multi-tenant isolation)
+state = ChatSDK::State::Pg.new(key_prefix: "myapp")
+
+# Disable auto-migration (if you manage schema yourself)
+state = ChatSDK::State::Pg.new(auto_migrate: false)
+```
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection URL (primary) |
+| `POSTGRES_URL` | PostgreSQL connection URL (fallback) |
+
+## Tables
+
+The adapter auto-creates three tables on first use:
+
+| Table | Purpose |
+|-------|---------|
+| `chat_sdk_subscriptions` | Subscribed thread IDs per key prefix |
+| `chat_sdk_locks` | Distributed processing locks with expiration |
+| `chat_sdk_cache` | JSONB key-value store with optional TTL |
+
+All tables use composite primary keys with `key_prefix` for multi-tenant isolation.
+
+## When to Use
+
+Use PostgreSQL state when:
+
+- You already run PostgreSQL and want to avoid adding Redis
+- You need state to survive process restarts
+- You want JSONB storage for structured state data
+- You need multi-tenant isolation via key prefixes
+
+## Atomic Operations
+
+- Locks use `INSERT ... ON CONFLICT DO NOTHING` for safe acquisition and owner-verified `DELETE` for release.
+- `set_if_absent` uses `INSERT ... ON CONFLICT DO NOTHING` to prevent race conditions.
+- TTL-based expiration is checked at read time and cleaned up via `cleanup_expired`.
+
+## Cleanup
+
+```ruby
+state = ChatSDK::State::Pg.new
+state.clear            # Deletes all state for this key prefix
+state.cleanup_expired  # Removes expired cache entries and locks
+```
+
+Use `clear` with caution in production -- this removes all subscriptions, locks, and stored state for the key prefix.
+
+## Direct Connection Access
+
+```ruby
+state = ChatSDK::State::Pg.new
+pg_conn = state.conn  # PG::Connection instance
+```

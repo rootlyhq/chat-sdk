@@ -48,6 +48,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: chat_sdk_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     name: "Ruby ${{ matrix.ruby }}"
 
@@ -65,6 +77,7 @@ jobs:
         run: bundle exec rspec
         env:
           REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/chat_sdk_test
 
   build-and-test:
     runs-on: ubuntu-latest

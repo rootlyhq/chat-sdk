@@ -58,6 +58,7 @@
 - [Telegram](docs/adapters/telegram.md)
 - [Twilio SMS/MMS](docs/adapters/twilio.md)
 - [Redis State](docs/adapters/state-redis.md)
+- [PostgreSQL State](docs/adapters/state-pg.md)
 - [Memory State](docs/adapters/state-memory.md)
 
 ## AI

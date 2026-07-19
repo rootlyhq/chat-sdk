@@ -23,6 +23,7 @@ AllCops:
     - "chat_sdk-telegram/**/*.rb"
     - "chat_sdk-twilio/**/*.rb"
     - "chat_sdk-state-redis/**/*.rb"
+    - "chat_sdk-state-pg/**/*.rb"
     - "spec/**/*.rb"
   Exclude:
     - "vendor/**/*"
