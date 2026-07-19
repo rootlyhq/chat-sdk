@@ -4,7 +4,7 @@
 /coverage/
 /pkg/
 /spec/reports/
-/tmp/
+tmp/
 
 .bundle
 .byebug_history
@@ -15,6 +15,9 @@
 
 Gemfile.lock
 
+log/
+storage/
+*.sqlite3
 *.swp
 *.swo
 .idea/
@@ -24,3 +27,4 @@ Thumbs.db
 .serena/
 .context/
 .vercel
+.env*
