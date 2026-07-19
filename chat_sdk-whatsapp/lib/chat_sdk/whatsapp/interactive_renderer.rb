@@ -18,13 +18,12 @@ module ChatSDK
         subtitle = node.attributes[:subtitle]
         text_parts = collect_text_parts(node)
         body_text = [subtitle, *text_parts].compact.reject(&:empty?).join("\n")
-        body_text = title if body_text.empty? && title
+        body_text = title if body_text.empty?
 
         if title && buttons.any? && buttons.length <= 3
-          # Interactive button message
           interactive = {
             "type" => "button",
-            "body" => {"text" => body_text.empty? ? title : body_text}
+            "body" => {"text" => body_text}
           }
           interactive["header"] = {"type" => "text", "text" => truncate(title, 60)} if title
           interactive["action"] = {

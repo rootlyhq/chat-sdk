@@ -16,7 +16,7 @@ module ChatSDK
           "recipient_type" => "individual",
           "to" => to,
           "type" => type
-        }.merge(stringify_keys(payload))
+        }.merge(payload)
 
         request(:post, "#{@phone_number_id}/messages", body)
       end
@@ -44,17 +44,16 @@ module ChatSDK
       private
 
       def connection
-        @connection ||= Faraday.new(url: BASE_URL) do |f|
-          f.request :json
-          f.response :json
-          f.adapter :net_http
-          f.headers["Authorization"] = "Bearer #{@access_token}"
-        end
+        @connection ||= build_connection { |f| f.request :json }
       end
 
       def media_connection
-        @media_connection ||= Faraday.new(url: BASE_URL) do |f|
-          f.request :multipart
+        @media_connection ||= build_connection { |f| f.request :multipart }
+      end
+
+      def build_connection
+        Faraday.new(url: BASE_URL) do |f|
+          yield f
           f.response :json
           f.adapter :net_http
           f.headers["Authorization"] = "Bearer #{@access_token}"
@@ -71,12 +70,7 @@ module ChatSDK
 
       def handle_response(response)
         body = response.body
-
-        if response.success?
-          return body if body.is_a?(Hash)
-
-          return {}
-        end
+        return body.is_a?(Hash) ? body : {} if response.success?
 
         if response.status == 429
           raise ChatSDK::RateLimitedError.new(
@@ -95,12 +89,6 @@ module ChatSDK
           body: body,
           adapter_name: :whatsapp
         )
-      end
-
-      def stringify_keys(hash)
-        hash.transform_keys(&:to_s).transform_values do |v|
-          v.is_a?(Hash) ? stringify_keys(v) : v
-        end
       end
     end
   end

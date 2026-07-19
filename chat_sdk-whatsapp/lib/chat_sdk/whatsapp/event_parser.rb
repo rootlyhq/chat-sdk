@@ -8,23 +8,11 @@ module ChatSDK
           return [] unless payload.is_a?(Hash)
           return [] unless payload["object"] == "whatsapp_business_account"
 
-          events = []
-
-          (payload["entry"] || []).each do |entry|
-            (entry["changes"] || []).each do |change|
-              next unless change["field"] == "messages"
-
-              value = change["value"]
-              next unless value
-
-              (value["messages"] || []).each do |msg|
-                event = parse_message(msg, phone_number_id)
-                events << event if event
-              end
-            end
-          end
-
-          events
+          (payload["entry"] || [])
+            .flat_map { |entry| entry["changes"] || [] }
+            .select { |change| change["field"] == "messages" }
+            .flat_map { |change| change.dig("value", "messages") || [] }
+            .filter_map { |msg| parse_message(msg, phone_number_id) }
         end
 
         private
@@ -33,62 +21,27 @@ module ChatSDK
           from = msg["from"]&.to_s
           return nil unless from
 
-          msg_id = msg["id"]
-          channel_id = from
+          author = ChatSDK::Author.new(id: from, name: from, platform: :whatsapp, bot: false)
           thread_id = "whatsapp:#{phone_number_id}:#{from}"
 
           case msg["type"]
           when "text"
-            parse_text_message(msg, from, msg_id, channel_id, thread_id)
+            build_direct_message(msg, msg.dig("text", "body") || "", author, from, thread_id)
           when "interactive"
-            parse_interactive_message(msg, from, channel_id, thread_id)
+            parse_interactive_message(msg, author, from, thread_id)
           when "image", "document", "audio", "video"
-            parse_media_message(msg, from, msg_id, channel_id, thread_id)
+            parse_media_message(msg, author, from, thread_id)
           end
         end
 
-        def parse_text_message(msg, from, msg_id, channel_id, thread_id)
-          text = msg.dig("text", "body") || ""
-
-          message = ChatSDK::Message.new(
-            id: msg_id,
-            text: text,
-            author: ChatSDK::Author.new(id: from, name: from, platform: :whatsapp, bot: false),
-            thread_id: thread_id,
-            channel_id: channel_id,
-            platform: :whatsapp,
-            raw: msg
-          )
-
-          ChatSDK::Events::DirectMessage.new(
-            message: message,
-            thread_id: thread_id,
-            channel_id: channel_id,
-            platform: :whatsapp,
-            adapter_name: :whatsapp,
-            raw: msg
-          )
-        end
-
-        def parse_interactive_message(msg, from, channel_id, thread_id)
+        def parse_interactive_message(msg, author, channel_id, thread_id)
           interactive = msg["interactive"] || {}
-          button_reply = interactive["button_reply"]
-          list_reply = interactive["list_reply"]
-
-          action_id = button_reply&.dig("id") || list_reply&.dig("id") || ""
-          value = action_id
-
-          user = ChatSDK::Author.new(
-            id: from,
-            name: from,
-            platform: :whatsapp,
-            bot: false
-          )
+          action_id = interactive.dig("button_reply", "id") || interactive.dig("list_reply", "id") || ""
 
           ChatSDK::Events::Action.new(
             action_id: action_id,
-            value: value,
-            user: user,
+            value: action_id,
+            user: author,
             thread_id: thread_id,
             channel_id: channel_id,
             platform: :whatsapp,
@@ -97,7 +50,7 @@ module ChatSDK
           )
         end
 
-        def parse_media_message(msg, from, msg_id, channel_id, thread_id)
+        def parse_media_message(msg, author, channel_id, thread_id)
           media_type = msg["type"]
           media_data = msg[media_type] || {}
           caption = media_data["caption"] || ""
@@ -105,11 +58,14 @@ module ChatSDK
           media_id = media_data["id"] || ""
 
           text = [caption, "[#{media_type}: #{mime_type} #{media_id}]"].reject(&:empty?).join("\n")
+          build_direct_message(msg, text, author, channel_id, thread_id)
+        end
 
+        def build_direct_message(msg, text, author, channel_id, thread_id)
           message = ChatSDK::Message.new(
-            id: msg_id,
+            id: msg["id"],
             text: text,
-            author: ChatSDK::Author.new(id: from, name: from, platform: :whatsapp, bot: false),
+            author: author,
             thread_id: thread_id,
             channel_id: channel_id,
             platform: :whatsapp,
