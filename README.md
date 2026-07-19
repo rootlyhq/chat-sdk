@@ -6,6 +6,7 @@
   <a href="https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml"><img src="https://github.com/rootlyhq/chat-sdk/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-000?style=flat-square&logo=opensourceinitiative&logoColor=white&labelColor=000&color=000" alt="MIT License"></a>
   <a href="https://rubygems.org/gems/chat_sdk"><img src="https://img.shields.io/gem/v/chat_sdk?style=flat-square&color=CC342D" alt="Gem Version"></a>
+  <a href="https://rubydoc.info/gems/chat_sdk"><img src="https://img.shields.io/badge/docs-rubydoc.info-blue?style=flat-square" alt="API Docs"></a>
 </p>
 
 > **Beta** — This SDK is experimental and under active development. APIs may change between minor versions. Not recommended for production use yet.
