@@ -1,6 +1,6 @@
 # State Adapters
 
-State adapters provide persistent storage for thread subscriptions, event deduplication, per-thread locks, and arbitrary key-value data. ChatSDK ships two implementations.
+State adapters provide persistent storage for thread subscriptions, event deduplication, per-thread locks, and arbitrary key-value data. ChatSDK ships four implementations.
 
 ## Memory State
 
@@ -55,6 +55,74 @@ bot = ChatSDK::Chat.new(
 - When you need state to survive restarts
 
 See [Redis State](adapters/state-redis.md).
+
+## PostgreSQL State
+
+`ChatSDK::State::Pg` stores data in PostgreSQL using the `pg` gem. Tables are auto-created on initialization with JSONB value storage and row-level locking.
+
+```ruby
+# Add to your Gemfile:
+# gem "chat_sdk-state-pg"
+
+require "chat_sdk/state/pg"
+
+state = ChatSDK::State::Pg.new(url: "postgresql://localhost/myapp")
+
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack },
+  state: state
+)
+```
+
+**When to use:**
+
+- You already run PostgreSQL and don't want another dependency
+- You need durable state with ACID guarantees
+- Multi-process deployments
+
+**Options:**
+
+- `url:` -- PostgreSQL connection URL (or `DATABASE_URL` env var)
+- `connection:` -- pass an existing `PG::Connection`
+- `key_prefix:` -- namespace for multi-tenant use (default: `"chat_sdk"`)
+- `auto_migrate:` -- create tables on init (default: `true`)
+
+See [PostgreSQL State](adapters/state-pg.md).
+
+## MySQL State
+
+`ChatSDK::State::Mysql` stores data in MySQL using the `mysql2` gem. Tables are auto-created on initialization with JSON value storage and InnoDB row-level locking.
+
+```ruby
+# Add to your Gemfile:
+# gem "chat_sdk-state-mysql"
+
+require "chat_sdk/state/mysql"
+
+state = ChatSDK::State::Mysql.new(url: "mysql2://root@localhost/myapp")
+
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: { slack: slack },
+  state: state
+)
+```
+
+**When to use:**
+
+- You already run MySQL and don't want another dependency
+- You need durable state with ACID guarantees
+- Multi-process deployments
+
+**Options:**
+
+- `url:` -- MySQL connection URL (or `MYSQL_URL` env var)
+- `connection:` -- pass an existing `Mysql2::Client`
+- `key_prefix:` -- namespace for multi-tenant use (default: `"chat_sdk"`)
+- `auto_migrate:` -- create tables on init (default: `true`)
+
+See [MySQL State](adapters/state-mysql.md).
 
 ## Lock Policies
 
@@ -131,13 +199,4 @@ end
 
 ## Building Custom State Adapters
 
-Subclass `ChatSDK::State::Base` and implement all methods. Use the shared contract examples to verify your implementation:
-
-```ruby
-require "chat_sdk/testing/state_contract"
-
-RSpec.describe MyCustomState do
-  subject { MyCustomState.new }
-  it_behaves_like "a chat_sdk state adapter"
-end
-```
+See [Building State Adapters](contributing/building-state-adapters.md) for a full guide on creating your own state backend.
