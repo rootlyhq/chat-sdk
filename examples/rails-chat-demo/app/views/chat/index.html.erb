@@ -1,32 +1,60 @@
-<div class="flex flex-col h-screen max-w-2xl mx-auto"
+<div class="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 p-4"
      data-controller="chat"
      data-chat-channel-value="<%= @channel_id %>">
 
-  <!-- Header -->
-  <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-800 flex items-center gap-2 bg-white dark:bg-gray-950">
-    <span class="text-lg">💎</span>
-    <h1 class="font-semibold">ChatSDK Demo</h1>
-    <span class="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-950 dark:text-red-400">Beta</span>
-  </div>
+  <div class="flex flex-col w-full max-w-2xl h-[700px] rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 overflow-hidden bg-white dark:bg-gray-950">
 
-  <!-- Messages -->
-  <div id="messages"
-       data-chat-target="messages"
-       class="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50 dark:bg-gray-900">
-    <p class="text-center text-sm text-gray-400">Send a message to start chatting. Try "deploy" for a card.</p>
-  </div>
+    <!-- Header -->
+    <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-800 bg-gradient-to-r from-red-600 to-red-700 text-white flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-2xl">💎</span>
+        <div>
+          <h1 class="font-bold text-lg leading-tight">ChatSDK</h1>
+          <p class="text-red-200 text-xs">Ruby chat bot framework</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="relative flex h-2.5 w-2.5">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+        </span>
+        <span class="text-xs text-red-200">Online</span>
+      </div>
+    </div>
 
-  <!-- Input -->
-  <form data-action="submit->chat#send"
-        class="p-4 border-t border-gray-200 dark:border-gray-800 flex gap-2 bg-white dark:bg-gray-950">
-    <input type="text"
-           data-chat-target="input"
-           placeholder="Type a message..."
-           autocomplete="off"
-           class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/50" />
-    <button type="submit"
-            class="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors">
-      Send
-    </button>
-  </form>
+    <!-- Messages -->
+    <div id="messages"
+         data-chat-target="messages"
+         class="flex-1 overflow-y-auto p-6 space-y-4 bg-gray-50 dark:bg-gray-900/50">
+      <div class="flex flex-col items-center justify-center py-12 text-center">
+        <div class="w-16 h-16 rounded-full bg-red-100 dark:bg-red-950 flex items-center justify-center mb-4">
+          <span class="text-3xl">💬</span>
+        </div>
+        <h2 class="font-semibold text-gray-700 dark:text-gray-300 mb-1">Welcome to ChatSDK Demo</h2>
+        <p class="text-sm text-gray-400 max-w-xs">Send a message and the bot will respond in real-time via ActionCable. Try typing "deploy" for a rich card.</p>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+      <form data-action="submit->chat#send" class="p-4 flex gap-3">
+        <input type="text"
+               data-chat-target="input"
+               placeholder="Type a message..."
+               autocomplete="off"
+               class="flex-1 px-4 py-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-transparent transition-all placeholder:text-gray-400" />
+        <button type="submit"
+                class="px-5 py-3 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-500/25 hover:shadow-red-500/40">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+        </button>
+      </form>
+      <div class="px-4 pb-3 flex items-center justify-center gap-1.5 text-[10px] text-gray-400">
+        <span>Powered by</span>
+        <a href="https://chat-sdk.ai" class="font-medium hover:text-red-500 transition-colors" target="_blank">ChatSDK Ruby</a>
+        <span>·</span>
+        <span>ActionCable + Turbo + Stimulus</span>
+      </div>
+    </div>
+
+  </div>
 </div>
