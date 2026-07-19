@@ -2,6 +2,7 @@
   "title": "Contributing",
   "pages": [
     "building-adapters",
+    "building-state-adapters",
     "testing-adapters"
   ]
 }

@@ -1,0 +1,279 @@
+---
+title: Building State Adapters
+description: Guide to creating a custom state adapter for ChatSDK by subclassing State::Base.
+---
+
+This guide walks you through creating a custom state adapter for ChatSDK. State adapters handle subscriptions, distributed locks, and key-value storage.
+
+## Subclass State::Base
+
+Create a new class that inherits from `ChatSDK::State::Base`:
+
+```ruby
+module ChatSDK
+  module State
+    class MyStore < ChatSDK::State::Base
+      def initialize(url: nil, connection: nil, key_prefix: "chat_sdk")
+        @key_prefix = key_prefix
+        @conn = connection || connect(url || ENV["MY_STORE_URL"])
+      end
+
+      # --- Subscriptions ---
+
+      def subscribe(thread_id)
+        # Mark thread_id as subscribed
+      end
+
+      def unsubscribe(thread_id)
+        # Remove thread_id subscription
+      end
+
+      def subscribed?(thread_id)
+        # Return true if thread_id is subscribed, false otherwise
+      end
+
+      # --- Distributed Locks ---
+
+      def acquire_lock(key, owner:, ttl:)
+        # Acquire lock only if not already held
+        # Return true on success, false if already locked
+      end
+
+      def release_lock(key, owner:)
+        # Release lock only if held by this owner
+        # Return true on success, false if owner mismatch
+      end
+
+      def force_lock(key, owner:, ttl:)
+        # Steal lock regardless of current owner
+        # Always returns true
+      end
+
+      # --- Key-Value Storage ---
+
+      def get(key)
+        # Return stored value or nil if missing/expired
+      end
+
+      def set(key, value, ttl: nil)
+        # Store value, optionally with TTL in seconds
+        # Return the value
+      end
+
+      def delete(key)
+        # Remove key
+      end
+
+      def set_if_absent(key, value, ttl: nil)
+        # Set only if key doesn't exist
+        # Return true if set, false if key already exists
+      end
+    end
+  end
+end
+```
+
+## Required Methods
+
+Every state adapter must implement these methods with exact return semantics:
+
+### Subscriptions
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `subscribe(thread_id)` | — | Mark a thread as subscribed |
+| `unsubscribe(thread_id)` | — | Remove a thread subscription |
+| `subscribed?(thread_id)` | `Boolean` | Check if a thread is subscribed |
+
+### Distributed Locks
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `acquire_lock(key, owner:, ttl:)` | `Boolean` | Acquire if free; `false` if already held |
+| `release_lock(key, owner:)` | `Boolean` | Release if owner matches; `false` otherwise |
+| `force_lock(key, owner:, ttl:)` | `true` | Steal lock regardless of current owner |
+
+The `ttl` parameter is in seconds. Expired locks must be treated as free by `acquire_lock`.
+
+### Key-Value Storage
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `get(key)` | Value or `nil` | Retrieve a value; return `nil` if missing or expired |
+| `set(key, value, ttl: nil)` | Value | Store a value with optional TTL in seconds |
+| `delete(key)` | — | Remove a key |
+| `set_if_absent(key, value, ttl: nil)` | `Boolean` | Set only if key is absent; `false` if it exists |
+
+## How the Dispatcher Uses State
+
+The dispatcher pipeline relies on state for:
+
+1. **Deduplication** — `set_if_absent` prevents processing the same event twice
+2. **Distributed locks** — `acquire_lock` ensures only one process handles an event
+3. **Subscriptions** — `subscribed?` determines if thread messages should be routed
+
+Understanding these use cases helps you get the semantics right. In particular, `set_if_absent` and `acquire_lock` must be **atomic** — in a database, use `INSERT ... ON CONFLICT DO NOTHING` or equivalent.
+
+## Database-Backed Adapters
+
+For database-backed state adapters, follow these patterns from the built-in PostgreSQL and MySQL adapters:
+
+### Auto-Migration
+
+Accept an `auto_migrate` option and create tables on initialization:
+
+```ruby
+def initialize(url: nil, connection: nil, key_prefix: "chat_sdk", auto_migrate: true)
+  @key_prefix = key_prefix
+  @conn = connection || connect(url)
+  ensure_tables if auto_migrate
+end
+
+private
+
+def ensure_tables
+  @conn.exec(<<~SQL)
+    CREATE TABLE IF NOT EXISTS chat_sdk_subscriptions (
+      key VARCHAR(255) PRIMARY KEY
+    );
+    CREATE TABLE IF NOT EXISTS chat_sdk_locks (
+      key VARCHAR(255) PRIMARY KEY,
+      owner VARCHAR(255) NOT NULL,
+      expires_at TIMESTAMP NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS chat_sdk_cache (
+      key VARCHAR(255) PRIMARY KEY,
+      value JSONB NOT NULL,
+      expires_at TIMESTAMP
+    );
+  SQL
+end
+```
+
+### Key Prefixing
+
+Scope all keys with `key_prefix` to support multi-tenant deployments:
+
+```ruby
+def subscription_key(thread_id)
+  "#{@key_prefix}:sub:#{thread_id}"
+end
+
+def lock_key(key)
+  "#{@key_prefix}:lock:#{key}"
+end
+
+def cache_key(key)
+  "#{@key_prefix}:kv:#{key}"
+end
+```
+
+### Atomic Lock Acquisition
+
+Use database-specific atomic operations:
+
+```ruby
+# PostgreSQL
+INSERT INTO chat_sdk_locks (key, owner, expires_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (key) DO NOTHING
+
+# MySQL
+INSERT IGNORE INTO chat_sdk_locks (lock_key, owner, expires_at)
+VALUES (?, ?, ?)
+```
+
+Check `cmd_tuples` (PostgreSQL) or `affected_rows` (MySQL) to determine if the insert succeeded.
+
+### Expired Row Cleanup
+
+Always delete expired rows before attempting lock acquisition or cache reads. Consider adding a `cleanup_expired` method for periodic maintenance:
+
+```ruby
+def cleanup_expired
+  now = Time.now.utc
+  @conn.exec_params("DELETE FROM chat_sdk_locks WHERE expires_at <= $1", [now])
+  @conn.exec_params("DELETE FROM chat_sdk_cache WHERE expires_at IS NOT NULL AND expires_at <= $1", [now])
+end
+```
+
+## Gem Structure
+
+Organize your state adapter as a separate gem:
+
+```
+chat_sdk-state-mystore/
+  lib/
+    chat_sdk/
+      state/
+        mystore.rb
+  spec/
+    chat_sdk/
+      state/
+        mystore_spec.rb
+    spec_helper.rb
+  chat_sdk-state-mystore.gemspec
+```
+
+State adapters don't need a separate Zeitwerk loader — the core `chat_sdk` autoloader handles the `ChatSDK::State` namespace. Your file just needs:
+
+```ruby
+require "chat_sdk"
+require "mystore_driver" # your database driver gem
+```
+
+### Gemspec
+
+```ruby
+Gem::Specification.new do |spec|
+  spec.name          = "chat_sdk-state-mystore"
+  spec.version       = ChatSDK::VERSION
+  spec.summary       = "MyStore state adapter for ChatSDK"
+  spec.add_dependency "chat_sdk", "~> 0.1"
+  spec.add_dependency "mystore_driver", "~> 1.0"
+end
+```
+
+## Verifying Your Adapter
+
+Use the shared contract examples to verify your adapter implements the required interface:
+
+```ruby
+require "chat_sdk/testing/state_contract"
+
+RSpec.describe ChatSDK::State::MyStore do
+  subject { described_class.new(url: "mystore://localhost/test") }
+
+  it_behaves_like "a chat_sdk state adapter"
+
+  # Add adapter-specific tests
+  describe "TTL expiration" do
+    it "expires keys after TTL" do
+      subject.set("key", "value", ttl: 1)
+      sleep 1.1
+      expect(subject.get("key")).to be_nil
+    end
+  end
+end
+```
+
+The shared contract tests cover:
+
+- `subscribe` / `unsubscribe` / `subscribed?` round-trip
+- `acquire_lock` succeeds when free, fails when held
+- `release_lock` succeeds for correct owner, fails for wrong owner
+- `force_lock` always succeeds (steals lock)
+- `get` / `set` round-trip, `nil` for missing keys
+- `delete` removes keys
+- `set_if_absent` succeeds when absent, fails when present (value unchanged)
+
+## Using Your Adapter
+
+```ruby
+chat = ChatSDK::Chat.new(
+  adapter: ChatSDK::MyPlatform::Adapter.new(api_key: "..."),
+  state: ChatSDK::State::MyStore.new(url: "mystore://localhost/mydb")
+)
+```
+
+See [State Adapters](/docs/state-adapters) for documentation on the built-in state backends.

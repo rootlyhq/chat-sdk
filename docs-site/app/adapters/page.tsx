@@ -349,10 +349,10 @@ function AdapterCard({ adapter }: { adapter: Adapter }) {
   );
 }
 
-function BuildYourOwnCard({ emoji, text }: { emoji: string; text: string }) {
+function BuildYourOwnCard({ emoji, text, href }: { emoji: string; text: string; href: string }) {
   return (
     <Link
-      href="/docs/contributing/building-adapters"
+      href={href}
       className="group flex flex-col items-center justify-center p-5 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 hover:border-red-500/30 transition-all text-center"
     >
       <span className="text-2xl mb-2">{emoji}</span>
@@ -417,7 +417,7 @@ export default function AdaptersPage() {
           <h2 className="text-2xl font-bold mb-6">Platform Adapters</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
             {fp.map((a) => <AdapterCard key={a.slug} adapter={a} />)}
-            {!search && <BuildYourOwnCard emoji="🔌" text="Extend ChatSDK with shared contract specs and the adapter base class." />}
+            {!search && <BuildYourOwnCard emoji="🔌" text="Extend ChatSDK with shared contract specs and the adapter base class." href="/docs/contributing/building-adapters" />}
           </div>
         </>
       )}
@@ -427,7 +427,7 @@ export default function AdaptersPage() {
           <h2 className="text-2xl font-bold mb-6">State Backends</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
             {fs.map((a) => <AdapterCard key={a.slug} adapter={a} />)}
-            {!search && <BuildYourOwnCard emoji="🗄️" text="Implement the State::Base interface with shared contract specs." />}
+            {!search && <BuildYourOwnCard emoji="🗄️" text="Implement the State::Base interface with shared contract specs." href="/docs/contributing/building-state-adapters" />}
           </div>
         </>
       )}
