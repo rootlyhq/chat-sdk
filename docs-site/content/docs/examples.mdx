@@ -1,0 +1,106 @@
+---
+title: Example Apps
+description: Working example applications showing ChatSDK in action — a Rails real-time chat UI and a minimal Rack Slack bot.
+---
+
+Two ready-to-run example apps live in the [`examples/`](https://github.com/rootlyhq/chat-sdk/tree/master/examples) directory.
+
+## Rails Chat Demo
+
+A real-time web chat UI powered by ActionCable, Turbo Streams, Stimulus, and Tailwind CSS. No external API keys needed — runs entirely locally.
+
+```bash
+cd examples/rails-chat-demo
+bundle install
+bin/rails db:prepare
+bin/dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) and start chatting. Type "deploy" for a rich card with buttons.
+
+### Stack
+
+- **Backend**: Rails 8, Ruby 4, Puma
+- **Real-time**: ActionCable (async adapter)
+- **Frontend**: Stimulus controller + vanilla JS
+- **Styling**: Tailwind CSS 4
+- **State**: `ChatSDK::State::Memory` (in-process)
+
+### How it works
+
+1. Browser connects via ActionCable WebSocket
+2. Stimulus controller sends messages through the subscription
+3. `ChatChannel#receive` broadcasts your message as an HTML partial
+4. ChatSDK dispatches the event to registered handlers
+5. Bot handler calls `thread.post("reply")`
+6. Web adapter renders `_message.html.erb` and broadcasts via ActionCable
+7. Stimulus controller inserts the HTML into the DOM
+
+### Key files
+
+```
+config/initializers/chat_sdk.rb  — Web adapter + bot handlers
+app/channels/chat_channel.rb    — ActionCable channel
+app/javascript/controllers/chat_controller.js — Stimulus controller
+app/views/chat/index.html.erb   — Chat UI
+app/views/chat/_message.html.erb — Message bubble partial
+```
+
+### Adding Slack alongside web chat
+
+Same handlers work on both platforms — add a second adapter:
+
+```ruby
+bot = ChatSDK::Chat.new(
+  user_name: "demo-bot",
+  adapters: {
+    web: ChatSDK::Web::Adapter.new,
+    slack: ChatSDK::Slack::Adapter.new
+  },
+  state: ChatSDK::State::Memory.new
+)
+```
+
+---
+
+## Rack Bot
+
+Minimal Slack bot in 3 files. No framework, no database — just a webhook handler on bare Rack.
+
+```bash
+cd examples/rack-bot
+export SLACK_BOT_TOKEN="xoxb-..."
+export SLACK_SIGNING_SECRET="..."
+bundle install
+bundle exec rackup config.ru -p 3000
+```
+
+Point your Slack app's event subscription URL to `https://your-domain.com/webhooks/slack`.
+
+### What it does
+
+| Trigger | Response |
+|---------|----------|
+| `@bot hello` | Echoes "Hello! You said: hello" |
+| `@bot deploy` | Posts a card with Approve/Reject buttons |
+| Click "Approve" | Acknowledges the action |
+
+### Files
+
+```
+config.ru  — Bot setup + Rack app (everything in one file)
+Gemfile    — Dependencies (chat_sdk + chat_sdk-slack)
+```
+
+### Architecture
+
+```
+Slack webhook POST → /webhooks/slack
+  → HMAC-SHA256 signature verification
+  → Parse Events API / Interactivity payload
+  → Dispatch to ChatSDK handler
+  → Handler calls thread.post()
+  → Slack Web API ← chat.postMessage
+```
+
+For local development, use [ngrok](https://ngrok.com): `ngrok http 3000`
