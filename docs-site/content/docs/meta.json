@@ -42,6 +42,7 @@
     "adapters/twilio",
     "adapters/messenger",
     "adapters/whatsapp",
+    "adapters/x",
     "---State Backends---",
     "adapters/state-memory",
     "adapters/state-redis",

@@ -84,6 +84,14 @@ function WhatsAppIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function XIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
 function TwilioIcon({ size = 22 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
@@ -259,6 +267,21 @@ const adapters: Adapter[] = [
     features: {
       post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
       reactions: 'yes', files: 'yes', modals: 'no', streaming: 'no',
+      dms: 'yes', history: 'no', typing: 'no',
+    },
+  },
+  {
+    name: 'X',
+    slug: 'x',
+    gem: 'chat_sdk-x',
+    type: 'platform',
+    tagline: 'Build X (Twitter) bots with tweets, direct messages, HMAC-SHA256 webhook verification, and likes.',
+    color: '#000000',
+    icon: <XIcon />,
+    official: true,
+    features: {
+      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
+      reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
       dms: 'yes', history: 'no', typing: 'no',
     },
   },

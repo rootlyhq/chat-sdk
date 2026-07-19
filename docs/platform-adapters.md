@@ -6,19 +6,19 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat | Mattermost | WhatsApp |
-|---------|-------|-------|-------|------------|----------|
-| Post | yes | yes | yes | yes | yes |
-| Edit | yes | yes | yes | yes | no |
-| Delete | yes | yes | yes | yes | no |
-| Ephemeral | yes | no | yes | yes | no |
-| Reactions | yes | yes | yes | yes | yes |
-| Files | yes | yes | no | yes | yes |
-| Modals | yes | no | no | no | no |
-| Streaming | yes | yes | yes | yes | no |
-| DMs | yes | yes | yes | yes | yes |
-| History | yes | yes | yes | yes | no |
-| Typing | yes | no | no | yes | no |
+| Feature | Slack | Teams | GChat | Mattermost | WhatsApp | X |
+|---------|-------|-------|-------|------------|----------|---|
+| Post | yes | yes | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes | no | no |
+| Delete | yes | yes | yes | yes | no | no |
+| Ephemeral | yes | no | yes | yes | no | no |
+| Reactions | yes | yes | yes | yes | yes | yes |
+| Files | yes | yes | no | yes | yes | no |
+| Modals | yes | no | no | no | no | no |
+| Streaming | yes | yes | yes | yes | no | no |
+| DMs | yes | yes | yes | yes | yes | yes |
+| History | yes | yes | yes | yes | no | no |
+| Typing | yes | no | no | yes | no | no |
 
 ## Official Adapters
 
@@ -27,6 +27,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Google Chat](adapters/gchat.md) -- `gem "chat_sdk-gchat"` -- Google Chat API adapter with Card v2.
 - [Mattermost](adapters/mattermost.md) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
 - [WhatsApp](adapters/whatsapp.md) -- `gem "chat_sdk-whatsapp"` -- WhatsApp Business Cloud API adapter with interactive message rendering.
+- [X](adapters/x.md) -- `gem "chat_sdk-x"` -- X API v2 adapter with HMAC-SHA256 webhook verification for tweets, DMs, and likes.
 
 ## Checking Capabilities at Runtime
 

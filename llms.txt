@@ -8,7 +8,7 @@ Docs: https://chat-sdk.ai
 
 - `chat_sdk` — Core SDK with Chat, Thread, Message, Channel, Author, Dispatcher, EventRegistry, Config, and errors
 
-## Platform Adapters (9)
+## Platform Adapters (10)
 
 - `chat_sdk-slack` — Slack (Block Kit cards, modals, ephemeral messages, slash commands, reactions)
 - `chat_sdk-teams` — Microsoft Teams (Adaptive Cards, Bot Framework, modals)
@@ -19,6 +19,7 @@ Docs: https://chat-sdk.ai
 - `chat_sdk-twilio` — Twilio SMS/MMS (HMAC-SHA1 signature verification)
 - `chat_sdk-messenger` — Facebook Messenger (HMAC-SHA256 verification, templates)
 - `chat_sdk-whatsapp` — WhatsApp (Cloud API, interactive messages)
+- `chat_sdk-x` -- X (HMAC-SHA256 verification, tweets, DMs, likes)
 
 ## State Backends (4)
 
@@ -107,6 +108,7 @@ Rack middleware for webhook ingestion. Mount the ChatSDK endpoint in `routes.rb`
 - [Twilio SMS/MMS](docs/adapters/twilio.md)
 - [Facebook Messenger](docs/adapters/messenger.md)
 - [WhatsApp](docs/adapters/whatsapp.md)
+- [X](docs/adapters/x.md)
 - [Redis State](docs/adapters/state-redis.md)
 - [PostgreSQL State](docs/adapters/state-pg.md)
 - [MySQL State](docs/adapters/state-mysql.md)

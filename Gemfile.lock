@@ -86,6 +86,13 @@ PATH
       faraday (~> 2.0)
 
 PATH
+  remote: chat_sdk-x
+  specs:
+    chat_sdk-x (0.3.1)
+      chat_sdk (~> 0.1)
+      faraday (~> 2.0)
+
+PATH
   remote: chat_sdk
   specs:
     chat_sdk (0.3.1)
@@ -344,6 +351,7 @@ DEPENDENCIES
   chat_sdk-telegram!
   chat_sdk-twilio!
   chat_sdk-whatsapp!
+  chat_sdk-x!
   rack-test (~> 2.1)
   rake (~> 13.0)
   rspec (~> 3.13)
