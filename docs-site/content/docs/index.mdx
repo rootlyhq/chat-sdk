@@ -3,7 +3,7 @@ title: Introduction
 description: ChatSDK Ruby — unified SDK for multi-platform chat bots with normalized events, cards DSL, streaming, and pluggable adapters.
 ---
 
-ChatSDK Ruby is a unified SDK for building chat bots that work across Slack, Microsoft Teams, Google Chat, Mattermost, and any other platform you write an adapter for. Inspired by [Vercel's Chat SDK](https://chat-sdk.dev), redesigned with idiomatic Ruby patterns.
+ChatSDK Ruby is a unified SDK for building chat bots that work across Slack, Microsoft Teams, Google Chat, Mattermost, Discord, Telegram, Twilio, Messenger, WhatsApp, and any other platform you write an adapter for. Inspired by [Vercel's Chat SDK](https://chat-sdk.dev), redesigned with idiomatic Ruby patterns.
 
 ## Key Features
 
@@ -13,7 +13,7 @@ ChatSDK Ruby is a unified SDK for building chat bots that work across Slack, Mic
 
 - **Streaming** -- Post a placeholder message and stream token-by-token updates with built-in throttling. Works on any adapter that supports message editing.
 
-- **Pluggable adapters** -- Swap platforms (Slack, Teams, Google Chat) and state backends (Memory, Redis) without changing your bot logic. Build your own adapter by subclassing `ChatSDK::Adapter::Base`.
+- **Pluggable adapters** -- Swap platforms and state backends (Memory, Redis, PostgreSQL, MySQL) without changing your bot logic. Nine official platform adapters ship out of the box, or build your own by subclassing `ChatSDK::Adapter::Base`.
 
 - **Thread subscriptions** -- Subscribe to a thread so future messages are routed to your `on_subscribed_message` handler, letting you build multi-turn conversations.
 

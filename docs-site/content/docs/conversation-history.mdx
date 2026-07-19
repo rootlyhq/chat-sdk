@@ -65,8 +65,14 @@ end
 | Slack | Yes | Uses `conversations.replies` for threads, `conversations.history` for channels |
 | Teams | Declared but limited | Returns empty results (Bot Framework limitation) |
 | Google Chat | Yes | Uses `list_messages` API |
+| Mattermost | Yes | Uses `get_posts_for_channel` |
+| Discord | Yes | Uses `get_channel_messages` |
+| Telegram | No | Raises `NotSupportedError` |
+| Twilio | No | Raises `NotSupportedError` |
+| Messenger | No | Raises `NotSupportedError` |
+| WhatsApp | No | Raises `NotSupportedError` |
 
-All three adapters declare the `:message_history` capability. The Teams adapter currently returns empty results because the Bot Framework API does not provide a message history endpoint for bots.
+Slack, Teams, Google Chat, Mattermost, and Discord declare the `:message_history` capability. The Teams adapter currently returns empty results because the Bot Framework API does not provide a message history endpoint for bots.
 
 ## Channel-Level History
 

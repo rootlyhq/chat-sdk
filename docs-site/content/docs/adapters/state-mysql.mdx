@@ -79,7 +79,7 @@ state.cleanup_expired  # Removes expired cache entries and locks
 
 Use `clear` with caution in production -- this removes all subscriptions, locks, and stored state for the key prefix.
 
-## Direct Connection Access
+## Direct Client Access
 
 ```ruby
 state = ChatSDK::State::Mysql.new

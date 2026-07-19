@@ -73,8 +73,14 @@ end
 | Slack | Yes -- uses `conversations.open` |
 | Teams | Yes -- creates a 1:1 conversation |
 | Google Chat | Yes -- uses `setup_space` with `DIRECT_MESSAGE` |
+| Mattermost | Yes -- creates a direct channel |
+| Discord | Yes -- creates a DM channel |
+| Telegram | Yes -- sends to chat ID |
+| Twilio | Yes -- sends to phone number |
+| Messenger | Yes -- sends to user PSID |
+| WhatsApp | Yes -- sends to phone number |
 
-All three adapters declare the `:direct_messages` capability. If you build a custom adapter without DM support, calling `open_dm` raises `ChatSDK::NotSupportedError`.
+All nine platform adapters declare the `:direct_messages` capability. If you build a custom adapter without DM support, calling `open_dm` raises `ChatSDK::NotSupportedError`.
 
 ## Proactive DMs
 

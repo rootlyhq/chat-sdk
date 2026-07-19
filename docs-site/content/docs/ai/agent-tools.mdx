@@ -8,7 +8,7 @@ description: Generate provider-agnostic tool definitions for AI agents with pres
 ## Creating Tools
 
 ```ruby
-tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger)
+tools = ChatSDK::AI.create_tools(preset: :messenger)
 ```
 
 Returns a hash of `tool_name => definition`:
@@ -45,23 +45,23 @@ Write tools can be gated behind approval:
 
 ```ruby
 # With approval (default) -- write tools have requires_approval: true
-tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger, require_approval: true)
+tools = ChatSDK::AI.create_tools(preset: :messenger, require_approval: true)
 
 # Without approval -- all tools have requires_approval: false
-tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger, require_approval: false)
+tools = ChatSDK::AI.create_tools(preset: :messenger, require_approval: false)
 ```
 
 Read-only tools (`fetch_messages`, `fetch_thread`) never require approval regardless of the setting.
 
 ## Executing Tools
 
-Use `ToolBuilder#execute` to dispatch an LLM's tool call to the correct adapter method:
+Use `ChatSDK::AI::ToolExecutor` to dispatch an LLM's tool call to the correct adapter method:
 
 ```ruby
-builder = ChatSDK::AI::ToolBuilder.new(chat: chat, preset: :messenger)
+executor = ChatSDK::AI.create_executor(chat: chat)
 
 # When your LLM returns a tool call:
-result = builder.execute(:post_message, {
+result = executor.execute(:post_message, {
   adapter_name: "slack",
   channel_id: "C123",
   text: "Hello from the agent!"
@@ -69,7 +69,7 @@ result = builder.execute(:post_message, {
 # => { id: "msg_1", text: "Hello from the agent!" }
 ```
 
-Arguments accept both symbol and string keys.
+Arguments accept both symbol and string keys. The `chat:` parameter is required for the executor (it needs access to the adapters to dispatch calls).
 
 ## Available Tools
 

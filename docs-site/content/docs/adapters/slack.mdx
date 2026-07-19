@@ -105,6 +105,14 @@ client.conversations_list(types: "public_channel")
 
 Cards built with `ChatSDK.card` are rendered as Slack Block Kit JSON. The `BlockKitRenderer` handles the translation automatically.
 
+## Mention Formatting
+
+The adapter formats user mentions as Slack-native `<@USER_ID>` syntax:
+
+```ruby
+slack.mention("U12345")  # => "<@U12345>"
+```
+
 ## Message IDs
 
 Slack uses timestamps (`ts`) as message IDs. The `Message#id` returned from `post` and other methods is the `ts` value (e.g., `"1234567890.123456"`).

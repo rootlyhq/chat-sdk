@@ -3,7 +3,7 @@ title: "API: State"
 description: ChatSDK::State::Base is the abstract interface for thread subscriptions, distributed locks, and key-value storage.
 ---
 
-`ChatSDK::State::Base` is the abstract base class for state backends. It provides the interface for thread subscriptions, distributed locks, and key-value storage. The SDK ships with `State::Memory` for development/testing; production deployments typically use a Redis-backed implementation.
+`ChatSDK::State::Base` is the abstract base class for state backends. It provides the interface for thread subscriptions, distributed locks, and key-value storage. The SDK ships with `State::Memory` for development/testing; production deployments typically use `State::Redis`, `State::Pg`, or `State::Mysql`.
 
 ## State::Base
 

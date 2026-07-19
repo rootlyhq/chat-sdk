@@ -13,8 +13,8 @@ Add the core gem and the adapter gems you need to your `Gemfile`:
 gem "chat_sdk"
 gem "chat_sdk-slack"
 
-# Optional: persistent state via Redis (recommended for production)
-gem "chat_sdk-state-redis"
+# Optional: persistent state for production (pick one)
+gem "chat_sdk-state-redis"  # or chat_sdk-state-pg / chat_sdk-state-mysql
 ```
 
 Then run:
