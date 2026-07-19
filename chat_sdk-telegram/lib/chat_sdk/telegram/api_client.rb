@@ -68,44 +68,13 @@ module ChatSDK
         # Telegram uses token in URL path, no auth headers needed
       end
 
-      def request(method, api_method, body = nil)
-        retries = 0
-        begin
-          response = connection.public_send(method, api_path(api_method)) do |req|
-            req.body = body if body && method != :get
-          end
-          handle_response(response)
-        rescue ChatSDK::RateLimitedError => e
-          retries += 1
-          raise if retries > MAX_RETRIES
-          sleep(e.retry_after || (2**retries * 0.5))
-          retry
-        end
+      def resolve_path(path)
+        api_path(path)
       end
 
-      def handle_response(response)
+      def extract_success_body(response)
         body = response.body
-
-        if response.success? && body.is_a?(Hash) && body["ok"]
-          return body["result"]
-        end
-
-        if response.status == 429
-          raise ChatSDK::RateLimitedError.new(
-            "#{adapter_name} API rate limited",
-            retry_after: extract_retry_after(response),
-            status: response.status,
-            body: body,
-            adapter_name: adapter_name
-          )
-        end
-
-        raise ChatSDK::PlatformError.new(
-          "#{adapter_name} API error: #{extract_error_message(response)}",
-          status: response.status,
-          body: body,
-          adapter_name: adapter_name
-        )
+        (body.is_a?(Hash) && body["ok"]) ? body["result"] : {}
       end
 
       def extract_retry_after(response)

@@ -16,15 +16,22 @@ module ChatSDK
       end
 
       def instrument(event_name, payload = {})
+        listeners = @mutex.synchronize { @subscribers[event_name]&.dup }
+        unless listeners&.any?
+          return yield if block_given?
+
+          return
+        end
+
         start = monotonic_now
         result = yield if block_given?
         payload[:duration] = monotonic_now - start
-        notify(event_name, payload)
+        fire(listeners, event_name, payload)
         result
       rescue => e
-        payload[:duration] = monotonic_now - start
+        payload[:duration] = monotonic_now - start if start
         payload[:error] = e
-        notify(event_name, payload)
+        fire(listeners, event_name, payload) if listeners&.any?
         raise
       end
 
@@ -34,8 +41,7 @@ module ChatSDK
 
       private
 
-      def notify(event_name, payload)
-        listeners = @mutex.synchronize { @subscribers[event_name].dup }
+      def fire(listeners, event_name, payload)
         listeners.each { |block| block.call(event_name, payload) }
       rescue => e
         ChatSDK::Log.debug("Instrumentation subscriber error: #{e.message}")

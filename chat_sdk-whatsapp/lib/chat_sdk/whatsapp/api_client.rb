@@ -30,7 +30,7 @@ module ChatSDK
       end
 
       def upload_media(io:, filename:, content_type:)
-        response = media_connection.post("#{@phone_number_id}/media") do |req|
+        response = upload_connection.post("#{@phone_number_id}/media") do |req|
           req.body = {
             "messaging_product" => "whatsapp",
             "file" => Faraday::Multipart::FilePart.new(io, content_type, filename),
@@ -42,10 +42,6 @@ module ChatSDK
       end
 
       private
-
-      def media_connection
-        @media_connection ||= build_connection { |f| f.request :multipart }
-      end
 
       def base_url
         BASE_URL

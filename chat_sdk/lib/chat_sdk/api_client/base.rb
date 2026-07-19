@@ -36,11 +36,16 @@ module ChatSDK
         raise NotImplementedError
       end
 
+      def resolve_path(path)
+        path
+      end
+
       def request(method, path, body = nil)
         retries = 0
+        resolved = resolve_path(path)
         begin
-          ChatSDK::Instrumentation.instrument("api_request.chat_sdk", adapter: adapter_name, method: method, path: path) do
-            response = connection.public_send(method, path) do |req|
+          ChatSDK::Instrumentation.instrument("api_request.chat_sdk", adapter: adapter_name, method: method, path: resolved) do
+            response = connection.public_send(method, resolved) do |req|
               req.body = body if body && method != :get
             end
             handle_response(response)
