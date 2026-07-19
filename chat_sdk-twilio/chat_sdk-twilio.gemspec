@@ -5,8 +5,8 @@ require_relative "../chat_sdk/lib/chat_sdk/version"
 Gem::Specification.new do |spec|
   spec.name          = "chat_sdk-twilio"
   spec.version       = ChatSDK::VERSION
-  spec.authors       = ["Rootly"]
-  spec.email         = ["eng@rootly.com"]
+  spec.authors       = ["Quentin Rousseau"]
+  spec.email         = ["quentin@rootly.com"]
   spec.summary       = "Twilio SMS/MMS adapter for ChatSDK"
   spec.description   = "Twilio SMS/MMS adapter for the ChatSDK framework with HMAC-SHA1 signature verification"
   spec.homepage      = "https://github.com/rootlyhq/chat-sdk"

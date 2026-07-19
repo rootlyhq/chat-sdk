@@ -7,8 +7,8 @@ require "chat_sdk/version"
 Gem::Specification.new do |spec|
   spec.name          = "chat_sdk"
   spec.version       = ChatSDK::VERSION
-  spec.authors       = ["Rootly"]
-  spec.email         = ["eng@rootly.com"]
+  spec.authors       = ["Quentin Rousseau"]
+  spec.email         = ["quentin@rootly.com"]
   spec.summary       = "Unified Ruby SDK for building chat bots across Slack, Teams, Google Chat, and more"
   spec.description   = "Platform-agnostic chat bot framework with normalized events, cards DSL, streaming, and pluggable adapters"
   spec.homepage      = "https://github.com/rootlyhq/chat-sdk"

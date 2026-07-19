@@ -5,8 +5,8 @@ require_relative "../chat_sdk/lib/chat_sdk/version"
 Gem::Specification.new do |spec|
   spec.name          = "chat_sdk-telegram"
   spec.version       = ChatSDK::VERSION
-  spec.authors       = ["Rootly"]
-  spec.email         = ["eng@rootly.com"]
+  spec.authors       = ["Quentin Rousseau"]
+  spec.email         = ["quentin@rootly.com"]
   spec.summary       = "Telegram adapter for ChatSDK"
   spec.description   = "Telegram Bot API adapter for the ChatSDK framework"
   spec.homepage      = "https://github.com/rootlyhq/chat-sdk"

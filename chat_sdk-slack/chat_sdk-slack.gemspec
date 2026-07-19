@@ -5,8 +5,8 @@ require_relative "../chat_sdk/lib/chat_sdk/version"
 Gem::Specification.new do |spec|
   spec.name          = "chat_sdk-slack"
   spec.version       = ChatSDK::VERSION
-  spec.authors       = ["Rootly"]
-  spec.email         = ["eng@rootly.com"]
+  spec.authors       = ["Quentin Rousseau"]
+  spec.email         = ["quentin@rootly.com"]
   spec.summary       = "Slack adapter for ChatSDK"
   spec.description   = "Slack bot adapter for the ChatSDK framework using slack-ruby-client"
   spec.homepage      = "https://github.com/rootlyhq/chat-sdk"

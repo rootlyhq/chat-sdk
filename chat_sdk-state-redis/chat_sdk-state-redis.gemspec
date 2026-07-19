@@ -5,8 +5,8 @@ require_relative "../chat_sdk/lib/chat_sdk/version"
 Gem::Specification.new do |spec|
   spec.name          = "chat_sdk-state-redis"
   spec.version       = ChatSDK::VERSION
-  spec.authors       = ["Rootly"]
-  spec.email         = ["eng@rootly.com"]
+  spec.authors       = ["Quentin Rousseau"]
+  spec.email         = ["quentin@rootly.com"]
   spec.summary       = "Redis state backend for ChatSDK"
   spec.description   = "Redis-backed conversation state storage for the ChatSDK framework"
   spec.homepage      = "https://github.com/rootlyhq/chat-sdk"
