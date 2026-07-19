@@ -57,6 +57,7 @@
 - [Discord](docs/adapters/discord.md)
 - [Telegram](docs/adapters/telegram.md)
 - [Twilio SMS/MMS](docs/adapters/twilio.md)
+- [Facebook Messenger](docs/adapters/messenger.md)
 - [Redis State](docs/adapters/state-redis.md)
 - [PostgreSQL State](docs/adapters/state-pg.md)
 - [MySQL State](docs/adapters/state-mysql.md)

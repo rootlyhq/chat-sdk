@@ -68,6 +68,14 @@ function TelegramIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function MessengerIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
+      <path d="M.001 11.639C.001 4.949 5.241 0 12.001 0S24 4.95 24 11.639c0 6.689-5.24 11.638-12 11.638-1.21 0-2.38-.16-3.47-.46a.96.96 0 0 0-.64.05l-2.39 1.05a.96.96 0 0 1-1.35-.85l-.07-2.14a.97.97 0 0 0-.32-.68A11.39 11.389 0 0 1 .002 11.64zm8.32-2.19-4.03 6.41c-.6.96.54 2.01 1.46 1.34l3.86-2.93a.72.72 0 0 1 .85-.02l2.85 2.14a1.8 1.8 0 0 0 2.62-.58l4.03-6.41c.6-.96-.54-2.01-1.46-1.34l-3.86 2.93a.72.72 0 0 1-.85.02l-2.85-2.14a1.8 1.8 0 0 0-2.62.58z" />
+    </svg>
+  );
+}
+
 function TwilioIcon({ size = 22 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
@@ -214,6 +222,21 @@ const adapters: Adapter[] = [
       post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
       reactions: 'no', files: 'no', modals: 'no', streaming: 'no',
       dms: 'yes', history: 'no', typing: 'no',
+    },
+  },
+  {
+    name: 'Messenger',
+    slug: 'messenger',
+    gem: 'chat_sdk-messenger',
+    type: 'platform',
+    tagline: 'Build Facebook Messenger bots with HMAC-SHA256 verification, Generic/Button templates, and typing indicators.',
+    color: '#0084FF',
+    icon: <MessengerIcon />,
+    official: true,
+    features: {
+      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
+      reactions: 'no', files: 'yes', modals: 'no', streaming: 'no',
+      dms: 'yes', history: 'no', typing: 'yes',
     },
   },
   {

@@ -39,6 +39,7 @@
     "adapters/discord",
     "adapters/telegram",
     "adapters/twilio",
+    "adapters/messenger",
     "---State Backends---",
     "adapters/state-memory",
     "adapters/state-redis",

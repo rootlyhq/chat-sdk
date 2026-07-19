@@ -8,6 +8,7 @@
     "discord",
     "telegram",
     "twilio",
+    "messenger",
     "state-memory",
     "state-redis",
     "state-pg"

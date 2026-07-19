@@ -22,6 +22,7 @@ AllCops:
     - "chat_sdk-discord/**/*.rb"
     - "chat_sdk-telegram/**/*.rb"
     - "chat_sdk-twilio/**/*.rb"
+    - "chat_sdk-messenger/**/*.rb"
     - "chat_sdk-state-redis/**/*.rb"
     - "chat_sdk-state-pg/**/*.rb"
     - "chat_sdk-state-mysql/**/*.rb"

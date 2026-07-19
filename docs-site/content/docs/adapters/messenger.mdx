@@ -1,0 +1,107 @@
+---
+title: Messenger Adapter
+description: Facebook Messenger adapter with HMAC-SHA256 signature verification and template rendering via the chat_sdk-messenger gem.
+---
+
+The Messenger adapter (`chat_sdk-messenger`) integrates with Facebook Messenger via the Send API with HMAC-SHA256 webhook signature verification and Generic/Button template rendering.
+
+## Installation
+
+```ruby
+# Gemfile
+gem "chat_sdk"
+gem "chat_sdk-messenger"
+```
+
+## Configuration
+
+```ruby
+require "chat_sdk"
+require "chat_sdk/messenger"
+
+messenger = ChatSDK::Messenger::Adapter.new(
+  app_secret: ENV["FACEBOOK_APP_SECRET"],               # Facebook App Secret
+  page_access_token: ENV["FACEBOOK_PAGE_ACCESS_TOKEN"],  # Page Access Token
+  verify_token: ENV["FACEBOOK_VERIFY_TOKEN"]             # Webhook verify token
+)
+```
+
+`app_secret` and `page_access_token` are required. `verify_token` is needed for the webhook verification handshake.
+
+## Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `FACEBOOK_APP_SECRET` | Your Facebook App Secret (for webhook signature verification) |
+| `FACEBOOK_PAGE_ACCESS_TOKEN` | Page Access Token from Facebook Developer Console |
+| `FACEBOOK_VERIFY_TOKEN` | Custom token for webhook subscription verification |
+
+## Facebook Setup
+
+1. Create a [Facebook App](https://developers.facebook.com/apps/) in the Developer Console.
+2. Add the Messenger product to your app.
+3. Generate a Page Access Token for the page your bot will manage.
+4. In the Webhooks settings, subscribe to `messages` and `messaging_postbacks` events.
+5. Set your webhook callback URL and verify token.
+6. Copy your App Secret from **Settings > Basic**.
+
+## Webhook URL
+
+```
+https://your-domain.com/webhooks/messenger
+```
+
+```ruby
+map "/webhooks/messenger" do
+  run bot.webhooks[:messenger]
+end
+```
+
+The adapter handles both the GET verification handshake (returns `hub.challenge`) and POST message webhooks.
+
+## Capabilities
+
+| Capability | Supported | Notes |
+|------------|-----------|-------|
+| `direct_messages` | Yes | Messenger is inherently 1:1 DM |
+| `typing_indicator` | Yes | Via `sender_action: typing_on` |
+| `file_uploads` | Yes | Requires publicly accessible URL |
+| `edit_messages` | No | Raises `NotSupportedError` |
+| `delete_messages` | No | Raises `NotSupportedError` |
+| `ephemeral_messages` | No | Raises `NotSupportedError` |
+| `reactions` | No | Raises `NotSupportedError` |
+| `modals` | No | Raises `NotSupportedError` |
+| `streaming_edit` | No | Raises `NotSupportedError` |
+| `threads` | No | Raises `NotSupportedError` |
+| `message_history` | No | Raises `NotSupportedError` |
+
+## Webhook Verification
+
+The adapter verifies incoming POST webhooks using Facebook's HMAC-SHA256 signature validation. The `X-Hub-Signature-256` header is compared against a computed signature using your App Secret and the raw request body.
+
+For GET requests, the adapter handles the webhook subscription handshake by verifying `hub.verify_token` and returning `hub.challenge`.
+
+## Cards Rendering
+
+Cards are rendered as Messenger templates:
+
+- **Generic Template**: When the card has a title and up to 3 buttons. Supports title, subtitle, image, and buttons.
+- **Button Template**: When the card has text and up to 3 buttons but no image.
+- **Fallback**: Plain text via the core `Cards::Renderer` for cards that exceed template limits.
+
+Buttons are rendered as `postback` type (with callback payload) or `web_url` type (for link buttons). Button titles are truncated to 20 characters per Messenger's limit.
+
+## Direct Client Access
+
+```ruby
+messenger_adapter = bot.adapter(:messenger)
+client = messenger_adapter.client  # ApiClient
+```
+
+## Mention Formatting
+
+Messenger has no mention syntax. `mention(user_id)` returns the user ID as-is:
+
+```ruby
+messenger_adapter.mention("123456")  # => "123456"
+```

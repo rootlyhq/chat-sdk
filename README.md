@@ -10,7 +10,7 @@
 
 > **Beta** — This SDK is experimental and under active development. APIs may change between minor versions. Not recommended for production use yet.
 
-Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, Discord, Telegram, Twilio SMS/MMS, and more. **Write your bot logic once, deploy everywhere.**
+Unified Ruby SDK for building chat bots across Slack, Microsoft Teams, Google Chat, Mattermost, Discord, Telegram, Twilio SMS/MMS, Facebook Messenger, and more. **Write your bot logic once, deploy everywhere.**
 
 Inspired by and built upon the API design of [Vercel's Chat SDK](https://chat-sdk.dev) (TypeScript). This is an independent Ruby implementation — not a fork — with idiomatic Ruby patterns, a block-based cards DSL, and adapters tailored for the Ruby ecosystem.
 
@@ -27,6 +27,7 @@ gem "chat_sdk-mattermost"
 gem "chat_sdk-discord"
 gem "chat_sdk-telegram"
 gem "chat_sdk-twilio"
+gem "chat_sdk-messenger"
 gem "chat_sdk-state-redis"
 gem "chat_sdk-state-pg"
 gem "chat_sdk-state-mysql"
@@ -132,17 +133,17 @@ bot.adapter(:slack).client.chat_postMessage(channel: "#ops", text: "raw")
 
 ## Adapters
 
-| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio |
-|---------|:-----:|:-----:|:-----:|:----------:|:-------:|:--------:|:------:|
-| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓/✗/✗ |
-| Ephemeral | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ |
-| Reactions | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| File uploads | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ |
-| Modals | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Streaming | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| DMs | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| History | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
-| Typing | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ |
+| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio | Messenger |
+|---------|:-----:|:-----:|:-----:|:----------:|:-------:|:--------:|:------:|:---------:|
+| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓/✗/✗ | ✓/✗/✗ |
+| Ephemeral | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Reactions | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| File uploads | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ |
+| Modals | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| Streaming | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
+| DMs | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| History | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ |
+| Typing | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ |
 
 Platform clients:
 - **Slack** — wraps [slack-ruby-client](https://github.com/slack-ruby/slack-ruby-client)
@@ -152,6 +153,7 @@ Platform clients:
 - **Discord** — raw Faraday client wrapping the Discord REST API v10 with Ed25519 signature verification
 - **Telegram** — raw Faraday client wrapping the Telegram Bot API with webhook secret token verification and inline keyboard rendering
 - **Twilio** — raw Faraday client wrapping the Twilio REST API with HMAC-SHA1 signature verification for SMS/MMS messaging
+- **Messenger** — raw Faraday client wrapping the Facebook Messenger Send API with HMAC-SHA256 signature verification and Generic/Button template rendering
 
 ## AI Coding Agents
 
