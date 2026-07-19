@@ -19,6 +19,8 @@ module ChatSDK
         private
 
         def parse_message(message, bot_username: nil)
+          return parse_bot_command(message, extract_user(message), message.dig("chat", "id")&.to_s, resolve_thread_id(message)) if bot_command?(message)
+
           user = extract_user(message)
           chat_id = message.dig("chat", "id")&.to_s
           chat_type = message.dig("chat", "type")
@@ -28,48 +30,23 @@ module ChatSDK
           msg = ChatSDK::Message.new(
             id: message["message_id"]&.to_s,
             text: text,
-            author: ChatSDK::Author.new(
-              id: user[:id],
-              name: user[:name],
-              platform: :telegram,
-              bot: false
-            ),
+            author: ChatSDK::Author.new(id: user[:id], name: user[:name], platform: :telegram, bot: false),
             thread_id: thread_id,
             channel_id: chat_id,
             platform: :telegram,
             raw: message
           )
 
-          if bot_command?(message)
-            parse_bot_command(message, user, chat_id, thread_id)
-          elsif mention?(text, bot_username)
-            [ChatSDK::Events::Mention.new(
-              message: msg,
-              thread_id: thread_id,
-              channel_id: chat_id,
-              platform: :telegram,
-              adapter_name: :telegram,
-              raw: message
-            )]
+          event_class = if mention?(text, bot_username)
+            ChatSDK::Events::Mention
           elsif chat_type == "private"
-            [ChatSDK::Events::DirectMessage.new(
-              message: msg,
-              thread_id: thread_id,
-              channel_id: chat_id,
-              platform: :telegram,
-              adapter_name: :telegram,
-              raw: message
-            )]
+            ChatSDK::Events::DirectMessage
           else
-            [ChatSDK::Events::SubscribedMessage.new(
-              message: msg,
-              thread_id: thread_id,
-              channel_id: chat_id,
-              platform: :telegram,
-              adapter_name: :telegram,
-              raw: message
-            )]
+            ChatSDK::Events::SubscribedMessage
           end
+
+          [event_class.new(message: msg, thread_id: thread_id, channel_id: chat_id,
+            platform: :telegram, adapter_name: :telegram, raw: message)]
         end
 
         def parse_callback_query(callback)
@@ -79,12 +56,8 @@ module ChatSDK
           message_id = message["message_id"]&.to_s
           callback_data = callback["data"] || ""
 
-          action_id, value = if callback_data.include?(":")
-            parts = callback_data.split(":", 2)
-            [parts[0], parts[1]]
-          else
-            [callback_data, callback_data]
-          end
+          action_id, value = callback_data.split(":", 2)
+          value ||= action_id
 
           user = ChatSDK::Author.new(
             id: user_info["id"]&.to_s || "unknown",

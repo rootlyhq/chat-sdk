@@ -147,7 +147,7 @@ module ChatSDK
 
       def parse_telegram_message(data, channel_id)
         ChatSDK::Message.new(
-          id: data["message_id"]&.to_s || data.dig("result", "message_id")&.to_s,
+          id: data["message_id"]&.to_s,
           text: data["text"] || "",
           author: ChatSDK::Author.new(
             id: data.dig("from", "id")&.to_s || "bot",

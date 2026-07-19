@@ -93,7 +93,6 @@ module ChatSDK
         case node.type
         when :button then render_button(node)
         when :link_button then render_link_button(node)
-        when :select then nil # selects expand into separate rows
         end
       end
 
