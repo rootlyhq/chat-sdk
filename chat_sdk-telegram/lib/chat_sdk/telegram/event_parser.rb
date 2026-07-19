@@ -30,7 +30,7 @@ module ChatSDK
           msg = ChatSDK::Message.new(
             id: message["message_id"]&.to_s,
             text: text,
-            author: ChatSDK::Author.new(id: user[:id], name: user[:name], platform: :telegram, bot: false),
+            author: ChatSDK::Author.new(id: user[:id], name: user[:name], platform: :telegram, bot: false, locale: user[:locale]),
             thread_id: thread_id,
             channel_id: chat_id,
             platform: :telegram,
@@ -63,7 +63,8 @@ module ChatSDK
             id: user_info["id"]&.to_s || "unknown",
             name: user_info["username"] || user_info["first_name"] || "unknown",
             platform: :telegram,
-            bot: false
+            bot: false,
+            locale: user_info["language_code"]
           )
 
           [ChatSDK::Events::Action.new(
@@ -82,7 +83,8 @@ module ChatSDK
           from = message["from"] || {}
           {
             id: from["id"]&.to_s || "unknown",
-            name: from["username"] || from["first_name"] || "unknown"
+            name: from["username"] || from["first_name"] || "unknown",
+            locale: from["language_code"]
           }
         end
 

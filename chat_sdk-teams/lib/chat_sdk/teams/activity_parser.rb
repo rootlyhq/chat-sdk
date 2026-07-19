@@ -131,7 +131,8 @@ module ChatSDK
             id: from["id"] || "unknown",
             name: from["name"] || from["id"] || "unknown",
             platform: :teams,
-            bot: from["role"] == "bot"
+            bot: from["role"] == "bot",
+            locale: activity["locale"]
           )
         end
 

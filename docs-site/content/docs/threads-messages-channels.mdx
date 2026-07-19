@@ -108,6 +108,7 @@ A `ChatSDK::Message` is a normalized representation of an incoming message.
 | `name` | `String` | Display name |
 | `platform` | `Symbol` | Platform identifier |
 | `bot?` | `Boolean` | Whether the author is a bot |
+| `locale` | `String` or `nil` | User's locale (e.g. `"en-US"`, `"fr"`). Available on Teams, Discord, and Telegram; `nil` on other platforms. |
 
 ## Channel
 

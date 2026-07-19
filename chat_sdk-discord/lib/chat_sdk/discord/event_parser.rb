@@ -58,7 +58,8 @@ module ChatSDK
             id: user_info[:id],
             name: user_info[:name],
             platform: :discord,
-            bot: false
+            bot: false,
+            locale: user_info[:locale]
           )
 
           [ChatSDK::Events::Action.new(
@@ -77,7 +78,8 @@ module ChatSDK
           user = payload.dig("member", "user") || payload["user"] || {}
           {
             id: user["id"] || "unknown",
-            name: user["username"] || user["id"] || "unknown"
+            name: user["username"] || user["id"] || "unknown",
+            locale: payload["locale"]
           }
         end
 
