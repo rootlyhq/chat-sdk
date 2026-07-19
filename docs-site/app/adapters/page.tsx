@@ -118,7 +118,7 @@ const adapters: Adapter[] = [
     slug: 'slack',
     gem: 'chat_sdk-slack',
     type: 'platform',
-    tagline: 'Full-featured adapter wrapping slack-ruby-client',
+    tagline: 'Build bots for Slack workspaces with threads, reactions, modals, streaming, and Block Kit cards.',
     color: '#4A154B',
     icon: <SlackIcon />,
     official: true,
@@ -133,7 +133,7 @@ const adapters: Adapter[] = [
     slug: 'teams',
     gem: 'chat_sdk-teams',
     type: 'platform',
-    tagline: 'Bot Framework connector with JWT verification',
+    tagline: 'Deploy bots to Microsoft Teams with Adaptive Cards, mentions, reactions, and file sharing.',
     color: '#6264A7',
     icon: <TeamsIcon />,
     official: true,
@@ -148,7 +148,7 @@ const adapters: Adapter[] = [
     slug: 'gchat',
     gem: 'chat_sdk-gchat',
     type: 'platform',
-    tagline: 'Official google-apps-chat-v1 client with OIDC token verification',
+    tagline: 'Integrate with Google Chat spaces for team collaboration with Card V2 and ephemeral messages.',
     color: '#00AC47',
     icon: <GChatIcon />,
     official: true,
@@ -163,7 +163,7 @@ const adapters: Adapter[] = [
     slug: 'mattermost',
     gem: 'chat_sdk-mattermost',
     type: 'platform',
-    tagline: 'REST API adapter with webhook token auth',
+    tagline: 'Connect to Mattermost servers with message attachments, reactions, typing indicators, and file uploads.',
     color: '#0058CC',
     icon: <MattermostIcon />,
     official: true,
@@ -178,7 +178,7 @@ const adapters: Adapter[] = [
     slug: 'discord',
     gem: 'chat_sdk-discord',
     type: 'platform',
-    tagline: 'REST API v10 adapter with Ed25519 verification and embed rendering',
+    tagline: 'Create Discord bots with slash commands, rich embeds, interactive buttons, and file attachments.',
     color: '#5865F2',
     icon: <DiscordIcon />,
     official: true,
@@ -193,7 +193,7 @@ const adapters: Adapter[] = [
     slug: 'telegram',
     gem: 'chat_sdk-telegram',
     type: 'platform',
-    tagline: 'Bot API adapter with webhook secret token verification and inline keyboard rendering',
+    tagline: 'Build Telegram bots with inline keyboards, reactions, typing indicators, and media support.',
     color: '#26A5E4',
     icon: <TelegramIcon />,
     official: true,
@@ -208,7 +208,7 @@ const adapters: Adapter[] = [
     slug: 'twilio',
     gem: 'chat_sdk-twilio',
     type: 'platform',
-    tagline: 'SMS/MMS adapter with HMAC-SHA1 signature verification',
+    tagline: 'Send and receive SMS/MMS messages through Twilio with webhook signature verification.',
     color: '#F22F46',
     icon: <TwilioIcon />,
     official: true,
@@ -223,7 +223,7 @@ const adapters: Adapter[] = [
     slug: 'state-redis',
     gem: 'chat_sdk-state-redis',
     type: 'state',
-    tagline: 'Production state backend with Lua-guarded locks',
+    tagline: 'High-performance state backend with atomic Lua-guarded locks and TTL-based key expiration.',
     color: '#DC382D',
     icon: <RedisIcon />,
     official: true,
@@ -234,7 +234,7 @@ const adapters: Adapter[] = [
     slug: 'state-pg',
     gem: 'chat_sdk-state-pg',
     type: 'state',
-    tagline: 'Production state backend with auto-migration and JSONB storage',
+    tagline: 'PostgreSQL state backend with auto-migration, JSONB storage, and row-level locking.',
     color: '#336791',
     icon: <PostgresIcon />,
     official: true,
@@ -245,7 +245,7 @@ const adapters: Adapter[] = [
     slug: 'state-mysql',
     gem: 'chat_sdk-state-mysql',
     type: 'state',
-    tagline: 'Production state backend with auto-migration and JSON storage',
+    tagline: 'MySQL state backend with auto-migration, JSON storage, and InnoDB row-level locking.',
     color: '#00758F',
     icon: <MysqlIcon />,
     official: true,
@@ -256,7 +256,7 @@ const adapters: Adapter[] = [
     slug: 'state-memory',
     gem: 'chat_sdk (built-in)',
     type: 'state',
-    tagline: 'In-process state for development and testing',
+    tagline: 'Zero-dependency in-process state for development, testing, and single-process deployments.',
     color: '#6B7280',
     icon: <MemoryIcon />,
     official: true,
@@ -288,47 +288,37 @@ export default function AdaptersPage() {
       </p>
 
       {/* Platform adapters */}
-      <h2 className="text-2xl font-bold mb-6">Platform Adapters</h2>
-      <div className="grid gap-4 mb-16">
+      <h2 className="text-2xl font-bold mb-2">Platform Adapters</h2>
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Published under <code className="text-xs">chat_sdk-*</code> and maintained by Rootly.</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-16">
         {platformAdapters.map((adapter) => (
           <Link
             key={adapter.slug}
             href={`/docs/adapters/${adapter.slug}`}
-            className="group flex items-start gap-5 p-6 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-all hover:shadow-md bg-white dark:bg-gray-950"
+            className="group flex flex-col p-5 rounded-2xl border border-gray-200 dark:border-gray-800 hover:border-red-500/30 dark:hover:border-red-500/30 transition-all hover:shadow-md bg-white dark:bg-gray-950"
           >
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
-              style={{ backgroundColor: adapter.color }}
-            >
-              {adapter.icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-3 mb-1.5 flex-wrap">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ backgroundColor: adapter.color }}
+                >
+                  {adapter.icon}
+                </div>
                 <h3 className="font-semibold text-lg group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
                   {adapter.name}
                 </h3>
-                {adapter.official && (
-                  <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                    Official
-                  </span>
-                )}
-                <code className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded">
-                  {adapter.gem}
-                </code>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{adapter.tagline}</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-                {Object.entries(adapter.features).map(([key, val]) => (
-                  <span key={key} className="text-xs flex items-center gap-1.5">
-                    <FeatureBadge status={val} />
-                    <span className="text-gray-500 dark:text-gray-400">{featureLabels[key]}</span>
-                  </span>
-                ))}
-              </div>
+              {adapter.official && (
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
+                  Official
+                </span>
+              )}
             </div>
-            <span className="text-gray-300 dark:text-gray-600 group-hover:text-red-500 transition-colors mt-3 text-lg">
-              →
-            </span>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 flex-1">{adapter.tagline}</p>
+            <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+              <code className="text-xs text-gray-400">{adapter.gem}</code>
+            </div>
           </Link>
         ))}
       </div>
