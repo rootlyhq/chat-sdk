@@ -138,15 +138,15 @@ bot.adapter(:slack).client.chat_postMessage(channel: "#ops", text: "raw")
 
 | Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio | Messenger | WhatsApp | X | Linear |
 |---------|:-----:|:-----:|:-----:|:----------:|:-------:|:--------:|:------:|:---------:|:--------:|:---:|:------:|
-| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✗ | ✓ |
+| Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✓ | ✓ |
 | Ephemeral | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Reactions | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ |
 | File uploads | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ |
 | Modals | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Streaming | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ |
 | DMs | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
-| History | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| Typing | ✓ | ✗ | ✗ | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| History | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ |
+| Typing | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
 
 Platform clients:
 - **Slack** — wraps [slack-ruby-client](https://github.com/slack-ruby/slack-ruby-client)

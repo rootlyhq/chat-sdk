@@ -170,7 +170,7 @@ const adapters: Adapter[] = [
     features: {
       post: 'yes', edit: 'yes', delete: 'yes', ephemeral: 'no',
       reactions: 'partial', files: 'yes', modals: 'no', streaming: 'yes',
-      dms: 'yes', history: 'yes', typing: 'no',
+      dms: 'yes', history: 'yes', typing: 'yes',
     },
   },
   {
@@ -215,7 +215,7 @@ const adapters: Adapter[] = [
     features: {
       post: 'yes', edit: 'yes', delete: 'yes', ephemeral: 'no',
       reactions: 'yes', files: 'yes', modals: 'no', streaming: 'yes',
-      dms: 'yes', history: 'yes', typing: 'no',
+      dms: 'yes', history: 'yes', typing: 'yes',
     },
   },
   {
@@ -288,9 +288,9 @@ const adapters: Adapter[] = [
     icon: <XIcon />,
     official: true,
     features: {
-      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
+      post: 'yes', edit: 'no', delete: 'yes', ephemeral: 'no',
       reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
-      dms: 'yes', history: 'no', typing: 'no',
+      dms: 'yes', history: 'yes', typing: 'no',
     },
   },
   {
