@@ -25,6 +25,7 @@ AllCops:
     - "chat_sdk-messenger/**/*.rb"
     - "chat_sdk-whatsapp/**/*.rb"
     - "chat_sdk-x/**/*.rb"
+    - "chat_sdk-linear/**/*.rb"
     - "chat_sdk-state-redis/**/*.rb"
     - "chat_sdk-state-pg/**/*.rb"
     - "chat_sdk-state-mysql/**/*.rb"

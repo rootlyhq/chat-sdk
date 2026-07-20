@@ -6,19 +6,19 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat | Mattermost | WhatsApp | X |
-|---------|-------|-------|-------|------------|----------|---|
-| Post | yes | yes | yes | yes | yes | yes |
-| Edit | yes | yes | yes | yes | no | no |
-| Delete | yes | yes | yes | yes | no | no |
-| Ephemeral | yes | no | yes | yes | no | no |
-| Reactions | yes | yes | yes | yes | yes | yes |
-| Files | yes | yes | no | yes | yes | no |
-| Modals | yes | no | no | no | no | no |
-| Streaming | yes | yes | yes | yes | no | no |
-| DMs | yes | yes | yes | yes | yes | yes |
-| History | yes | yes | yes | yes | no | no |
-| Typing | yes | no | no | yes | no | no |
+| Feature | Slack | Teams | GChat | Mattermost | WhatsApp | X | Linear |
+|---------|-------|-------|-------|------------|----------|---|--------|
+| Post | yes | yes | yes | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes | no | no | no |
+| Delete | yes | yes | yes | yes | no | no | no |
+| Ephemeral | yes | no | yes | yes | no | no | no |
+| Reactions | yes | yes | yes | yes | yes | yes | yes |
+| Files | yes | yes | no | yes | yes | no | no |
+| Modals | yes | no | no | no | no | no | no |
+| Streaming | yes | yes | yes | yes | no | no | no |
+| DMs | yes | yes | yes | yes | yes | yes | no |
+| History | yes | yes | yes | yes | no | no | no |
+| Typing | yes | no | no | yes | no | no | no |
 
 ## Official Adapters
 
@@ -28,6 +28,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Mattermost](adapters/mattermost.md) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
 - [WhatsApp](adapters/whatsapp.md) -- `gem "chat_sdk-whatsapp"` -- WhatsApp Business Cloud API adapter with interactive message rendering.
 - [X](adapters/x.md) -- `gem "chat_sdk-x"` -- X API v2 adapter with HMAC-SHA256 webhook verification for tweets, DMs, and likes.
+- [Linear](adapters/linear.md) -- `gem "chat_sdk-linear"` -- Linear GraphQL API adapter with HMAC-SHA256 webhook verification for issue comments and reactions.
 
 ## Checking Capabilities at Runtime
 

@@ -15,6 +15,13 @@ PATH
       googleauth (~> 1.0)
 
 PATH
+  remote: chat_sdk-linear
+  specs:
+    chat_sdk-linear (0.4.0)
+      chat_sdk (~> 0.1)
+      faraday (~> 2.0)
+
+PATH
   remote: chat_sdk-mattermost
   specs:
     chat_sdk-mattermost (0.4.0)
@@ -341,6 +348,7 @@ DEPENDENCIES
   chat_sdk!
   chat_sdk-discord!
   chat_sdk-gchat!
+  chat_sdk-linear!
   chat_sdk-mattermost!
   chat_sdk-messenger!
   chat_sdk-slack!

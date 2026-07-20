@@ -92,6 +92,14 @@ function XIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function LinearIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
+      <path d="M2.997 11.573a9.108 9.108 0 0 1 1.953-4.56l7.036 7.037a9.108 9.108 0 0 1-4.559 1.952L2.997 11.573ZM3.781 5.903A9.108 9.108 0 0 1 11.999 2.4c5.014 0 9.1 4.086 9.1 9.1a9.108 9.108 0 0 1-3.503 8.218L3.781 5.903ZM2.687 12.782l8.531 8.531a9.175 9.175 0 0 1-1.218.082c-5.014 0-9.1-4.086-9.1-9.1 0-.413.028-.82.082-1.218l1.705 1.705Z" />
+    </svg>
+  );
+}
+
 function TwilioIcon({ size = 22 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
@@ -283,6 +291,21 @@ const adapters: Adapter[] = [
       post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
       reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
       dms: 'yes', history: 'no', typing: 'no',
+    },
+  },
+  {
+    name: 'Linear',
+    slug: 'linear',
+    gem: 'chat_sdk-linear',
+    type: 'platform',
+    tagline: 'Integrate with Linear issue comments via GraphQL with HMAC-SHA256 webhook verification and emoji reactions.',
+    color: '#5E6AD2',
+    icon: <LinearIcon />,
+    official: true,
+    features: {
+      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
+      reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
+      dms: 'no', history: 'no', typing: 'no',
     },
   },
   {

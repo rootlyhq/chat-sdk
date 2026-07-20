@@ -9,6 +9,9 @@
     "telegram",
     "twilio",
     "messenger",
+    "whatsapp",
+    "x",
+    "linear",
     "state-memory",
     "state-redis",
     "state-pg"
