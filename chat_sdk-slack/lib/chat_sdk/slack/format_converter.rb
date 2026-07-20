@@ -21,16 +21,6 @@ module ChatSDK
 
       private
 
-      # Splits text into alternating [text, code, text, code, ...] segments.
-      # Odd-indexed segments are code blocks (including their delimiters) and
-      # should be passed through without conversion.
-      def split_code_blocks(text)
-        # Match fenced code blocks (```...```) and inline code (`...`)
-        # The fenced block pattern must come first so triple backticks aren't
-        # eaten by the inline pattern.
-        text.split(/(```[\s\S]*?```|`[^`]+`)/)
-      end
-
       # ── Slack mrkdwn → Markdown ──────────────────────────────────────────
 
       def convert_mrkdwn_to_md(text)
@@ -81,14 +71,8 @@ module ChatSDK
         # Links: [text](url) -> <url|text>
         result = result.gsub(/\[([^\]]+)\]\(([^)]+)\)/) { "<#{Regexp.last_match(2)}|#{Regexp.last_match(1)}>" }
 
-        # Bold: **text** -> *text* (use placeholder to prevent italic pass from catching it)
-        result = result.gsub(/\*\*(.+?)\*\*/, "\x00BOLD\\1BOLD\x00")
-
-        # Italic: *text* -> _text_ (only single asterisks remaining after bold placeholder)
-        result = result.gsub(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/, '_\1_')
-
-        # Restore bold placeholders
-        result = result.gsub(/\x00BOLD(.+?)BOLD\x00/, '*\1*')
+        # Bold/italic with placeholder to prevent double conversion
+        result = convert_bold_and_italic_from_md(result, bold_char: "*", italic_char: "_")
 
         # Strikethrough: ~~text~~ -> ~text~
         result = result.gsub(/~~(.+?)~~/, '~\1~')

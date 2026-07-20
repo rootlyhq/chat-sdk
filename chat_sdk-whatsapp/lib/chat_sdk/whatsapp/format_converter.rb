@@ -23,10 +23,6 @@ module ChatSDK
 
       private
 
-      def split_code_blocks(text)
-        text.split(/(```[\s\S]*?```|`[^`]+`)/)
-      end
-
       def convert_whatsapp_to_md(text)
         result = text
 
@@ -43,14 +39,8 @@ module ChatSDK
       def convert_md_to_whatsapp(text)
         result = text
 
-        # Bold: **text** → *text* (placeholder to prevent italic pass from catching it)
-        result = result.gsub(/\*\*(.+?)\*\*/m, "\x00BOLD\\1BOLD\x00")
-
-        # Italic: *text* → _text_ (only single asterisks remaining after bold placeholder)
-        result = result.gsub(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/m, '_\1_')
-
-        # Restore bold placeholders
-        result = result.gsub(/\x00BOLD(.+?)BOLD\x00/m, '*\1*')
+        # Bold/italic with placeholder to prevent double conversion
+        result = convert_bold_and_italic_from_md(result, bold_char: "*", italic_char: "_")
 
         # Strikethrough: ~~text~~ → ~text~
         result.gsub(/~~(.+?)~~/m, '~\1~')

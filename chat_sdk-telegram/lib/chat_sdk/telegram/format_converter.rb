@@ -4,7 +4,6 @@ module ChatSDK
   module Telegram
     class FormatConverter < ChatSDK::Format::Converter
       SPECIAL_CHARS = %w[_ * [ ] ( ) ~ \\ ` > # + - = | { } . !].freeze
-      ESCAPE_RE = Regexp.union(SPECIAL_CHARS).freeze
 
       # Telegram MarkdownV2 → standard Markdown
       def to_markdown(platform_text)
@@ -30,17 +29,11 @@ module ChatSDK
         text = markdown.to_s
         return "" if text.empty?
 
-        parts = split_code_segments(text)
+        parts = split_code_blocks(text)
         parts.map.with_index { |part, i| i.odd? ? part : escape_special_chars(part) }.join
       end
 
       private
-
-      # Splits text into alternating [text, code, text, code, ...] segments.
-      # Odd-indexed segments are code blocks/inline code and are NOT escaped.
-      def split_code_segments(text)
-        text.split(/(```[\s\S]*?```|`[^`]+`)/)
-      end
 
       # Escape Telegram MarkdownV2 special chars outside of markdown syntax.
       # Preserves bold (**), italic (*), strikethrough (~~), links, etc.

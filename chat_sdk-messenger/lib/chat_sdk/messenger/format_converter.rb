@@ -15,30 +15,6 @@ module ChatSDK
 
         strip_markdown(text)
       end
-
-      private
-
-      def strip_markdown(text)
-        result = text
-
-        # Remove fenced code blocks but keep content
-        result = result.gsub(/```\w*\n?([\s\S]*?)```/, '\1')
-
-        # Remove inline code markers
-        result = result.gsub(/`([^`]+)`/, '\1')
-
-        # Convert links: [text](url) → text (url)
-        result = result.gsub(/\[([^\]]+)\]\(([^)]+)\)/, '\1 (\2)')
-
-        # Remove bold markers: **text** → text
-        result = result.gsub(/\*\*(.+?)\*\*/m, '\1')
-
-        # Remove italic markers: *text* → text
-        result = result.gsub(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/m, '\1')
-
-        # Remove strikethrough markers: ~~text~~ → text
-        result.gsub(/~~(.+?)~~/m, '\1')
-      end
     end
   end
 end
