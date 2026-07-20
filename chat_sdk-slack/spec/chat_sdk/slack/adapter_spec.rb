@@ -13,9 +13,9 @@ RSpec.describe ChatSDK::Slack::Adapter do
   it_behaves_like "a chat_sdk platform adapter"
 
   describe "#initialize" do
-    it "raises ConfigurationError without bot_token" do
+    it "raises ConfigurationError without bot_token or client_id" do
       expect { described_class.new(bot_token: nil, signing_secret: signing_secret) }
-        .to raise_error(ChatSDK::ConfigurationError, /bot_token required/)
+        .to raise_error(ChatSDK::ConfigurationError, /bot_token or client_id required/)
     end
 
     it "raises ConfigurationError without signing_secret" do
@@ -474,6 +474,273 @@ RSpec.describe ChatSDK::Slack::Adapter do
   describe "#mention" do
     it "formats a Slack user mention" do
       expect(subject.mention("U123")).to eq("<@U123>")
+    end
+  end
+
+  describe "multi-workspace OAuth" do
+    let(:multi_adapter) do
+      described_class.new(
+        client_id: "test-client-id",
+        client_secret: "test-client-secret",
+        signing_secret: signing_secret
+      )
+    end
+    let(:state) { ChatSDK::State::Memory.new }
+
+    before do
+      multi_adapter.set_state(state)
+      # Clear any thread-local client from previous tests
+      Thread.current[:chat_sdk_slack_client] = nil
+    end
+
+    after do
+      Thread.current[:chat_sdk_slack_client] = nil
+    end
+
+    describe "#initialize" do
+      it "accepts client_id + client_secret without bot_token" do
+        adapter = described_class.new(
+          client_id: "cid",
+          client_secret: "csec",
+          signing_secret: signing_secret
+        )
+        expect(adapter.name).to eq(:slack)
+      end
+
+      it "raises ConfigurationError without bot_token or client_id" do
+        expect {
+          described_class.new(signing_secret: signing_secret)
+        }.to raise_error(ChatSDK::ConfigurationError, /bot_token or client_id required/)
+      end
+    end
+
+    describe "#set_state" do
+      it "injects the state store" do
+        adapter = described_class.new(
+          client_id: "cid",
+          client_secret: "csec",
+          signing_secret: signing_secret
+        )
+        adapter.set_state(state)
+        # Should be able to set/get installations now
+        adapter.set_installation("T001", bot_token: "xoxb-test")
+        expect(adapter.get_installation("T001")).to include("bot_token" => "xoxb-test")
+      end
+    end
+
+    describe "#set_installation" do
+      it "stores installation data in state" do
+        multi_adapter.set_installation("T001",
+          bot_token: "xoxb-team1",
+          bot_user_id: "U_BOT1",
+          team_name: "Team One")
+
+        stored = state.get("slack:installation:T001")
+        expect(stored).to eq({
+          "bot_token" => "xoxb-team1",
+          "bot_user_id" => "U_BOT1",
+          "team_name" => "Team One"
+        })
+      end
+
+      it "raises ConfigurationError without state" do
+        adapter = described_class.new(
+          client_id: "cid",
+          client_secret: "csec",
+          signing_secret: signing_secret
+        )
+        expect {
+          adapter.set_installation("T001", bot_token: "xoxb-test")
+        }.to raise_error(ChatSDK::ConfigurationError, /requires state/)
+      end
+    end
+
+    describe "#get_installation" do
+      it "retrieves stored installation" do
+        multi_adapter.set_installation("T001",
+          bot_token: "xoxb-team1",
+          bot_user_id: "U_BOT1",
+          team_name: "Team One")
+
+        result = multi_adapter.get_installation("T001")
+        expect(result["bot_token"]).to eq("xoxb-team1")
+        expect(result["bot_user_id"]).to eq("U_BOT1")
+        expect(result["team_name"]).to eq("Team One")
+      end
+
+      it "returns nil for unknown team" do
+        expect(multi_adapter.get_installation("T_UNKNOWN")).to be_nil
+      end
+
+      it "returns nil without state" do
+        adapter = described_class.new(
+          client_id: "cid",
+          client_secret: "csec",
+          signing_secret: signing_secret
+        )
+        expect(adapter.get_installation("T001")).to be_nil
+      end
+    end
+
+    describe "#delete_installation" do
+      it "removes installation from state" do
+        multi_adapter.set_installation("T001", bot_token: "xoxb-team1")
+        multi_adapter.delete_installation("T001")
+
+        expect(multi_adapter.get_installation("T001")).to be_nil
+      end
+    end
+
+    describe "#handle_oauth_callback" do
+      it "exchanges code and stores installation" do
+        temp_client = instance_double(::Slack::Web::Client)
+        allow(::Slack::Web::Client).to receive(:new).with(no_args).and_return(temp_client)
+        allow(temp_client).to receive(:oauth_v2_access).with(
+          client_id: "test-client-id",
+          client_secret: "test-client-secret",
+          code: "oauth-code-123"
+        ).and_return({
+          "ok" => true,
+          "access_token" => "xoxb-new-team-token",
+          "bot_user_id" => "U_NEW_BOT",
+          "team" => {"id" => "T_NEW", "name" => "New Team"}
+        })
+
+        result = multi_adapter.handle_oauth_callback(code: "oauth-code-123")
+
+        expect(result[:team_id]).to eq("T_NEW")
+        expect(result[:installation]["bot_token"]).to eq("xoxb-new-team-token")
+        expect(result[:installation]["bot_user_id"]).to eq("U_NEW_BOT")
+        expect(result[:installation]["team_name"]).to eq("New Team")
+
+        # Verify it was stored
+        stored = multi_adapter.get_installation("T_NEW")
+        expect(stored["bot_token"]).to eq("xoxb-new-team-token")
+      end
+
+      it "raises ConfigurationError without client_id" do
+        adapter = described_class.new(
+          bot_token: bot_token,
+          signing_secret: signing_secret
+        )
+        expect {
+          adapter.handle_oauth_callback(code: "some-code")
+        }.to raise_error(ChatSDK::ConfigurationError, /client_id required/)
+      end
+
+      it "passes redirect_uri when provided" do
+        temp_client = instance_double(::Slack::Web::Client)
+        allow(::Slack::Web::Client).to receive(:new).with(no_args).and_return(temp_client)
+        allow(temp_client).to receive(:oauth_v2_access).with(
+          client_id: "test-client-id",
+          client_secret: "test-client-secret",
+          code: "oauth-code-456",
+          redirect_uri: "https://example.com/callback"
+        ).and_return({
+          "ok" => true,
+          "access_token" => "xoxb-redir-token",
+          "bot_user_id" => "U_REDIR",
+          "team" => {"id" => "T_REDIR", "name" => "Redir Team"}
+        })
+
+        result = multi_adapter.handle_oauth_callback(
+          code: "oauth-code-456",
+          redirect_uri: "https://example.com/callback"
+        )
+        expect(result[:team_id]).to eq("T_REDIR")
+      end
+    end
+
+    describe "per-webhook token resolution" do
+      def build_request(body, content_type: "application/json")
+        env = Rack::MockRequest.env_for(
+          "/slack/events",
+          :method => "POST",
+          :input => body,
+          "CONTENT_TYPE" => content_type
+        )
+        Rack::Request.new(env)
+      end
+
+      it "resolves team client from event_callback payload" do
+        multi_adapter.set_installation("T_MULTI",
+          bot_token: "xoxb-multi-token",
+          bot_user_id: "U_MULTI_BOT")
+
+        payload = {
+          "type" => "event_callback",
+          "team_id" => "T_MULTI",
+          "event" => {
+            "type" => "app_mention",
+            "user" => "U123",
+            "text" => "<@B456> hello",
+            "ts" => "1234567890.123456",
+            "channel" => "C789"
+          }
+        }
+        request = build_request(JSON.generate(payload))
+        events = multi_adapter.parse_events(request)
+
+        expect(events.size).to eq(1)
+        expect(multi_adapter.client).to be_a(::Slack::Web::Client)
+        expect(multi_adapter.client.token).to eq("xoxb-multi-token")
+      end
+
+      it "resolves team client from interactive payload with team.id" do
+        multi_adapter.set_installation("T_INTER",
+          bot_token: "xoxb-inter-token")
+
+        payload = {
+          "type" => "block_actions",
+          "team" => {"id" => "T_INTER"},
+          "user" => {"id" => "U123", "name" => "testuser"},
+          "channel" => {"id" => "C789"},
+          "message" => {"ts" => "1234567890.123456"},
+          "trigger_id" => "T999",
+          "actions" => [
+            {"action_id" => "btn:ok", "value" => "clicked"}
+          ]
+        }
+        request = build_request(JSON.generate(payload))
+        events = multi_adapter.parse_events(request)
+
+        expect(events.size).to eq(1)
+        expect(multi_adapter.client.token).to eq("xoxb-inter-token")
+      end
+
+      it "does not set thread client in single-workspace mode" do
+        payload = {
+          "type" => "event_callback",
+          "team_id" => "T001",
+          "event" => {
+            "type" => "app_mention",
+            "user" => "U123",
+            "text" => "hello",
+            "ts" => "1234567890.123456",
+            "channel" => "C789"
+          }
+        }
+        request = build_request(JSON.generate(payload))
+        subject.parse_events(request)
+
+        # Thread-local should not be set in single-workspace mode
+        expect(Thread.current[:chat_sdk_slack_client]).to be_nil
+      end
+    end
+
+    describe "#client in multi-workspace mode" do
+      it "returns nil when no team client is resolved and no bot_token" do
+        Thread.current[:chat_sdk_slack_client] = nil
+        expect(multi_adapter.client).to be_nil
+      end
+
+      it "returns thread-local client when set" do
+        team_client = ::Slack::Web::Client.new(token: "xoxb-thread-local")
+        Thread.current[:chat_sdk_slack_client] = team_client
+
+        expect(multi_adapter.client).to eq(team_client)
+        expect(multi_adapter.client.token).to eq("xoxb-thread-local")
+      end
     end
   end
 

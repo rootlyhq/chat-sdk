@@ -8,22 +8,89 @@ module ChatSDK
         :streaming_edit, :threads, :direct_messages, :message_history,
         :scheduled_messages
 
-      attr_reader :client
-
-      def initialize(bot_token: nil, signing_secret: nil)
+      def initialize(bot_token: nil, signing_secret: nil,
+        client_id: nil, client_secret: nil)
         @bot_token = bot_token || ENV["SLACK_BOT_TOKEN"]
         @signing_secret = signing_secret || ENV["SLACK_SIGNING_SECRET"]
+        @client_id = client_id || ENV["SLACK_CLIENT_ID"]
+        @client_secret = client_secret || ENV["SLACK_CLIENT_SECRET"]
 
-        raise ChatSDK::ConfigurationError, "Slack bot_token required" unless @bot_token
+        unless @bot_token || @client_id
+          raise ChatSDK::ConfigurationError, "Slack bot_token or client_id required"
+        end
         raise ChatSDK::ConfigurationError, "Slack signing_secret required" unless @signing_secret
 
-        ::Slack.configure do |config|
-          config.token = @bot_token
+        if @bot_token
+          ::Slack.configure do |config|
+            config.token = @bot_token
+          end
+          @client = ::Slack::Web::Client.new(token: @bot_token)
         end
 
-        @client = ::Slack::Web::Client.new(token: @bot_token)
         @renderer = BlockKitRenderer.new
         @modal_renderer = ModalRenderer.new
+      end
+
+      # Returns the per-request client (multi-workspace) or the static client (single-workspace).
+      def client
+        ::Thread.current[:chat_sdk_slack_client] || @client
+      end
+
+      # Inject state store after initialization (e.g., from Chat instance).
+      def set_state(state)
+        @state = state
+      end
+
+      # --- Multi-workspace installation management ---
+
+      def set_installation(team_id, bot_token:, bot_user_id: nil, team_name: nil)
+        raise ChatSDK::ConfigurationError, "Multi-workspace mode requires state" unless @state
+
+        @state.set(installation_key(team_id), {
+          "bot_token" => bot_token,
+          "bot_user_id" => bot_user_id,
+          "team_name" => team_name
+        })
+      end
+
+      def get_installation(team_id)
+        return nil unless @state
+
+        @state.get(installation_key(team_id))
+      end
+
+      def delete_installation(team_id)
+        return unless @state
+
+        @state.delete(installation_key(team_id))
+      end
+
+      def handle_oauth_callback(code:, redirect_uri: nil)
+        raise ChatSDK::ConfigurationError, "client_id required for OAuth" unless @client_id
+
+        temp_client = ::Slack::Web::Client.new
+        params = {
+          client_id: @client_id,
+          client_secret: @client_secret,
+          code: code
+        }
+        params[:redirect_uri] = redirect_uri if redirect_uri
+
+        result = temp_client.oauth_v2_access(**params)
+
+        team_id = result["team"]["id"]
+        installation = {
+          "bot_token" => result["access_token"],
+          "bot_user_id" => result["bot_user_id"],
+          "team_name" => result["team"]["name"]
+        }
+
+        set_installation(team_id,
+          bot_token: installation["bot_token"],
+          bot_user_id: installation["bot_user_id"],
+          team_name: installation["team_name"])
+
+        {team_id: team_id, installation: installation}
       end
 
       def name
@@ -74,6 +141,12 @@ module ChatSDK
         parsed = parse_body(body, rack_request.content_type)
         return [] unless parsed
 
+        # Multi-workspace: resolve per-team client from payload
+        if @client_id
+          team_id = parsed["team_id"] || parsed.dig("team", "id")
+          resolve_team_client(team_id) if team_id
+        end
+
         EventParser.parse(parsed)
       end
 
@@ -85,7 +158,7 @@ module ChatSDK
 
         apply_message_params(params, msg)
 
-        result = @client.chat_postMessage(**params)
+        result = client.chat_postMessage(**params)
 
         ChatSDK::Message.new(
           id: result["ts"],
@@ -104,11 +177,11 @@ module ChatSDK
 
         apply_message_params(params, msg)
 
-        @client.chat_update(**params)
+        client.chat_update(**params)
       end
 
       def delete_message(channel_id:, message_id:)
-        @client.chat_delete(channel: channel_id, ts: message_id)
+        client.chat_delete(channel: channel_id, ts: message_id)
       end
 
       def post_ephemeral(channel_id:, user_id:, message:, thread_id: nil)
@@ -118,26 +191,26 @@ module ChatSDK
 
         apply_message_params(params, msg)
 
-        @client.chat_postEphemeral(**params)
+        client.chat_postEphemeral(**params)
       end
 
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
         params = {channels: channel_id, file: Faraday::Multipart::FilePart.new(io, nil, filename)}
         params[:thread_ts] = thread_id if thread_id
         params[:initial_comment] = comment if comment
-        @client.files_upload(**params)
+        client.files_upload(**params)
       end
 
       def add_reaction(channel_id:, message_id:, emoji:)
-        @client.reactions_add(channel: channel_id, timestamp: message_id, name: emoji)
+        client.reactions_add(channel: channel_id, timestamp: message_id, name: emoji)
       end
 
       def remove_reaction(channel_id:, message_id:, emoji:)
-        @client.reactions_remove(channel: channel_id, timestamp: message_id, name: emoji)
+        client.reactions_remove(channel: channel_id, timestamp: message_id, name: emoji)
       end
 
       def get_user(user_id)
-        result = @client.users_info(user: user_id)
+        result = client.users_info(user: user_id)
         return nil unless result&.dig("user", "id")
 
         ChatSDK::Author.new(
@@ -150,7 +223,7 @@ module ChatSDK
       end
 
       def open_dm(user_id)
-        result = @client.conversations_open(users: user_id)
+        result = client.conversations_open(users: user_id)
         result["channel"]["id"]
       end
 
@@ -161,7 +234,7 @@ module ChatSDK
         params = {channel: channel_id, text: text, post_at: post_at.to_i}
         params[:thread_ts] = thread_id if thread_id
 
-        result = @client.chat_scheduleMessage(**params)
+        result = client.chat_scheduleMessage(**params)
 
         ChatSDK::Message.new(
           id: result["scheduled_message_id"],
@@ -176,9 +249,9 @@ module ChatSDK
 
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
         result = if thread_id
-          @client.conversations_replies(channel: channel_id, ts: thread_id, cursor: cursor, limit: limit)
+          client.conversations_replies(channel: channel_id, ts: thread_id, cursor: cursor, limit: limit)
         else
-          @client.conversations_history(channel: channel_id, cursor: cursor, limit: limit)
+          client.conversations_history(channel: channel_id, cursor: cursor, limit: limit)
         end
         messages = result["messages"].map { |m| parse_slack_message(m, channel_id) }
         [messages, result["response_metadata"]&.dig("next_cursor")]
@@ -186,15 +259,15 @@ module ChatSDK
 
       def open_modal(trigger_id:, modal:)
         view = @modal_renderer.render(modal)
-        @client.views_open(trigger_id: trigger_id, view: view)
+        client.views_open(trigger_id: trigger_id, view: view)
       end
 
       def publish_home_view(user_id:, view:)
-        @client.views_publish(user_id: user_id, view: view)
+        client.views_publish(user_id: user_id, view: view)
       end
 
       def set_suggested_prompts(channel_id:, thread_id:, prompts:)
-        @client.assistant_threads_setSuggestedPrompts(
+        client.assistant_threads_setSuggestedPrompts(
           channel_id: channel_id,
           thread_ts: thread_id,
           prompts: prompts
@@ -202,7 +275,7 @@ module ChatSDK
       end
 
       def set_assistant_status(channel_id:, thread_id:, status:)
-        @client.assistant_threads_setStatus(
+        client.assistant_threads_setStatus(
           channel_id: channel_id,
           thread_ts: thread_id,
           status: status
@@ -210,7 +283,7 @@ module ChatSDK
       end
 
       def set_assistant_title(channel_id:, thread_id:, title:)
-        @client.assistant_threads_setTitle(
+        client.assistant_threads_setTitle(
           channel_id: channel_id,
           thread_ts: thread_id,
           title: title
@@ -234,7 +307,7 @@ module ChatSDK
         app_token ||= ENV["SLACK_APP_TOKEN"]
         raise ChatSDK::ConfigurationError, "Slack app_token required for socket mode" unless app_token
 
-        socket = SocketMode.new(app_token: app_token, bot_client: @client)
+        socket = SocketMode.new(app_token: app_token, bot_client: client)
         socket.start(&block)
       end
 
@@ -251,6 +324,21 @@ module ChatSDK
       end
 
       private
+
+      def resolve_team_client(team_id)
+        return unless @client_id && @state
+
+        installation = get_installation(team_id)
+        return unless installation
+
+        ::Thread.current[:chat_sdk_slack_client] = ::Slack::Web::Client.new(
+          token: installation["bot_token"]
+        )
+      end
+
+      def installation_key(team_id)
+        "slack:installation:#{team_id}"
+      end
 
       def apply_message_params(params, msg)
         if msg.card?
