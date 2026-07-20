@@ -7,6 +7,8 @@ require "rack/utils"
 module ChatSDK
   module X
     class Adapter < ChatSDK::Adapter::Base
+      include ChatSDK::Adapter::MediaTypes
+
       capabilities :direct_messages, :reactions, :delete_messages, :message_history, :file_uploads
 
       attr_reader :client
@@ -93,7 +95,7 @@ module ChatSDK
         content_type = detect_content_type(filename)
         bytes = io.respond_to?(:size) ? io.size : io.read.bytesize.tap { io.rewind }
 
-        media_id = @client.upload_media(io: io, filename: filename, content_type: content_type, total_bytes: bytes)
+        media_id = @client.upload_media(io: io, content_type: content_type, total_bytes: bytes)
 
         text = comment || ""
         result = @client.create_tweet(text: text, media_ids: [media_id])
@@ -167,16 +169,6 @@ module ChatSDK
           platform: :x,
           raw: result
         )
-      end
-
-      CONTENT_TYPES = {
-        ".jpg" => "image/jpeg", ".jpeg" => "image/jpeg", ".png" => "image/png",
-        ".gif" => "image/gif", ".webp" => "image/webp",
-        ".mp4" => "video/mp4", ".mov" => "video/quicktime"
-      }.freeze
-
-      def detect_content_type(filename)
-        CONTENT_TYPES.fetch(File.extname(filename).downcase, "application/octet-stream")
       end
     end
   end

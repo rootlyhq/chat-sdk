@@ -129,17 +129,6 @@ module ChatSDK
         )
       end
 
-      # Teams Bot Framework API does not support adding/removing reactions
-      # programmatically. Inbound reactions are still parsed from messageReaction
-      # activities, but outbound reaction methods raise NotSupportedError.
-      def add_reaction(channel_id:, message_id:, emoji:)
-        super
-      end
-
-      def remove_reaction(channel_id:, message_id:, emoji:)
-        super
-      end
-
       def open_dm(user_id)
         require_capability!(:direct_messages)
         # To open a DM, we need a service URL. Use the first cached one.
@@ -163,15 +152,8 @@ module ChatSDK
         conversation_id
       end
 
-      # Teams Bot Framework doesn't provide a message history API.
-      # Fetching message history requires Microsoft Graph API with separate
-      # credentials (graph_client_id, graph_client_secret, graph_tenant_id).
-      def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
-        super
-      end
-
       def open_modal(trigger_id:, modal:)
-        super # raises NotSupportedError
+        super
       end
 
       def start_typing(channel_id:, thread_id: nil)

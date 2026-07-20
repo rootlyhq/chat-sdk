@@ -24,8 +24,7 @@ module ChatSDK
         params = {"PageSize" => limit.to_s}
         params["To"] = to if to
         params["From"] = from if from
-        query = URI.encode_www_form(params)
-        response = connection.get("#{messages_path}?#{query}")
+        response = connection.get(messages_path, params)
         handle_response(response)
       end
 

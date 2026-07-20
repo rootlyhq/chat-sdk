@@ -18,7 +18,7 @@ module ChatSDK
         request(:post, "/2/tweets", body)
       end
 
-      def upload_media(io:, filename:, content_type:, total_bytes:) # rubocop:disable Lint/UnusedMethodArgument
+      def upload_media(io:, content_type:, total_bytes:)
         # INIT
         init_result = request(:post, "/2/media/upload", {
           command: "INIT",
