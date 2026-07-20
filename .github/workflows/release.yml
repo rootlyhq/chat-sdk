@@ -78,8 +78,7 @@ jobs:
           - gem: chat_sdk-x
             oidc_role: rg_oidc_akr_z8m6kkm4sq3x796erfm7
           - gem: chat_sdk-linear
-            # chat_sdk-linear: no OIDC role yet
-            oidc_role: ""
+            oidc_role: rg_oidc_akr_3ayj5cmnm5b6e7frhyak
           - gem: chat_sdk-state-redis
             oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
           - gem: chat_sdk-state-pg
