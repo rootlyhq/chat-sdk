@@ -46,9 +46,24 @@ module ChatSDK
       def post_message(channel_id:, message:, thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
         payload = prepare_message_payload(message)
 
-        result = @client.send_message(to: channel_id, **payload)
+        result = if payload[:type] == "text" && payload.dig(:text, :body)
+          chunks = split_message(payload[:text][:body])
+          chunks.reduce(nil) do |_, chunk|
+            @client.send_message(to: channel_id, type: "text", text: {body: chunk})
+          end
+        else
+          @client.send_message(to: channel_id, **payload)
+        end
 
         parse_whatsapp_message(result, channel_id)
+      end
+
+      def post_template(channel_id:, template_name:, language_code: "en", components: nil)
+        @client.send_template(to: channel_id, template_name: template_name, language_code: language_code, components: components)
+      end
+
+      def mark_as_read(message_id:)
+        @client.mark_as_read(message_id: message_id)
       end
 
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil) # rubocop:disable Lint/UnusedMethodArgument
@@ -90,7 +105,25 @@ module ChatSDK
         end
       end
 
+      WHATSAPP_MESSAGE_LIMIT = 4096
+
       private
+
+      def split_message(text)
+        return [text] if text.length <= WHATSAPP_MESSAGE_LIMIT
+
+        chunks = []
+        remaining = text
+        while remaining.length > WHATSAPP_MESSAGE_LIMIT
+          cut_at = remaining.rindex("\n\n", WHATSAPP_MESSAGE_LIMIT) ||
+            remaining.rindex("\n", WHATSAPP_MESSAGE_LIMIT) ||
+            WHATSAPP_MESSAGE_LIMIT
+          chunks << remaining[0...cut_at]
+          remaining = remaining[cut_at..].lstrip
+        end
+        chunks << remaining unless remaining.empty?
+        chunks
+      end
 
       def prepare_message_payload(message)
         msg = ChatSDK::PostableMessage.from(message)

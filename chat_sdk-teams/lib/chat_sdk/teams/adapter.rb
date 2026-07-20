@@ -4,8 +4,7 @@ module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
-        :message_history, :reactions, :file_uploads, :streaming_edit,
-        :typing_indicator
+        :file_uploads, :streaming_edit, :typing_indicator
 
       attr_reader :client
 
@@ -130,22 +129,15 @@ module ChatSDK
         )
       end
 
+      # Teams Bot Framework API does not support adding/removing reactions
+      # programmatically. Inbound reactions are still parsed from messageReaction
+      # activities, but outbound reaction methods raise NotSupportedError.
       def add_reaction(channel_id:, message_id:, emoji:)
-        require_capability!(:reactions)
-        # Teams Bot Framework API does not support adding reactions programmatically
-        # The capability is declared because inbound reactions are parsed
-        raise ChatSDK::PlatformError.new(
-          "Teams Bot Framework API does not support adding reactions programmatically",
-          adapter_name: :teams
-        )
+        super
       end
 
       def remove_reaction(channel_id:, message_id:, emoji:)
-        require_capability!(:reactions)
-        raise ChatSDK::PlatformError.new(
-          "Teams Bot Framework API does not support removing reactions programmatically",
-          adapter_name: :teams
-        )
+        super
       end
 
       def open_dm(user_id)
@@ -171,11 +163,11 @@ module ChatSDK
         conversation_id
       end
 
+      # Teams Bot Framework doesn't provide a message history API.
+      # Fetching message history requires Microsoft Graph API with separate
+      # credentials (graph_client_id, graph_client_secret, graph_tenant_id).
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
-        require_capability!(:message_history)
-        # Teams Bot Framework doesn't provide a message history API
-        # Return empty to satisfy the interface
-        [[], nil]
+        super
       end
 
       def open_modal(trigger_id:, modal:)

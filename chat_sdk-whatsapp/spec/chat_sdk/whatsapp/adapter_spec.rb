@@ -801,6 +801,171 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
     end
   end
 
+  describe "#post_template" do
+    it "sends a template message" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["type"] == "template" &&
+            body["template"]["name"] == "hello_world" &&
+            body["template"]["language"]["code"] == "en"
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            "messaging_product" => "whatsapp",
+            "messages" => [{"id" => "wamid.template123"}]
+          }),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.post_template(channel_id: "15551234567", template_name: "hello_world")
+      expect(stub).to have_been_requested
+      expect(result).to be_a(Hash)
+      expect(result.dig("messages", 0, "id")).to eq("wamid.template123")
+    end
+
+    it "sends a template with components and custom language" do
+      components = [{"type" => "body", "parameters" => [{"type" => "text", "text" => "World"}]}]
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["type"] == "template" &&
+            body["template"]["name"] == "greeting" &&
+            body["template"]["language"]["code"] == "es" &&
+            body["template"]["components"] == components
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            "messaging_product" => "whatsapp",
+            "messages" => [{"id" => "wamid.template456"}]
+          }),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.post_template(
+        channel_id: "15551234567",
+        template_name: "greeting",
+        language_code: "es",
+        components: components
+      )
+      expect(stub).to have_been_requested
+      expect(result.dig("messages", 0, "id")).to eq("wamid.template456")
+    end
+  end
+
+  describe "#mark_as_read" do
+    it "marks a message as read" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["messaging_product"] == "whatsapp" &&
+            body["status"] == "read" &&
+            body["message_id"] == "wamid.abc123"
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"success" => true}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.mark_as_read(message_id: "wamid.abc123")
+      expect(stub).to have_been_requested
+      expect(result).to be_a(Hash)
+      expect(result["success"]).to be true
+    end
+  end
+
+  describe "#split_message (via post_message auto-chunking)" do
+    let(:success_response) do
+      {
+        status: 200,
+        body: JSON.generate({
+          "messaging_product" => "whatsapp",
+          "messages" => [{"id" => "wamid.chunk"}]
+        }),
+        headers: {"Content-Type" => "application/json"}
+      }
+    end
+
+    it "sends a single message when text is under the limit" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .to_return(success_response)
+
+      subject.post_message(channel_id: "15551234567", message: "Short message")
+      expect(stub).to have_been_requested.once
+    end
+
+    it "splits on double-newline when text exceeds 4096 characters" do
+      first_part = "A" * 4000
+      second_part = "B" * 200
+      long_text = "#{first_part}\n\n#{second_part}"
+
+      bodies = []
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .to_return(success_response)
+        .with { |req|
+          body = JSON.parse(req.body)
+          bodies << body["text"]["body"] if body["type"] == "text"
+          true
+        }
+
+      subject.post_message(channel_id: "15551234567", message: long_text)
+      expect(stub).to have_been_requested.twice
+      expect(bodies.first).to eq(first_part)
+      expect(bodies.last).to eq(second_part)
+    end
+
+    it "splits on single newline when no double-newline is available" do
+      first_part = "C" * 4000
+      second_part = "D" * 200
+      long_text = "#{first_part}\n#{second_part}"
+
+      bodies = []
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .to_return(success_response)
+        .with { |req|
+          body = JSON.parse(req.body)
+          bodies << body["text"]["body"] if body["type"] == "text"
+          true
+        }
+
+      subject.post_message(channel_id: "15551234567", message: long_text)
+      expect(stub).to have_been_requested.twice
+      expect(bodies.first).to eq(first_part)
+      expect(bodies.last).to eq(second_part)
+    end
+
+    it "hard-cuts at 4096 when no newline is available" do
+      long_text = "E" * 5000
+
+      bodies = []
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .to_return(success_response)
+        .with { |req|
+          body = JSON.parse(req.body)
+          bodies << body["text"]["body"] if body["type"] == "text"
+          true
+        }
+
+      subject.post_message(channel_id: "15551234567", message: long_text)
+      expect(stub).to have_been_requested.twice
+      expect(bodies.first.length).to eq(4096)
+      expect(bodies.last.length).to eq(904)
+    end
+
+    it "returns the last message result" do
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
+        .to_return(success_response)
+
+      long_text = "F" * 5000
+      result = subject.post_message(channel_id: "15551234567", message: long_text)
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.id).to eq("wamid.chunk")
+    end
+  end
+
   describe "API error handling" do
     it "raises RateLimitedError on 429" do
       stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})

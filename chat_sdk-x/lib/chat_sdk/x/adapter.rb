@@ -7,7 +7,7 @@ require "rack/utils"
 module ChatSDK
   module X
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :direct_messages, :reactions, :delete_messages, :message_history
+      capabilities :direct_messages, :reactions, :delete_messages, :message_history, :file_uploads
 
       attr_reader :client
 
@@ -83,21 +83,21 @@ module ChatSDK
             raw: result
           )
         else
-          payload = {text: text}
-          payload[:reply] = {in_reply_to_tweet_id: channel_id} if channel_id && thread_id
-          result = @client.create_tweet(**payload)
-          tweet_id = result.dig("data", "id") || result["id"]
-
-          ChatSDK::Message.new(
-            id: tweet_id,
-            text: text,
-            author: ChatSDK::Author.new(id: @user_id || "bot", name: "bot", platform: :x, bot: true),
-            thread_id: thread_id || "x:post:#{tweet_id}",
-            channel_id: channel_id,
-            platform: :x,
-            raw: result
-          )
+          reply_to = (channel_id if channel_id && thread_id)
+          result = @client.create_tweet(text: text, reply_to: reply_to)
+          parse_tweet_message(result, channel_id, thread_id: thread_id)
         end
+      end
+
+      def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil) # rubocop:disable Lint/UnusedMethodArgument
+        content_type = detect_content_type(filename)
+        bytes = io.respond_to?(:size) ? io.size : io.read.bytesize.tap { io.rewind }
+
+        media_id = @client.upload_media(io: io, filename: filename, content_type: content_type, total_bytes: bytes)
+
+        text = comment || ""
+        result = @client.create_tweet(text: text, media_ids: [media_id])
+        parse_tweet_message(result, channel_id)
       end
 
       def delete_message(channel_id:, message_id:) # rubocop:disable Lint/UnusedMethodArgument
@@ -151,6 +151,32 @@ module ChatSDK
 
       def render(postable_message)
         postable_message.text
+      end
+
+      private
+
+      def parse_tweet_message(result, channel_id, thread_id: nil)
+        tweet_id = result.dig("data", "id") || result["id"]
+
+        ChatSDK::Message.new(
+          id: tweet_id,
+          text: result.dig("data", "text") || "",
+          author: ChatSDK::Author.new(id: @user_id || "bot", name: "bot", platform: :x, bot: true),
+          thread_id: thread_id || "x:post:#{tweet_id}",
+          channel_id: channel_id,
+          platform: :x,
+          raw: result
+        )
+      end
+
+      CONTENT_TYPES = {
+        ".jpg" => "image/jpeg", ".jpeg" => "image/jpeg", ".png" => "image/png",
+        ".gif" => "image/gif", ".webp" => "image/webp",
+        ".mp4" => "video/mp4", ".mov" => "video/quicktime"
+      }.freeze
+
+      def detect_content_type(filename)
+        CONTENT_TYPES.fetch(File.extname(filename).downcase, "application/octet-stream")
       end
     end
   end

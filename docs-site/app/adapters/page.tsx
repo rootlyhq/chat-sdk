@@ -169,8 +169,8 @@ const adapters: Adapter[] = [
     official: true,
     features: {
       post: 'yes', edit: 'yes', delete: 'yes', ephemeral: 'no',
-      reactions: 'partial', files: 'yes', modals: 'no', streaming: 'yes',
-      dms: 'yes', history: 'yes', typing: 'yes',
+      reactions: 'no', files: 'yes', modals: 'no', streaming: 'yes',
+      dms: 'yes', history: 'no', typing: 'yes',
     },
   },
   {
@@ -243,9 +243,9 @@ const adapters: Adapter[] = [
     icon: <TwilioIcon />,
     official: true,
     features: {
-      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
+      post: 'yes', edit: 'no', delete: 'yes', ephemeral: 'no',
       reactions: 'no', files: 'no', modals: 'no', streaming: 'no',
-      dms: 'yes', history: 'no', typing: 'no',
+      dms: 'yes', history: 'yes', typing: 'no',
     },
   },
   {

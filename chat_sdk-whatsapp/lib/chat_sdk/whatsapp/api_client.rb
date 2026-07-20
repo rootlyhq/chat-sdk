@@ -29,6 +29,28 @@ module ChatSDK
         )
       end
 
+      def send_template(to:, template_name:, language_code: "en", components: nil)
+        body = {
+          "messaging_product" => "whatsapp",
+          "to" => to,
+          "type" => "template",
+          "template" => {
+            "name" => template_name,
+            "language" => {"code" => language_code}
+          }
+        }
+        body["template"]["components"] = components if components
+        request(:post, "#{@phone_number_id}/messages", body)
+      end
+
+      def mark_as_read(message_id:)
+        request(:post, "#{@phone_number_id}/messages", {
+          "messaging_product" => "whatsapp",
+          "status" => "read",
+          "message_id" => message_id
+        })
+      end
+
       def upload_media(io:, filename:, content_type:)
         response = upload_connection.post("#{@phone_number_id}/media") do |req|
           req.body = {

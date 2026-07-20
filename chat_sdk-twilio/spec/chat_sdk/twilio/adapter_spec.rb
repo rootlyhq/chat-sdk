@@ -292,6 +292,85 @@ RSpec.describe ChatSDK::Twilio::Adapter do
     end
   end
 
+  describe "#fetch_messages" do
+    let(:api_url) { "https://api.twilio.com/2010-04-01/Accounts/#{account_sid}/Messages.json" }
+
+    it "fetches messages for a phone number" do
+      stub_request(:get, %r{#{Regexp.escape(api_url)}\?PageSize=20&To=%2B15559876543})
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            "messages" => [
+              {
+                "sid" => "SM001",
+                "body" => "Hello",
+                "from" => "+15551111111",
+                "to" => "+15559876543",
+                "direction" => "inbound"
+              },
+              {
+                "sid" => "SM002",
+                "body" => "Hi back",
+                "from" => phone_number,
+                "to" => "+15559876543",
+                "direction" => "outbound-api"
+              }
+            ]
+          }),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      messages, next_cursor = subject.fetch_messages(channel_id: "+15559876543")
+
+      expect(messages.size).to eq(2)
+      expect(messages.first).to be_a(ChatSDK::Message)
+      expect(messages.first.id).to eq("SM001")
+      expect(messages.first.text).to eq("Hello")
+      expect(messages.first.author.id).to eq("+15551111111")
+      expect(messages.first.author.bot?).to be false
+      expect(messages.last.author.bot?).to be true
+      expect(messages.first.thread_id).to eq("twilio:+15559876543")
+      expect(next_cursor).to be_nil
+    end
+
+    it "returns empty array when no messages" do
+      stub_request(:get, %r{#{Regexp.escape(api_url)}})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"messages" => []}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      messages, next_cursor = subject.fetch_messages(channel_id: "+15559876543")
+
+      expect(messages).to eq([])
+      expect(next_cursor).to be_nil
+    end
+
+    it "passes custom limit" do
+      stub = stub_request(:get, %r{#{Regexp.escape(api_url)}\?PageSize=5&To=%2B15559876543})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"messages" => []}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      subject.fetch_messages(channel_id: "+15559876543", limit: 5)
+      expect(stub).to have_been_requested
+    end
+  end
+
+  describe "#delete_message" do
+    it "deletes a message by SID" do
+      stub = stub_request(:delete, "https://api.twilio.com/2010-04-01/Accounts/#{account_sid}/Messages/SM001.json")
+        .to_return(status: 204, body: "", headers: {})
+
+      expect { subject.delete_message(channel_id: "+15559876543", message_id: "SM001") }
+        .not_to raise_error
+      expect(stub).to have_been_requested
+    end
+  end
+
   describe "#upload_file" do
     it "raises NotSupportedError since file_uploads is not a declared capability" do
       expect { subject.upload_file(channel_id: "+15559876543", io: StringIO.new("data"), filename: "test.txt") }
@@ -308,11 +387,6 @@ RSpec.describe ChatSDK::Twilio::Adapter do
   describe "capability gaps" do
     it "raises NotSupportedError for edit_message" do
       expect { subject.edit_message(channel_id: "C1", message_id: "M1", message: "test") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
-    it "raises NotSupportedError for delete_message" do
-      expect { subject.delete_message(channel_id: "C1", message_id: "M1") }
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
@@ -336,17 +410,8 @@ RSpec.describe ChatSDK::Twilio::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "raises NotSupportedError for message_history" do
-      expect { subject.fetch_messages(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
     it "does not support edit_messages capability" do
       expect(subject.supports?(:edit_messages)).to be false
-    end
-
-    it "does not support delete_messages capability" do
-      expect(subject.supports?(:delete_messages)).to be false
     end
 
     it "does not support ephemeral_messages capability" do
@@ -373,12 +438,16 @@ RSpec.describe ChatSDK::Twilio::Adapter do
       expect(subject.supports?(:typing_indicator)).to be false
     end
 
-    it "does not support message_history capability" do
-      expect(subject.supports?(:message_history)).to be false
-    end
-
     it "supports direct_messages capability" do
       expect(subject.supports?(:direct_messages)).to be true
+    end
+
+    it "supports message_history capability" do
+      expect(subject.supports?(:message_history)).to be true
+    end
+
+    it "supports delete_messages capability" do
+      expect(subject.supports?(:delete_messages)).to be true
     end
 
     it "does not support file_uploads capability" do

@@ -5,7 +5,7 @@ require "rack/utils"
 module ChatSDK
   module Twilio
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :direct_messages
+      capabilities :direct_messages, :message_history, :delete_messages
 
       attr_reader :client
 
@@ -70,6 +70,31 @@ module ChatSDK
         )
 
         parse_twilio_message(result, channel_id)
+      end
+
+      def fetch_messages(channel_id:, thread_id: nil, limit: 20) # rubocop:disable Lint/UnusedMethodArgument
+        result = @client.list_messages(to: channel_id, limit: limit)
+        messages = (result["messages"] || []).map do |msg|
+          ChatSDK::Message.new(
+            id: msg["sid"],
+            text: msg["body"] || "",
+            author: ChatSDK::Author.new(
+              id: msg["from"],
+              name: msg["from"],
+              platform: :twilio,
+              bot: msg["direction"] != "inbound"
+            ),
+            thread_id: "twilio:#{channel_id}",
+            channel_id: channel_id,
+            platform: :twilio,
+            raw: msg
+          )
+        end
+        [messages, nil]
+      end
+
+      def delete_message(channel_id:, message_id:) # rubocop:disable Lint/UnusedMethodArgument
+        @client.delete_message(message_sid: message_id)
       end
 
       def open_dm(user_id)

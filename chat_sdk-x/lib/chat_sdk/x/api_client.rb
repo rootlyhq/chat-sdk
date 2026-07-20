@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "base64"
+
 module ChatSDK
   module X
     class ApiClient < ChatSDK::ApiClient::Base
@@ -9,10 +11,40 @@ module ChatSDK
         @access_token = access_token
       end
 
-      def create_tweet(text:, reply: nil)
+      def create_tweet(text:, reply_to: nil, media_ids: nil)
         body = {"text" => text}
-        body["reply"] = reply if reply
+        body["reply"] = {"in_reply_to_tweet_id" => reply_to} if reply_to
+        body["media"] = {"media_ids" => media_ids} if media_ids&.any?
         request(:post, "/2/tweets", body)
+      end
+
+      def upload_media(io:, filename:, content_type:, total_bytes:) # rubocop:disable Lint/UnusedMethodArgument
+        # INIT
+        init_result = request(:post, "/2/media/upload", {
+          command: "INIT",
+          total_bytes: total_bytes,
+          media_type: content_type
+        })
+        media_id = init_result.dig("data", "id") || init_result["media_id_string"]
+
+        # APPEND (single chunk, works for images <5MB)
+        response = upload_connection.post("/2/media/upload") do |req|
+          req.body = {
+            command: "APPEND",
+            media_id: media_id,
+            segment_index: 0,
+            media_data: Base64.strict_encode64(io.read)
+          }
+        end
+        handle_response(response)
+
+        # FINALIZE
+        request(:post, "/2/media/upload", {
+          command: "FINALIZE",
+          media_id: media_id
+        })
+
+        media_id
       end
 
       def send_dm(participant_id:, text:)

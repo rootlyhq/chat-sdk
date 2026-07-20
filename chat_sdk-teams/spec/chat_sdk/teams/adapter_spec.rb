@@ -375,12 +375,58 @@ RSpec.describe ChatSDK::Teams::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
+    it "raises NotSupportedError for add_reaction" do
+      expect { subject.add_reaction(channel_id: "C1", message_id: "M1", emoji: "like") }
+        .to raise_error(ChatSDK::NotSupportedError)
+    end
+
+    it "raises NotSupportedError for remove_reaction" do
+      expect { subject.remove_reaction(channel_id: "C1", message_id: "M1", emoji: "like") }
+        .to raise_error(ChatSDK::NotSupportedError)
+    end
+
+    it "raises NotSupportedError for fetch_messages" do
+      expect { subject.fetch_messages(channel_id: "C1") }
+        .to raise_error(ChatSDK::NotSupportedError)
+    end
+
     it "does not support ephemeral_messages capability" do
       expect(subject.supports?(:ephemeral_messages)).to be false
     end
 
     it "does not support modals capability" do
       expect(subject.supports?(:modals)).to be false
+    end
+
+    it "does not support reactions capability" do
+      expect(subject.supports?(:reactions)).to be false
+    end
+
+    it "does not support message_history capability" do
+      expect(subject.supports?(:message_history)).to be false
+    end
+
+    it "still parses inbound reactions from activities" do
+      activity = {
+        "type" => "messageReaction",
+        "from" => {"id" => "user-1", "name" => "Alice"},
+        "conversation" => {"id" => "conv-1"},
+        "replyToId" => "msg-100",
+        "reactionsAdded" => [{"type" => "like"}],
+        "serviceUrl" => "https://smba.trafficmanager.net/teams/"
+      }
+      env = Rack::MockRequest.env_for(
+        "/api/messages",
+        :method => "POST",
+        :input => JSON.generate(activity),
+        "CONTENT_TYPE" => "application/json"
+      )
+      request = Rack::Request.new(env)
+      events = subject.parse_events(request)
+
+      expect(events.size).to eq(1)
+      expect(events.first).to be_a(ChatSDK::Events::Reaction)
+      expect(events.first.emoji).to eq("like")
     end
   end
 

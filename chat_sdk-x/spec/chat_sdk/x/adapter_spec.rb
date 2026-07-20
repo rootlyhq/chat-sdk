@@ -448,6 +448,93 @@ RSpec.describe ChatSDK::X::Adapter do
     end
   end
 
+  describe "#upload_file" do
+    it "uploads media and creates a tweet with the media attached" do
+      # INIT
+      stub_request(:post, "https://api.x.com/2/media/upload")
+        .with { |req|
+          parsed = JSON.parse(req.body)
+          parsed["command"] == "INIT"
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"id" => "media-123"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      # APPEND (multipart)
+      stub_request(:post, "https://api.x.com/2/media/upload")
+        .with { |req| req.body.to_s.include?("APPEND") }
+        .to_return(
+          status: 200,
+          body: JSON.generate({}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      # FINALIZE
+      stub_request(:post, "https://api.x.com/2/media/upload")
+        .with { |req|
+          next false unless req.body.is_a?(String)
+
+          parsed = begin
+            JSON.parse(req.body)
+          rescue JSON::ParserError
+            nil
+          end
+          parsed&.dig("command") == "FINALIZE"
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"id" => "media-123"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      # create_tweet with media_ids
+      stub_request(:post, "https://api.x.com/2/tweets")
+        .with { |req|
+          parsed = JSON.parse(req.body)
+          parsed["media"] && parsed["media"]["media_ids"] == ["media-123"]
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"id" => "tweet-media-1", "text" => "Check this out"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      io = StringIO.new("fake image data")
+      result = subject.upload_file(channel_id: "user-456", io: io, filename: "photo.jpg", comment: "Check this out")
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.id).to eq("tweet-media-1")
+      expect(result.platform).to eq(:x)
+    end
+
+    it "uses empty text when no comment is provided" do
+      stub_request(:post, "https://api.x.com/2/media/upload").to_return(
+        status: 200,
+        body: JSON.generate({"data" => {"id" => "media-456"}}),
+        headers: {"Content-Type" => "application/json"}
+      )
+
+      stub_request(:post, "https://api.x.com/2/tweets")
+        .with { |req|
+          parsed = JSON.parse(req.body)
+          parsed["text"] == ""
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"id" => "tweet-media-2", "text" => ""}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      io = StringIO.new("fake image data")
+      result = subject.upload_file(channel_id: "user-456", io: io, filename: "photo.png")
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.id).to eq("tweet-media-2")
+    end
+  end
+
   describe "capability gaps" do
     it "raises NotSupportedError for edit_message" do
       expect { subject.edit_message(channel_id: "C1", message_id: "M1", message: "test") }
@@ -466,11 +553,6 @@ RSpec.describe ChatSDK::X::Adapter do
 
     it "raises NotSupportedError for typing indicator" do
       expect { subject.start_typing(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
-    it "raises NotSupportedError for file uploads" do
-      expect { subject.upload_file(channel_id: "C1", io: StringIO.new("data"), filename: "test.txt") }
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
@@ -500,6 +582,10 @@ RSpec.describe ChatSDK::X::Adapter do
 
     it "supports message_history capability" do
       expect(subject.supports?(:message_history)).to be true
+    end
+
+    it "supports file_uploads capability" do
+      expect(subject.supports?(:file_uploads)).to be true
     end
   end
 end

@@ -20,6 +20,22 @@ module ChatSDK
         handle_response(response)
       end
 
+      def list_messages(to: nil, from: nil, limit: 20)
+        params = {"PageSize" => limit.to_s}
+        params["To"] = to if to
+        params["From"] = from if from
+        query = URI.encode_www_form(params)
+        response = connection.get("#{messages_path}?#{query}")
+        handle_response(response)
+      end
+
+      def delete_message(message_sid:)
+        response = connection.delete("/2010-04-01/Accounts/#{@account_sid}/Messages/#{message_sid}.json")
+        return {} if response.status == 204
+
+        handle_response(response)
+      end
+
       private
 
       def messages_path
