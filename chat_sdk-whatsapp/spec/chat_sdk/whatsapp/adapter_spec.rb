@@ -801,6 +801,72 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
     end
   end
 
+  describe ".template_components" do
+    it "returns an empty array when no arguments are provided" do
+      result = described_class.template_components
+      expect(result).to eq([])
+    end
+
+    it "builds a header component" do
+      result = described_class.template_components(header: "Order Update")
+
+      expect(result.size).to eq(1)
+      expect(result[0]["type"]).to eq("header")
+      expect(result[0]["parameters"]).to eq([{"type" => "text", "text" => "Order Update"}])
+    end
+
+    it "builds a body component with parameters" do
+      result = described_class.template_components(body_params: ["ORD-123", "shipped"])
+
+      expect(result.size).to eq(1)
+      expect(result[0]["type"]).to eq("body")
+      expect(result[0]["parameters"]).to eq([
+        {"type" => "text", "text" => "ORD-123"},
+        {"type" => "text", "text" => "shipped"}
+      ])
+    end
+
+    it "converts body_params to strings" do
+      result = described_class.template_components(body_params: [42, 3.14])
+
+      expect(result[0]["parameters"]).to eq([
+        {"type" => "text", "text" => "42"},
+        {"type" => "text", "text" => "3.14"}
+      ])
+    end
+
+    it "builds button components with indexed payloads" do
+      result = described_class.template_components(button_payloads: ["track_order", "cancel_order"])
+
+      expect(result.size).to eq(2)
+      expect(result[0]).to eq({
+        "type" => "button",
+        "sub_type" => "quick_reply",
+        "index" => "0",
+        "parameters" => [{"type" => "payload", "payload" => "track_order"}]
+      })
+      expect(result[1]).to eq({
+        "type" => "button",
+        "sub_type" => "quick_reply",
+        "index" => "1",
+        "parameters" => [{"type" => "payload", "payload" => "cancel_order"}]
+      })
+    end
+
+    it "builds all component types together" do
+      result = described_class.template_components(
+        header: "Order Update",
+        body_params: ["ORD-123", "shipped"],
+        button_payloads: ["track_order"]
+      )
+
+      expect(result.size).to eq(3)
+      expect(result[0]["type"]).to eq("header")
+      expect(result[1]["type"]).to eq("body")
+      expect(result[2]["type"]).to eq("button")
+    end
+  end
+
   describe "#post_template" do
     it "sends a template message" do
       stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})

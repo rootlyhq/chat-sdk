@@ -59,6 +59,35 @@ module ChatSDK
         parse_whatsapp_message(result, channel_id)
       end
 
+      def self.template_components(header: nil, body_params: [], button_payloads: [])
+        components = []
+
+        if header
+          components << {
+            "type" => "header",
+            "parameters" => [{"type" => "text", "text" => header}]
+          }
+        end
+
+        if body_params.any?
+          components << {
+            "type" => "body",
+            "parameters" => body_params.map { |p| {"type" => "text", "text" => p.to_s} }
+          }
+        end
+
+        button_payloads.each_with_index do |payload, index|
+          components << {
+            "type" => "button",
+            "sub_type" => "quick_reply",
+            "index" => index.to_s,
+            "parameters" => [{"type" => "payload", "payload" => payload}]
+          }
+        end
+
+        components
+      end
+
       def post_template(channel_id:, template_name:, language_code: "en", components: nil)
         @client.send_template(to: channel_id, template_name: template_name, language_code: language_code, components: components)
       end

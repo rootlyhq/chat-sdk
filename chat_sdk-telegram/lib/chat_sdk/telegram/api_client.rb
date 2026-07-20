@@ -10,14 +10,14 @@ module ChatSDK
       end
 
       def send_message(chat_id:, text:, reply_markup: nil, reply_to_message_id: nil)
-        body = {"chat_id" => chat_id, "text" => text, "parse_mode" => "Markdown"}
+        body = {"chat_id" => chat_id, "text" => text, "parse_mode" => "MarkdownV2"}
         body["reply_markup"] = reply_markup if reply_markup
         body["reply_to_message_id"] = reply_to_message_id if reply_to_message_id
         request(:post, "sendMessage", body)
       end
 
       def edit_message_text(chat_id:, message_id:, text:, reply_markup: nil)
-        body = {"chat_id" => chat_id, "message_id" => message_id, "text" => text, "parse_mode" => "Markdown"}
+        body = {"chat_id" => chat_id, "message_id" => message_id, "text" => text, "parse_mode" => "MarkdownV2"}
         body["reply_markup"] = reply_markup if reply_markup
         request(:post, "editMessageText", body)
       end

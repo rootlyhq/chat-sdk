@@ -5,7 +5,8 @@ module ChatSDK
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :ephemeral_messages,
         :file_uploads, :reactions, :modals, :typing_indicator,
-        :streaming_edit, :threads, :direct_messages, :message_history
+        :streaming_edit, :threads, :direct_messages, :message_history,
+        :scheduled_messages
 
       attr_reader :client
 
@@ -151,6 +152,26 @@ module ChatSDK
       def open_dm(user_id)
         result = @client.conversations_open(users: user_id)
         result["channel"]["id"]
+      end
+
+      def schedule_message(channel_id:, message:, post_at:, thread_id: nil)
+        msg = ChatSDK::PostableMessage.from(message)
+        text = msg.text || ""
+
+        params = {channel: channel_id, text: text, post_at: post_at.to_i}
+        params[:thread_ts] = thread_id if thread_id
+
+        result = @client.chat_scheduleMessage(**params)
+
+        ChatSDK::Message.new(
+          id: result["scheduled_message_id"],
+          text: text,
+          author: ChatSDK::Author.new(id: "bot", name: "bot", platform: :slack, bot: true),
+          thread_id: thread_id || result["scheduled_message_id"],
+          channel_id: channel_id,
+          platform: :slack,
+          raw: result
+        )
       end
 
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)

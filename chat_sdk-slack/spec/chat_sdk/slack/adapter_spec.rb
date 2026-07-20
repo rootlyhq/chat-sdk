@@ -375,6 +375,54 @@ RSpec.describe ChatSDK::Slack::Adapter do
     end
   end
 
+  describe "#schedule_message" do
+    it "schedules a message and returns a Message" do
+      post_at = Time.now.to_i + 3600
+
+      allow(subject.client).to receive(:chat_scheduleMessage)
+        .with(channel: "C789", text: "Reminder!", post_at: post_at)
+        .and_return({
+          "ok" => true,
+          "channel" => "C789",
+          "scheduled_message_id" => "Q1234ABCD",
+          "post_at" => post_at
+        })
+
+      result = subject.schedule_message(channel_id: "C789", message: "Reminder!", post_at: post_at)
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.id).to eq("Q1234ABCD")
+      expect(result.text).to eq("Reminder!")
+      expect(result.channel_id).to eq("C789")
+      expect(result.platform).to eq(:slack)
+      expect(result.thread_id).to eq("Q1234ABCD")
+    end
+
+    it "schedules a threaded message" do
+      post_at = Time.now.to_i + 3600
+
+      allow(subject.client).to receive(:chat_scheduleMessage)
+        .with(channel: "C789", text: "Follow-up", post_at: post_at, thread_ts: "1234567890.123456")
+        .and_return({
+          "ok" => true,
+          "channel" => "C789",
+          "scheduled_message_id" => "Q5678EFGH",
+          "post_at" => post_at
+        })
+
+      result = subject.schedule_message(
+        channel_id: "C789",
+        message: "Follow-up",
+        post_at: post_at,
+        thread_id: "1234567890.123456"
+      )
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.id).to eq("Q5678EFGH")
+      expect(result.thread_id).to eq("1234567890.123456")
+    end
+  end
+
   describe "#mention" do
     it "formats a Slack user mention" do
       expect(subject.mention("U123")).to eq("<@U123>")
