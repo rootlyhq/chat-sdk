@@ -304,7 +304,7 @@ const adapters: Adapter[] = [
     official: true,
     features: {
       post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
-      reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
+      reactions: 'no', files: 'no', modals: 'no', streaming: 'no',
       dms: 'no', history: 'no', typing: 'no',
     },
   },

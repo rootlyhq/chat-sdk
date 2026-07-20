@@ -27,28 +27,6 @@ module ChatSDK
         graphql(query, {input: input})
       end
 
-      def create_reaction(comment_id:, emoji:)
-        query = <<~GQL
-          mutation($input: ReactionCreateInput!) {
-            reactionCreate(input: $input) {
-              success
-            }
-          }
-        GQL
-        graphql(query, {input: {commentId: comment_id, emoji: emoji}})
-      end
-
-      def delete_reaction(comment_id:, emoji:)
-        query = <<~GQL
-          mutation($input: ReactionCreateInput!) {
-            reactionDelete(input: $input) {
-              success
-            }
-          }
-        GQL
-        graphql(query, {input: {commentId: comment_id, emoji: emoji}})
-      end
-
       private
 
       def base_url

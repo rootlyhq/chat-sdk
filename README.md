@@ -140,7 +140,7 @@ bot.adapter(:slack).client.chat_postMessage(channel: "#ops", text: "raw")
 |---------|:-----:|:-----:|:-----:|:----------:|:-------:|:--------:|:------:|:---------:|:--------:|:---:|:------:|
 | Post/Edit/Delete | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✗ | ✓/✗/✗ |
 | Ephemeral | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
-| Reactions | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ |
+| Reactions | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ |
 | File uploads | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ |
 | Modals | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | Streaming | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
@@ -159,7 +159,7 @@ Platform clients:
 - **Messenger** — raw Faraday client wrapping the Facebook Messenger Send API with HMAC-SHA256 signature verification and Generic/Button template rendering
 - **WhatsApp** — raw Faraday client wrapping the WhatsApp Business Cloud API with HMAC-SHA256 signature verification and interactive message rendering
 - **X** -- raw Faraday client wrapping the X API v2 with HMAC-SHA256 webhook signature verification for tweets, DMs, and likes
-- **Linear** -- raw Faraday client wrapping the Linear GraphQL API with HMAC-SHA256 webhook signature verification for issue comments and reactions
+- **Linear** -- raw Faraday client wrapping the Linear GraphQL API with HMAC-SHA256 webhook signature verification for issue comment threading
 
 ## AI Coding Agents
 

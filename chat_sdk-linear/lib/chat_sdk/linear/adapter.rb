@@ -6,7 +6,7 @@ require "rack/utils"
 module ChatSDK
   module Linear
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :reactions
+      capabilities
 
       attr_reader :client
 
@@ -87,14 +87,6 @@ module ChatSDK
           platform: :linear,
           raw: result
         )
-      end
-
-      def add_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
-        @client.create_reaction(comment_id: message_id, emoji: emoji)
-      end
-
-      def remove_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
-        @client.delete_reaction(comment_id: message_id, emoji: emoji)
       end
 
       def mention(user_id)

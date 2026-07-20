@@ -279,40 +279,16 @@ RSpec.describe ChatSDK::Linear::Adapter do
   end
 
   describe "#add_reaction" do
-    it "creates a reaction on a comment" do
-      stub_request(:post, "https://api.linear.app/graphql")
-        .with { |req|
-          body = JSON.parse(req.body)
-          body.dig("variables", "input", "commentId") == "comment-123" &&
-            body.dig("variables", "input", "emoji") == "thumbsup"
-        }
-        .to_return(
-          status: 200,
-          body: JSON.generate({"data" => {"reactionCreate" => {"success" => true}}}),
-          headers: {"Content-Type" => "application/json"}
-        )
-
+    it "raises NotSupportedError" do
       expect { subject.add_reaction(channel_id: "issue-1", message_id: "comment-123", emoji: "thumbsup") }
-        .not_to raise_error
+        .to raise_error(ChatSDK::NotSupportedError)
     end
   end
 
   describe "#remove_reaction" do
-    it "deletes a reaction from a comment" do
-      stub_request(:post, "https://api.linear.app/graphql")
-        .with { |req|
-          body = JSON.parse(req.body)
-          body.dig("variables", "input", "commentId") == "comment-123" &&
-            body.dig("variables", "input", "emoji") == "thumbsup"
-        }
-        .to_return(
-          status: 200,
-          body: JSON.generate({"data" => {"reactionDelete" => {"success" => true}}}),
-          headers: {"Content-Type" => "application/json"}
-        )
-
+    it "raises NotSupportedError" do
       expect { subject.remove_reaction(channel_id: "issue-1", message_id: "comment-123", emoji: "thumbsup") }
-        .not_to raise_error
+        .to raise_error(ChatSDK::NotSupportedError)
     end
   end
 
@@ -373,8 +349,8 @@ RSpec.describe ChatSDK::Linear::Adapter do
       expect(subject.supports?(:direct_messages)).to be false
     end
 
-    it "supports reactions capability" do
-      expect(subject.supports?(:reactions)).to be true
+    it "does not support reactions capability" do
+      expect(subject.supports?(:reactions)).to be false
     end
   end
 end

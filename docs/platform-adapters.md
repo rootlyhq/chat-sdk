@@ -12,7 +12,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 | Edit | yes | yes | yes | yes | no | no | no |
 | Delete | yes | yes | yes | yes | no | no | no |
 | Ephemeral | yes | no | yes | yes | no | no | no |
-| Reactions | yes | yes | yes | yes | yes | yes | yes |
+| Reactions | yes | yes | yes | yes | yes | yes | no |
 | Files | yes | yes | no | yes | yes | no | no |
 | Modals | yes | no | no | no | no | no | no |
 | Streaming | yes | yes | yes | yes | no | no | no |
@@ -28,7 +28,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Mattermost](adapters/mattermost.md) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
 - [WhatsApp](adapters/whatsapp.md) -- `gem "chat_sdk-whatsapp"` -- WhatsApp Business Cloud API adapter with interactive message rendering.
 - [X](adapters/x.md) -- `gem "chat_sdk-x"` -- X API v2 adapter with HMAC-SHA256 webhook verification for tweets, DMs, and likes.
-- [Linear](adapters/linear.md) -- `gem "chat_sdk-linear"` -- Linear GraphQL API adapter with HMAC-SHA256 webhook verification for issue comments and reactions.
+- [Linear](adapters/linear.md) -- `gem "chat_sdk-linear"` -- Linear GraphQL API adapter with HMAC-SHA256 webhook verification for issue comment threading.
 
 ## Checking Capabilities at Runtime
 
