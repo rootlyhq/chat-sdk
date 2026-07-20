@@ -189,6 +189,34 @@ module ChatSDK
         @client.views_open(trigger_id: trigger_id, view: view)
       end
 
+      def publish_home_view(user_id:, view:)
+        @client.views_publish(user_id: user_id, view: view)
+      end
+
+      def set_suggested_prompts(channel_id:, thread_id:, prompts:)
+        @client.assistant_threads_setSuggestedPrompts(
+          channel_id: channel_id,
+          thread_ts: thread_id,
+          prompts: prompts
+        )
+      end
+
+      def set_assistant_status(channel_id:, thread_id:, status:)
+        @client.assistant_threads_setStatus(
+          channel_id: channel_id,
+          thread_ts: thread_id,
+          status: status
+        )
+      end
+
+      def set_assistant_title(channel_id:, thread_id:, title:)
+        @client.assistant_threads_setTitle(
+          channel_id: channel_id,
+          thread_ts: thread_id,
+          title: title
+        )
+      end
+
       def start_typing(channel_id:, thread_id: nil)
         # Slack doesn't have a native typing indicator API for bots
         # This is a no-op but the capability is declared for streaming support

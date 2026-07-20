@@ -423,6 +423,54 @@ RSpec.describe ChatSDK::Slack::Adapter do
     end
   end
 
+  describe "#publish_home_view" do
+    it "publishes a home tab view" do
+      view = {type: "home", blocks: [{type: "section", text: {type: "mrkdwn", text: "Hello"}}]}
+
+      allow(subject.client).to receive(:views_publish)
+        .with(user_id: "U123", view: view)
+        .and_return({"ok" => true})
+
+      expect { subject.publish_home_view(user_id: "U123", view: view) }
+        .not_to raise_error
+    end
+  end
+
+  describe "#set_suggested_prompts" do
+    it "sets suggested prompts on a thread" do
+      prompts = [{title: "Summarize", message: "Summarize this thread"}]
+
+      allow(subject.client).to receive(:assistant_threads_setSuggestedPrompts)
+        .with(channel_id: "C123", thread_ts: "1234.5678", prompts: prompts)
+        .and_return({"ok" => true})
+
+      expect { subject.set_suggested_prompts(channel_id: "C123", thread_id: "1234.5678", prompts: prompts) }
+        .not_to raise_error
+    end
+  end
+
+  describe "#set_assistant_status" do
+    it "sets assistant status on a thread" do
+      allow(subject.client).to receive(:assistant_threads_setStatus)
+        .with(channel_id: "C123", thread_ts: "1234.5678", status: "Thinking...")
+        .and_return({"ok" => true})
+
+      expect { subject.set_assistant_status(channel_id: "C123", thread_id: "1234.5678", status: "Thinking...") }
+        .not_to raise_error
+    end
+  end
+
+  describe "#set_assistant_title" do
+    it "sets assistant title on a thread" do
+      allow(subject.client).to receive(:assistant_threads_setTitle)
+        .with(channel_id: "C123", thread_ts: "1234.5678", title: "Incident Summary")
+        .and_return({"ok" => true})
+
+      expect { subject.set_assistant_title(channel_id: "C123", thread_id: "1234.5678", title: "Incident Summary") }
+        .not_to raise_error
+    end
+  end
+
   describe "#mention" do
     it "formats a Slack user mention" do
       expect(subject.mention("U123")).to eq("<@U123>")
