@@ -103,6 +103,7 @@ PATH
   remote: chat_sdk
   specs:
     chat_sdk (0.7.0)
+      commonmarker (~> 2.0)
       zeitwerk (~> 2.6)
 
 GEM
@@ -113,6 +114,12 @@ GEM
     ast (2.4.3)
     base64 (0.3.0)
     bigdecimal (4.1.2)
+    commonmarker (2.9.0-aarch64-linux)
+    commonmarker (2.9.0-aarch64-linux-musl)
+    commonmarker (2.9.0-arm64-darwin)
+    commonmarker (2.9.0-x86_64-darwin)
+    commonmarker (2.9.0-x86_64-linux)
+    commonmarker (2.9.0-x86_64-linux-musl)
     connection_pool (3.0.2)
     crack (1.0.1)
       bigdecimal
@@ -168,12 +175,6 @@ GEM
     google-protobuf (4.35.1-arm64-darwin)
       bigdecimal
       rake (~> 13.3)
-    google-protobuf (4.35.1-x86-linux-gnu)
-      bigdecimal
-      rake (~> 13.3)
-    google-protobuf (4.35.1-x86-linux-musl)
-      bigdecimal
-      rake (~> 13.3)
     google-protobuf (4.35.1-x86_64-darwin)
       bigdecimal
       rake (~> 13.3)
@@ -207,12 +208,6 @@ GEM
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
     grpc (1.82.0-arm64-darwin)
-      google-protobuf (>= 3.25, < 5.0)
-      googleapis-common-protos-types (~> 1.0)
-    grpc (1.82.0-x86-linux-gnu)
-      google-protobuf (>= 3.25, < 5.0)
-      googleapis-common-protos-types (~> 1.0)
-    grpc (1.82.0-x86-linux-musl)
       google-protobuf (>= 3.25, < 5.0)
       googleapis-common-protos-types (~> 1.0)
     grpc (1.82.0-x86_64-darwin)
@@ -337,9 +332,6 @@ PLATFORMS
   aarch64-linux-gnu
   aarch64-linux-musl
   arm64-darwin
-  ruby
-  x86-linux-gnu
-  x86-linux-musl
   x86_64-darwin
   x86_64-linux-gnu
   x86_64-linux-musl
