@@ -51,6 +51,16 @@ module ChatSDK
         })
       end
 
+      def get_media_url(media_id:)
+        request(:get, media_id.to_s)
+      end
+
+      def download_media(url:)
+        Faraday.get(url) do |req|
+          req.headers["Authorization"] = "Bearer #{@access_token}"
+        end
+      end
+
       def upload_media(io:, filename:, content_type:)
         response = upload_connection.post("#{@phone_number_id}/media") do |req|
           req.body = {

@@ -61,6 +61,19 @@ module ChatSDK
         request(:get, path)
       end
 
+      # Channels / Threads
+      def get_channel(channel_id)
+        request(:get, "#{API_PREFIX}/channels/#{channel_id}")
+      end
+
+      def modify_channel(channel_id, name:)
+        request(:patch, "#{API_PREFIX}/channels/#{channel_id}", {"name" => name})
+      end
+
+      def start_thread(channel_id, message_id, name:)
+        request(:post, "#{API_PREFIX}/channels/#{channel_id}/messages/#{message_id}/threads", {"name" => name})
+      end
+
       # Typing indicator
       def trigger_typing(channel_id)
         request(:post, "#{API_PREFIX}/channels/#{channel_id}/typing")

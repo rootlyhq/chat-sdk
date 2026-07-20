@@ -744,6 +744,122 @@ RSpec.describe ChatSDK::Slack::Adapter do
     end
   end
 
+  describe "#update_modal" do
+    it "calls views_update with rendered modal" do
+      modal = ChatSDK::Modals::Builder.new(
+        title: "Edit Incident",
+        callback_id: "edit_form"
+      ) do
+        text_input id: "title", label: "Title"
+      end.build
+
+      allow(subject.client).to receive(:views_update)
+        .and_return({"ok" => true})
+
+      subject.update_modal(view_id: "V123ABC", modal: modal)
+
+      expect(subject.client).to have_received(:views_update) do |args|
+        expect(args[:view_id]).to eq("V123ABC")
+        expect(args[:view][:type]).to eq("modal")
+        expect(args[:view][:callback_id]).to eq("edit_form")
+      end
+    end
+  end
+
+  describe "#send_to_response_url" do
+    it "POSTs message payload to the response URL" do
+      stub_request = nil
+      allow(Faraday).to receive(:post).and_yield(
+        double("request").tap do |req|
+          allow(req).to receive(:headers).and_return({})
+          allow(req).to receive(:body=) { |b| stub_request = b }
+        end
+      ).and_return(double("response", status: 200))
+
+      subject.send_to_response_url(
+        response_url: "https://hooks.slack.com/actions/T123/456/respond",
+        message: "Hello from response URL"
+      )
+
+      expect(Faraday).to have_received(:post)
+        .with("https://hooks.slack.com/actions/T123/456/respond")
+      parsed = JSON.parse(stub_request)
+      expect(parsed["text"]).to eq("Hello from response URL")
+    end
+
+    it "sends card blocks when message has a card" do
+      stub_request = nil
+      allow(Faraday).to receive(:post).and_yield(
+        double("request").tap do |req|
+          allow(req).to receive(:headers).and_return({})
+          allow(req).to receive(:body=) { |b| stub_request = b }
+        end
+      ).and_return(double("response", status: 200))
+
+      card = ChatSDK.card { text "Card content" }
+      msg = ChatSDK::PostableMessage.new(card: card)
+
+      subject.send_to_response_url(
+        response_url: "https://hooks.slack.com/actions/T123/456/respond",
+        message: msg
+      )
+
+      parsed = JSON.parse(stub_request)
+      expect(parsed["blocks"]).to be_an(Array)
+      expect(parsed["blocks"].first).to include("type" => "section")
+    end
+  end
+
+  describe "#fetch_thread" do
+    it "returns the channel info from conversations_info" do
+      channel_data = {
+        "id" => "C789",
+        "name" => "general",
+        "is_channel" => true
+      }
+      allow(subject.client).to receive(:conversations_info)
+        .with(channel: "C789")
+        .and_return({"ok" => true, "channel" => channel_data})
+
+      result = subject.fetch_thread(channel_id: "C789")
+
+      expect(result).to eq(channel_data)
+      expect(result["id"]).to eq("C789")
+      expect(result["name"]).to eq("general")
+    end
+
+    it "accepts an optional thread_id parameter" do
+      channel_data = {"id" => "C789", "name" => "general"}
+      allow(subject.client).to receive(:conversations_info)
+        .with(channel: "C789")
+        .and_return({"ok" => true, "channel" => channel_data})
+
+      result = subject.fetch_thread(channel_id: "C789", thread_id: "1234567890.123456")
+
+      expect(result).to eq(channel_data)
+    end
+  end
+
+  describe "#stop_socket_mode" do
+    it "stops the socket mode connection" do
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new)
+        .with(app_token: "xapp-test-token", bot_client: subject.client)
+        .and_return(socket_double)
+      allow(socket_double).to receive(:start)
+      allow(socket_double).to receive(:stop)
+
+      subject.start_socket_mode(app_token: "xapp-test-token") { |_| }
+      subject.stop_socket_mode
+
+      expect(socket_double).to have_received(:stop)
+    end
+
+    it "does nothing when socket mode was never started" do
+      expect { subject.stop_socket_mode }.not_to raise_error
+    end
+  end
+
   describe "#start_socket_mode" do
     it "raises ConfigurationError without app_token" do
       expect { subject.start_socket_mode(app_token: nil) {} }

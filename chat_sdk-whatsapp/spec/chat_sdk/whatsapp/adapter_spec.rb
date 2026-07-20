@@ -943,6 +943,61 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
     end
   end
 
+  describe "#download_media" do
+    let(:media_id) { "media_id_abc123" }
+    let(:media_url) { "https://lookaside.fbsbx.com/whatsapp_business/attachments/?mid=abc123&ext=1234567890&hash=ATuoK" }
+
+    it "fetches the media URL then downloads the binary content" do
+      stub_request(:get, %r{graph\.facebook\.com/v25\.0/#{media_id}})
+        .to_return(
+          status: 200,
+          body: JSON.generate({
+            "url" => media_url,
+            "mime_type" => "image/jpeg",
+            "sha256" => "abc123hash",
+            "file_size" => 12345,
+            "id" => media_id
+          }),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      stub_request(:get, media_url)
+        .with(headers: {"Authorization" => "Bearer #{access_token}"})
+        .to_return(
+          status: 200,
+          body: "raw-binary-image-data",
+          headers: {"Content-Type" => "image/jpeg"}
+        )
+
+      result = subject.download_media(media_id: media_id)
+      expect(result).to eq("raw-binary-image-data")
+    end
+
+    it "returns nil when the media URL is missing" do
+      stub_request(:get, %r{graph\.facebook\.com/v25\.0/#{media_id}})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => media_id}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.download_media(media_id: media_id)
+      expect(result).to be_nil
+    end
+
+    it "raises PlatformError when the media metadata request fails" do
+      stub_request(:get, %r{graph\.facebook\.com/v25\.0/#{media_id}})
+        .to_return(
+          status: 400,
+          body: JSON.generate({"error" => {"message" => "Invalid media ID"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.download_media(media_id: media_id) }
+        .to raise_error(ChatSDK::PlatformError, /Invalid media ID/)
+    end
+  end
+
   describe "#split_message (via post_message auto-chunking)" do
     let(:success_response) do
       {

@@ -267,6 +267,10 @@ module ChatSDK
         client.views_open(trigger_id: trigger_id, view: view)
       end
 
+      def update_modal(view_id:, modal:)
+        client.views_update(view_id: view_id, view: @modal_renderer.render(modal))
+      end
+
       def publish_home_view(user_id:, view:)
         client.views_publish(user_id: user_id, view: view)
       end
@@ -295,6 +299,21 @@ module ChatSDK
         )
       end
 
+      def send_to_response_url(response_url:, message:)
+        msg = ChatSDK::PostableMessage.from(message)
+        payload = {}
+        apply_message_params(payload, msg)
+        Faraday.post(response_url) do |req|
+          req.headers["Content-Type"] = "application/json"
+          req.body = JSON.generate(payload)
+        end
+      end
+
+      def fetch_thread(channel_id:, thread_id: nil)
+        result = client.conversations_info(channel: channel_id)
+        result["channel"]
+      end
+
       def start_typing(channel_id:, thread_id: nil)
         # Slack doesn't have a native typing indicator API for bots
         # This is a no-op but the capability is declared for streaming support
@@ -312,8 +331,12 @@ module ChatSDK
         app_token ||= ENV["SLACK_APP_TOKEN"]
         raise ChatSDK::ConfigurationError, "Slack app_token required for socket mode" unless app_token
 
-        socket = SocketMode.new(app_token: app_token, bot_client: client)
-        socket.start(&block)
+        @socket_mode = SocketMode.new(app_token: app_token, bot_client: client)
+        @socket_mode.start(&block)
+      end
+
+      def stop_socket_mode
+        @socket_mode&.stop
       end
 
       def mention(user_id)

@@ -96,6 +96,15 @@ module ChatSDK
         @client.mark_as_read(message_id: message_id)
       end
 
+      def download_media(media_id:)
+        meta = @client.get_media_url(media_id: media_id)
+        url = meta["url"]
+        return nil unless url
+
+        response = @client.download_media(url: url)
+        response.body
+      end
+
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil) # rubocop:disable Lint/UnusedMethodArgument
         content_type = detect_content_type(filename)
         media_type = media_type_for(content_type)

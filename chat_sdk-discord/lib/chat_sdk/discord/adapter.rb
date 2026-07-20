@@ -150,6 +150,18 @@ module ChatSDK
         @client.trigger_typing(channel_id)
       end
 
+      def fetch_thread(channel_id:, thread_id: nil)
+        @client.get_channel(channel_id)
+      end
+
+      def set_thread_title(channel_id:, title:)
+        @client.modify_channel(channel_id, name: title)
+      end
+
+      def create_thread(channel_id:, message_id:, name:)
+        @client.start_thread(channel_id, message_id, name: name)
+      end
+
       def mention(user_id)
         "<@#{user_id}>"
       end

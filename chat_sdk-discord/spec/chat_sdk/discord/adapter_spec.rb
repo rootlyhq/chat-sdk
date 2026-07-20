@@ -455,6 +455,68 @@ RSpec.describe ChatSDK::Discord::Adapter do
     end
   end
 
+  describe "#fetch_thread" do
+    it "returns channel info" do
+      stub_request(:get, "https://discord.com/api/v10/channels/ch123")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => "ch123", "name" => "general", "type" => 0}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.fetch_thread(channel_id: "ch123")
+      expect(result).to be_a(Hash)
+      expect(result["id"]).to eq("ch123")
+      expect(result["name"]).to eq("general")
+      expect(result["type"]).to eq(0)
+    end
+
+    it "accepts an optional thread_id parameter" do
+      stub_request(:get, "https://discord.com/api/v10/channels/thread-456")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => "thread-456", "name" => "incident-thread", "type" => 11}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.fetch_thread(channel_id: "thread-456", thread_id: "ignored")
+      expect(result["id"]).to eq("thread-456")
+      expect(result["type"]).to eq(11)
+    end
+  end
+
+  describe "#set_thread_title" do
+    it "renames a channel or thread" do
+      stub_request(:patch, "https://discord.com/api/v10/channels/ch123")
+        .with(body: {"name" => "new-title"})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => "ch123", "name" => "new-title"}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.set_thread_title(channel_id: "ch123", title: "new-title")
+      expect(result["name"]).to eq("new-title")
+    end
+  end
+
+  describe "#create_thread" do
+    it "starts a thread from a message" do
+      stub_request(:post, "https://discord.com/api/v10/channels/ch123/messages/msg-1/threads")
+        .with(body: {"name" => "incident-thread"})
+        .to_return(
+          status: 201,
+          body: JSON.generate({"id" => "thread-789", "name" => "incident-thread", "type" => 11}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.create_thread(channel_id: "ch123", message_id: "msg-1", name: "incident-thread")
+      expect(result["id"]).to eq("thread-789")
+      expect(result["name"]).to eq("incident-thread")
+      expect(result["type"]).to eq(11)
+    end
+  end
+
   describe "capability gaps" do
     it "raises NotSupportedError for ephemeral messages" do
       expect { subject.post_ephemeral(channel_id: "C1", user_id: "U1", message: "test") }
