@@ -1,7 +1,7 @@
 PATH
   remote: chat_sdk-discord
   specs:
-    chat_sdk-discord (0.3.1)
+    chat_sdk-discord (0.4.0)
       chat_sdk (~> 0.1)
       ed25519 (~> 1.3)
       faraday (~> 2.0)
@@ -9,7 +9,7 @@ PATH
 PATH
   remote: chat_sdk-gchat
   specs:
-    chat_sdk-gchat (0.3.1)
+    chat_sdk-gchat (0.4.0)
       chat_sdk (~> 0.1)
       google-apps-chat-v1
       googleauth (~> 1.0)
@@ -17,49 +17,49 @@ PATH
 PATH
   remote: chat_sdk-mattermost
   specs:
-    chat_sdk-mattermost (0.3.1)
+    chat_sdk-mattermost (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
 PATH
   remote: chat_sdk-messenger
   specs:
-    chat_sdk-messenger (0.3.1)
+    chat_sdk-messenger (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
 PATH
   remote: chat_sdk-slack
   specs:
-    chat_sdk-slack (0.3.1)
+    chat_sdk-slack (0.4.0)
       chat_sdk (~> 0.1)
       slack-ruby-client (>= 2.0)
 
 PATH
   remote: chat_sdk-state-mysql
   specs:
-    chat_sdk-state-mysql (0.3.1)
+    chat_sdk-state-mysql (0.4.0)
       chat_sdk (~> 0.1)
       mysql2 (~> 0.5)
 
 PATH
   remote: chat_sdk-state-pg
   specs:
-    chat_sdk-state-pg (0.3.1)
+    chat_sdk-state-pg (0.4.0)
       chat_sdk (~> 0.1)
       pg (~> 1.5)
 
 PATH
   remote: chat_sdk-state-redis
   specs:
-    chat_sdk-state-redis (0.3.1)
+    chat_sdk-state-redis (0.4.0)
       chat_sdk (~> 0.1)
       redis-client (~> 0.19)
 
 PATH
   remote: chat_sdk-teams
   specs:
-    chat_sdk-teams (0.3.1)
+    chat_sdk-teams (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
       jwt (>= 2.7)
@@ -67,35 +67,35 @@ PATH
 PATH
   remote: chat_sdk-telegram
   specs:
-    chat_sdk-telegram (0.3.1)
+    chat_sdk-telegram (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
 PATH
   remote: chat_sdk-twilio
   specs:
-    chat_sdk-twilio (0.3.1)
+    chat_sdk-twilio (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
 PATH
   remote: chat_sdk-whatsapp
   specs:
-    chat_sdk-whatsapp (0.3.1)
+    chat_sdk-whatsapp (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
 PATH
   remote: chat_sdk-x
   specs:
-    chat_sdk-x (0.3.1)
+    chat_sdk-x (0.4.0)
       chat_sdk (~> 0.1)
       faraday (~> 2.0)
 
 PATH
   remote: chat_sdk
   specs:
-    chat_sdk (0.3.1)
+    chat_sdk (0.4.0)
       zeitwerk (~> 2.6)
 
 GEM

@@ -76,7 +76,7 @@ jobs:
           - gem: chat_sdk-whatsapp
             oidc_role: rg_oidc_akr_ecaoy89thaytxj1wfsva
           - gem: chat_sdk-x
-            oidc_role: "" # chat_sdk-x: no OIDC role yet
+            oidc_role: rg_oidc_akr_z8m6kkm4sq3x796erfm7
           - gem: chat_sdk-state-redis
             oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
           - gem: chat_sdk-state-pg
