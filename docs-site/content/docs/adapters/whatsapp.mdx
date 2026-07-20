@@ -167,3 +167,14 @@ whatsapp.mark_as_read(message_id: "wamid.abc123")
 ## Auto-Chunking
 
 Messages longer than 4,096 characters are automatically split into multiple messages. The adapter splits at paragraph boundaries (`\n\n`), then line boundaries (`\n`), falling back to the character limit. Each chunk is sent as a separate message in order.
+
+## Download Media
+
+Download media (images, documents, audio, video) from WhatsApp by media ID:
+
+```ruby
+binary = whatsapp.download_media(media_id: "media_abc123")
+File.write("photo.jpg", binary)
+```
+
+Returns the raw binary content, or `nil` if the media URL is not available.

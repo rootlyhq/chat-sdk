@@ -218,3 +218,39 @@ author.raw    # => full Slack API response
 ```
 
 Returns a `ChatSDK::Author` or `nil` if the user is not found.
+
+## Update Modal
+
+Update an already-open modal view by ID:
+
+```ruby
+slack.update_modal(view_id: "V123ABC", modal: updated_modal)
+```
+
+## Response URL
+
+Post to a Slack response URL from slash commands or interactive payloads:
+
+```ruby
+slack.send_to_response_url(
+  response_url: "https://hooks.slack.com/actions/T123/456/respond",
+  message: "Updated!"
+)
+```
+
+## Fetch Thread Info
+
+Get channel/conversation metadata:
+
+```ruby
+info = slack.fetch_thread(channel_id: "C12345")
+info["name"]  # => "general"
+```
+
+## Stop Socket Mode
+
+Cleanly shut down a Socket Mode connection:
+
+```ruby
+slack.stop_socket_mode
+```

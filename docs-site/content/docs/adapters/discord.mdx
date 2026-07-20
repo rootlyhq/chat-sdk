@@ -125,3 +125,22 @@ author.raw    # => full Discord API response
 ```
 
 Returns a `ChatSDK::Author` or `nil` if the user is not found.
+
+## Fetch Thread Info
+
+Get channel or thread metadata:
+
+```ruby
+info = discord.fetch_thread(channel_id: "ch123")
+info["name"]  # => "general"
+info["type"]  # => 0 (guild text), 11 (public thread), etc.
+```
+
+## Thread Management
+
+Create a thread from a message and rename threads:
+
+```ruby
+thread = discord.create_thread(channel_id: "ch123", message_id: "msg-1", name: "incident-42")
+discord.set_thread_title(channel_id: thread["id"], title: "resolved-incident-42")
+```
