@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
   spec.required_ruby_version = ">= 3.2.0"
   spec.files         = Dir["lib/**/*", "LICENSE", "README.md"]
   spec.require_paths = ["lib"]
-  spec.add_dependency "chat_sdk", "~> 0.1"
+  spec.add_dependency "chat_sdk", ">= 0.1"
   spec.add_dependency "redis-client", "~> 0.19"
   spec.metadata["rubygems_mfa_required"] = "true"
 end
