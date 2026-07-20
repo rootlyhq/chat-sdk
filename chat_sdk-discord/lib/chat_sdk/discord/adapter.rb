@@ -162,6 +162,54 @@ module ChatSDK
         end
       end
 
+      # Discord-specific: receive real-time events via the Discord Gateway WebSocket.
+      # Requires the optional 'discordrb' gem. Not part of the base adapter contract.
+      def start_gateway(&block)
+        raise ArgumentError, "start_gateway requires a block" unless block
+
+        begin
+          require "discordrb"
+        rescue LoadError
+          raise ChatSDK::ConfigurationError,
+            "Discord gateway requires the 'discordrb' gem. Add gem 'discordrb' to your Gemfile."
+        end
+
+        bot = Discordrb::Bot.new(token: "Bot #{@bot_token}")
+
+        bot.message do |event|
+          next if event.author.bot_account?
+
+          author = ChatSDK::Author.new(
+            id: event.author.id.to_s,
+            name: event.author.username,
+            platform: :discord,
+            bot: false
+          )
+          message = ChatSDK::Message.new(
+            id: event.message.id.to_s,
+            text: event.message.content,
+            author: author,
+            thread_id: event.message.id.to_s,
+            channel_id: event.channel.id.to_s,
+            platform: :discord,
+            raw: {content: event.message.content, author_id: event.author.id.to_s}
+          )
+
+          mention_event = ChatSDK::Events::Mention.new(
+            message: message,
+            thread_id: message.thread_id,
+            channel_id: message.channel_id,
+            platform: :discord,
+            adapter_name: :discord,
+            raw: message.raw
+          )
+
+          block.call(mention_event)
+        end
+
+        bot.run
+      end
+
       private
 
       def prepare_message_payload(message)

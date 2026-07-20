@@ -385,9 +385,9 @@ RSpec.describe ChatSDK::Teams::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "raises NotSupportedError for fetch_messages" do
+    it "raises ConfigurationError for fetch_messages without Graph API credentials" do
       expect { subject.fetch_messages(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
+        .to raise_error(ChatSDK::ConfigurationError, /Graph API credentials/)
     end
 
     it "does not support ephemeral_messages capability" do
@@ -402,8 +402,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(subject.supports?(:reactions)).to be false
     end
 
-    it "does not support message_history capability" do
-      expect(subject.supports?(:message_history)).to be false
+    it "supports message_history capability" do
+      expect(subject.supports?(:message_history)).to be true
     end
 
     it "still parses inbound reactions from activities" do
@@ -678,6 +678,169 @@ RSpec.describe ChatSDK::Teams::Adapter do
       msg = ChatSDK::PostableMessage.new(text: "Plain text")
       result = subject.render(msg)
       expect(result).to eq("Plain text")
+    end
+  end
+
+  describe "#fetch_messages" do
+    let(:graph_client_id) { "graph-client-id" }
+    let(:graph_client_secret) { "graph-client-secret" }
+    let(:graph_tenant_id) { "graph-tenant-id" }
+    let(:graph_token_url) { "https://login.microsoftonline.com/#{graph_tenant_id}/oauth2/v2.0/token" }
+
+    context "without Graph API credentials" do
+      it "raises ConfigurationError" do
+        adapter = described_class.new(app_id: app_id, app_password: app_password)
+        expect { adapter.fetch_messages(channel_id: "chat-1") }
+          .to raise_error(ChatSDK::ConfigurationError, /Graph API credentials/)
+      end
+    end
+
+    context "with Graph API credentials" do
+      subject do
+        described_class.new(
+          app_id: app_id,
+          app_password: app_password,
+          graph_client_id: graph_client_id,
+          graph_client_secret: graph_client_secret,
+          graph_tenant_id: graph_tenant_id
+        )
+      end
+
+      before do
+        stub_request(:post, graph_token_url)
+          .to_return(
+            status: 200,
+            body: JSON.generate({"access_token" => "graph-token", "expires_in" => 3600}),
+            headers: {"Content-Type" => "application/json"}
+          )
+      end
+
+      it "fetches messages from Graph API" do
+        graph_response = {
+          "value" => [
+            {
+              "id" => "msg-1",
+              "body" => {"contentType" => "text", "content" => "Hello from Graph"},
+              "from" => {"user" => {"id" => "user-1", "displayName" => "Alice"}},
+              "createdDateTime" => "2024-01-15T10:30:00Z",
+              "replyToId" => nil
+            },
+            {
+              "id" => "msg-2",
+              "body" => {"contentType" => "text", "content" => "Second message"},
+              "from" => {"user" => {"id" => "user-2", "displayName" => "Bob"}},
+              "createdDateTime" => "2024-01-15T10:31:00Z",
+              "replyToId" => "msg-1"
+            }
+          ]
+        }
+
+        stub_request(:get, "https://graph.microsoft.com/v1.0/chats/chat-1/messages?$top=50&$orderby=createdDateTime%20desc")
+          .to_return(
+            status: 200,
+            body: JSON.generate(graph_response),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        messages, next_cursor = subject.fetch_messages(channel_id: "chat-1")
+
+        expect(messages.size).to eq(2)
+
+        expect(messages[0]).to be_a(ChatSDK::Message)
+        expect(messages[0].id).to eq("msg-1")
+        expect(messages[0].text).to eq("Hello from Graph")
+        expect(messages[0].author.id).to eq("user-1")
+        expect(messages[0].author.name).to eq("Alice")
+        expect(messages[0].author.bot?).to be false
+        expect(messages[0].channel_id).to eq("chat-1")
+        expect(messages[0].platform).to eq(:teams)
+        expect(messages[0].timestamp).to eq("2024-01-15T10:30:00Z")
+
+        expect(messages[1].id).to eq("msg-2")
+        expect(messages[1].thread_id).to eq("msg-1")
+
+        expect(next_cursor).to be_nil
+      end
+
+      it "returns the next page link when present" do
+        graph_response = {
+          "value" => [
+            {
+              "id" => "msg-1",
+              "body" => {"contentType" => "text", "content" => "Hello"},
+              "from" => {"user" => {"id" => "user-1", "displayName" => "Alice"}},
+              "createdDateTime" => "2024-01-15T10:30:00Z"
+            }
+          ],
+          "@odata.nextLink" => "https://graph.microsoft.com/v1.0/chats/chat-1/messages?$skiptoken=abc123"
+        }
+
+        stub_request(:get, "https://graph.microsoft.com/v1.0/chats/chat-1/messages?$top=25&$orderby=createdDateTime%20desc")
+          .to_return(
+            status: 200,
+            body: JSON.generate(graph_response),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        messages, next_cursor = subject.fetch_messages(channel_id: "chat-1", limit: 25)
+
+        expect(messages.size).to eq(1)
+        expect(next_cursor).to eq("https://graph.microsoft.com/v1.0/chats/chat-1/messages?$skiptoken=abc123")
+      end
+
+      it "identifies bot messages from application senders" do
+        graph_response = {
+          "value" => [
+            {
+              "id" => "msg-bot",
+              "body" => {"contentType" => "text", "content" => "Bot reply"},
+              "from" => {"application" => {"id" => "app-1", "displayName" => "MyBot"}},
+              "createdDateTime" => "2024-01-15T10:30:00Z"
+            }
+          ]
+        }
+
+        stub_request(:get, "https://graph.microsoft.com/v1.0/chats/chat-1/messages?$top=50&$orderby=createdDateTime%20desc")
+          .to_return(
+            status: 200,
+            body: JSON.generate(graph_response),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        messages, = subject.fetch_messages(channel_id: "chat-1")
+
+        expect(messages[0].author.id).to eq("app-1")
+        expect(messages[0].author.name).to eq("MyBot")
+        expect(messages[0].author.bot?).to be true
+      end
+
+      it "handles empty results" do
+        graph_response = {"value" => []}
+
+        stub_request(:get, "https://graph.microsoft.com/v1.0/chats/chat-1/messages?$top=50&$orderby=createdDateTime%20desc")
+          .to_return(
+            status: 200,
+            body: JSON.generate(graph_response),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        messages, next_cursor = subject.fetch_messages(channel_id: "chat-1")
+
+        expect(messages).to be_empty
+        expect(next_cursor).to be_nil
+      end
+
+      it "raises PlatformError on Graph API failure" do
+        stub_request(:get, "https://graph.microsoft.com/v1.0/chats/chat-1/messages?$top=50&$orderby=createdDateTime%20desc")
+          .to_return(
+            status: 403,
+            body: JSON.generate({"error" => {"code" => "Forbidden", "message" => "Insufficient privileges"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        expect { subject.fetch_messages(channel_id: "chat-1") }
+          .to raise_error(ChatSDK::PlatformError, /Graph API error: 403/)
+      end
     end
   end
 end

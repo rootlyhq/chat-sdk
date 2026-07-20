@@ -43,6 +43,27 @@ module ChatSDK
         []
       end
 
+      # Parses a Google Cloud Pub/Sub push message containing a Google Chat event.
+      #
+      # When a Pub/Sub subscription is configured externally (via Google Cloud
+      # Console or Terraform) for Google Workspace Events, push messages arrive
+      # as HTTP POSTs with the Chat event base64-encoded inside
+      # `message.data`. This method decodes the envelope and delegates to
+      # {EventParser}.
+      #
+      # @param rack_request [Rack::Request] the incoming Pub/Sub push request
+      # @return [Array<ChatSDK::Events::Base>] parsed events (empty on bad payload)
+      def parse_pubsub_event(rack_request)
+        envelope = read_json_body(rack_request)
+        data = envelope.dig("message", "data")
+        return [] unless data
+
+        decoded = JSON.parse(Base64.decode64(data))
+        EventParser.parse(decoded)
+      rescue JSON::ParserError, ArgumentError
+        []
+      end
+
       # Outbound
       def post_message(channel_id:, message:, thread_id: nil)
         msg = ChatSDK::PostableMessage.from(message)

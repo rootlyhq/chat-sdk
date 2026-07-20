@@ -217,6 +217,145 @@ RSpec.describe ChatSDK::GChat::Adapter do
     end
   end
 
+  describe "#parse_pubsub_event" do
+    def build_request(body)
+      env = Rack::MockRequest.env_for(
+        "/gchat/pubsub",
+        :method => "POST",
+        :input => body,
+        "CONTENT_TYPE" => "application/json"
+      )
+      Rack::Request.new(env)
+    end
+
+    def pubsub_envelope(chat_event)
+      {
+        "message" => {
+          "data" => Base64.strict_encode64(JSON.generate(chat_event)),
+          "messageId" => "1234567890",
+          "publishTime" => "2024-01-01T00:00:00Z"
+        },
+        "subscription" => "projects/my-project/subscriptions/chat-sub"
+      }
+    end
+
+    context "with a valid Pub/Sub push containing a MESSAGE event" do
+      it "decodes the base64 payload and parses into a Mention event" do
+        chat_event = {
+          "type" => "MESSAGE",
+          "message" => {
+            "name" => "spaces/SPACE1/messages/MSG_PS1",
+            "sender" => {"name" => "users/789", "displayName" => "Charlie"},
+            "text" => "@Bot check status",
+            "argumentText" => "check status",
+            "thread" => {"name" => "spaces/SPACE1/threads/THREAD_PS1"},
+            "space" => {"name" => "spaces/SPACE1"},
+            "annotations" => [
+              {
+                "type" => "USER_MENTION",
+                "userMention" => {"type" => "MENTION", "user" => {"name" => "users/bot"}}
+              }
+            ]
+          }
+        }
+        request = build_request(JSON.generate(pubsub_envelope(chat_event)))
+        events = subject.parse_pubsub_event(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Mention)
+        expect(event.message.text).to eq("@Bot check status")
+        expect(event.message.author.id).to eq("789")
+        expect(event.message.author.name).to eq("Charlie")
+        expect(event.channel_id).to eq("SPACE1")
+        expect(event.thread_id).to eq("THREAD_PS1")
+      end
+    end
+
+    context "with a valid Pub/Sub push containing a non-mention MESSAGE" do
+      it "decodes and parses into a SubscribedMessage event" do
+        chat_event = {
+          "type" => "MESSAGE",
+          "message" => {
+            "name" => "spaces/SPACE2/messages/MSG_PS2",
+            "sender" => {"name" => "users/456", "displayName" => "Dana"},
+            "text" => "hello everyone",
+            "thread" => {"name" => "spaces/SPACE2/threads/THREAD_PS2"},
+            "space" => {"name" => "spaces/SPACE2"}
+          }
+        }
+        request = build_request(JSON.generate(pubsub_envelope(chat_event)))
+        events = subject.parse_pubsub_event(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::SubscribedMessage)
+        expect(event.message.text).to eq("hello everyone")
+        expect(event.message.author.id).to eq("456")
+        expect(event.channel_id).to eq("SPACE2")
+      end
+    end
+
+    context "with a Pub/Sub push containing a CARD_CLICKED event" do
+      it "decodes and parses into an Action event" do
+        chat_event = {
+          "type" => "CARD_CLICKED",
+          "action" => {
+            "actionMethodName" => "btn:confirm",
+            "parameters" => [{"key" => "value", "value" => "confirmed"}]
+          },
+          "user" => {"name" => "users/101", "displayName" => "Eve"},
+          "message" => {
+            "name" => "spaces/SPACE3/messages/MSG_PS3",
+            "space" => {"name" => "spaces/SPACE3"},
+            "thread" => {"name" => "spaces/SPACE3/threads/THREAD_PS3"}
+          },
+          "space" => {"name" => "spaces/SPACE3"}
+        }
+        request = build_request(JSON.generate(pubsub_envelope(chat_event)))
+        events = subject.parse_pubsub_event(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Action)
+        expect(event.action_id).to eq("btn:confirm")
+        expect(event.value).to eq("confirmed")
+        expect(event.user.id).to eq("101")
+      end
+    end
+
+    context "when message.data is missing" do
+      it "returns an empty array" do
+        envelope = {"message" => {"messageId" => "123"}, "subscription" => "projects/p/subscriptions/s"}
+        request = build_request(JSON.generate(envelope))
+        expect(subject.parse_pubsub_event(request)).to be_empty
+      end
+    end
+
+    context "when message.data contains invalid base64" do
+      it "returns an empty array" do
+        envelope = {"message" => {"data" => "!!not-base64!!"}, "subscription" => "projects/p/subscriptions/s"}
+        request = build_request(JSON.generate(envelope))
+        expect(subject.parse_pubsub_event(request)).to be_empty
+      end
+    end
+
+    context "when message.data decodes to invalid JSON" do
+      it "returns an empty array" do
+        envelope = {"message" => {"data" => Base64.strict_encode64("not json")}, "subscription" => "projects/p/subscriptions/s"}
+        request = build_request(JSON.generate(envelope))
+        expect(subject.parse_pubsub_event(request)).to be_empty
+      end
+    end
+
+    context "when the outer envelope is invalid JSON" do
+      it "returns an empty array" do
+        request = build_request("not valid json at all")
+        expect(subject.parse_pubsub_event(request)).to be_empty
+      end
+    end
+  end
+
   describe "#post_message" do
     it "creates a message via the GAPIC client" do
       result = double("result",

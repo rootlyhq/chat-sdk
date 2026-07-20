@@ -222,6 +222,22 @@ module ChatSDK
         # This is a no-op but the capability is declared for streaming support
       end
 
+      # Slack-specific: receive real-time events via Socket Mode WebSocket.
+      # Requires the optional 'faye-websocket' gem and an app-level token (xapp-*).
+      # Not part of the base adapter contract.
+      #
+      # Usage:
+      #   adapter.start_socket_mode(app_token: "xapp-...") do |event|
+      #     # event is a ChatSDK::Events::* instance
+      #   end
+      def start_socket_mode(app_token: nil, &block)
+        app_token ||= ENV["SLACK_APP_TOKEN"]
+        raise ChatSDK::ConfigurationError, "Slack app_token required for socket mode" unless app_token
+
+        socket = SocketMode.new(app_token: app_token, bot_client: @client)
+        socket.start(&block)
+      end
+
       def mention(user_id)
         "<@#{user_id}>"
       end

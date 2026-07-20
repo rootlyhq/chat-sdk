@@ -477,6 +477,36 @@ RSpec.describe ChatSDK::Slack::Adapter do
     end
   end
 
+  describe "#start_socket_mode" do
+    it "raises ConfigurationError without app_token" do
+      expect { subject.start_socket_mode(app_token: nil) {} }
+        .to raise_error(ChatSDK::ConfigurationError, /app_token required/)
+    end
+
+    it "raises ConfigurationError without app_token when ENV is empty" do
+      allow(ENV).to receive(:fetch).and_call_original
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("SLACK_APP_TOKEN").and_return(nil)
+
+      expect { subject.start_socket_mode {} }
+        .to raise_error(ChatSDK::ConfigurationError, /app_token required/)
+    end
+
+    it "delegates to SocketMode with the given app_token" do
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new)
+        .with(app_token: "xapp-test-token", bot_client: subject.client)
+        .and_return(socket_double)
+
+      block = proc { |_event| }
+      allow(socket_double).to receive(:start)
+
+      subject.start_socket_mode(app_token: "xapp-test-token", &block)
+
+      expect(socket_double).to have_received(:start)
+    end
+  end
+
   describe ChatSDK::Slack::BlockKitRenderer do
     let(:renderer) { described_class.new }
 

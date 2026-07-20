@@ -4,17 +4,23 @@ module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
-        :file_uploads, :streaming_edit, :typing_indicator
+        :file_uploads, :streaming_edit, :typing_indicator, :message_history
 
       attr_reader :client
 
-      def initialize(app_id: nil, app_password: nil, tenant_id: nil)
+      def initialize(app_id: nil, app_password: nil, tenant_id: nil,
+        graph_client_id: nil, graph_client_secret: nil, graph_tenant_id: nil)
         @app_id = app_id || ENV["TEAMS_APP_ID"]
         @app_password = app_password || ENV["TEAMS_APP_PASSWORD"]
         @tenant_id = tenant_id || ENV["TEAMS_TENANT_ID"]
 
         raise ChatSDK::ConfigurationError, "Teams app_id required" unless @app_id
         raise ChatSDK::ConfigurationError, "Teams app_password required" unless @app_password
+
+        @graph_client_id = graph_client_id || ENV["TEAMS_GRAPH_CLIENT_ID"]
+        @graph_client_secret = graph_client_secret || ENV["TEAMS_GRAPH_CLIENT_SECRET"]
+        @graph_tenant_id = graph_tenant_id || ENV["TEAMS_GRAPH_TENANT_ID"]
+        @graph_client = GraphClient.new(@graph_client_id, @graph_client_secret, @graph_tenant_id) if @graph_client_id
 
         @client = BotFrameworkClient.new(app_id: @app_id, app_password: @app_password)
         @jwt_verifier = JwtVerifier.new(app_id: @app_id)
@@ -177,6 +183,20 @@ module ChatSDK
         end
       end
 
+      def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
+        require_capability!(:message_history)
+        unless @graph_client
+          raise ChatSDK::ConfigurationError,
+            "Teams message history requires Graph API credentials " \
+            "(TEAMS_GRAPH_CLIENT_ID, TEAMS_GRAPH_CLIENT_SECRET, TEAMS_GRAPH_TENANT_ID)"
+        end
+
+        result = @graph_client.fetch_messages(chat_id: channel_id, limit: limit)
+        messages = (result["value"] || []).map { |m| parse_graph_message(m, channel_id) }
+        next_link = result["@odata.nextLink"]
+        [messages, next_link]
+      end
+
       # Store a service URL for a conversation (useful when sending proactive messages)
       def register_service_url(conversation_id, service_url)
         @service_urls[conversation_id] = service_url
@@ -210,6 +230,28 @@ module ChatSDK
           )
         end
         url
+      end
+
+      def parse_graph_message(data, channel_id)
+        from = data["from"] || {}
+        user = from["user"] || from["application"] || {}
+        is_bot = !from["application"].nil?
+
+        ChatSDK::Message.new(
+          id: data["id"],
+          text: data.dig("body", "content") || "",
+          author: ChatSDK::Author.new(
+            id: user["id"] || "unknown",
+            name: user["displayName"] || "unknown",
+            platform: :teams,
+            bot: is_bot
+          ),
+          thread_id: data["replyToId"] || data["id"],
+          channel_id: channel_id,
+          platform: :teams,
+          timestamp: data["createdDateTime"],
+          raw: data
+        )
       end
     end
   end

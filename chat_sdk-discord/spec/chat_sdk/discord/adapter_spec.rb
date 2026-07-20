@@ -628,4 +628,17 @@ RSpec.describe ChatSDK::Discord::Adapter do
       end
     end
   end
+
+  describe "#start_gateway" do
+    it "raises ConfigurationError when discordrb is not installed" do
+      # discordrb is not in our test bundle, so LoadError is the real behavior
+      expect { subject.start_gateway { |_event| } }
+        .to raise_error(ChatSDK::ConfigurationError, /discordrb/)
+    end
+
+    it "raises ArgumentError when called without a block" do
+      expect { subject.start_gateway }
+        .to raise_error(ArgumentError, /requires a block/)
+    end
+  end
 end
