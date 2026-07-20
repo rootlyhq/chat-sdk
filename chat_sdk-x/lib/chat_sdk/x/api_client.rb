@@ -31,8 +31,6 @@ module ChatSDK
       end
 
       def upload_media(io:, content_type:, total_bytes:)
-        ensure_valid_token
-
         # INIT
         init_result = request(:post, "/2/media/upload", {
           command: "INIT",
