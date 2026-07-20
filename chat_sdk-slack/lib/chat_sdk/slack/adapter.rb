@@ -29,6 +29,7 @@ module ChatSDK
 
         @renderer = BlockKitRenderer.new
         @modal_renderer = ModalRenderer.new
+        @team_clients = {}
       end
 
       # Returns the per-request client (multi-workspace) or the static client (single-workspace).
@@ -46,6 +47,7 @@ module ChatSDK
       def set_installation(team_id, bot_token:, bot_user_id: nil, team_name: nil)
         raise ChatSDK::ConfigurationError, "Multi-workspace mode requires state" unless @state
 
+        @team_clients.delete(team_id)
         @state.set(installation_key(team_id), {
           "bot_token" => bot_token,
           "bot_user_id" => bot_user_id,
@@ -60,6 +62,7 @@ module ChatSDK
       end
 
       def delete_installation(team_id)
+        @team_clients.delete(team_id)
         return unless @state
 
         @state.delete(installation_key(team_id))
@@ -142,7 +145,9 @@ module ChatSDK
         return [] unless parsed
 
         # Multi-workspace: resolve per-team client from payload
+        # Clear any stale client from a previous request on this thread (Puma thread pool safety)
         if @client_id
+          ::Thread.current[:chat_sdk_slack_client] = nil
           team_id = parsed["team_id"] || parsed.dig("team", "id")
           resolve_team_client(team_id) if team_id
         end
@@ -328,12 +333,18 @@ module ChatSDK
       def resolve_team_client(team_id)
         return unless @client_id && @state
 
+        cached = @team_clients[team_id]
+        if cached
+          ::Thread.current[:chat_sdk_slack_client] = cached
+          return
+        end
+
         installation = get_installation(team_id)
         return unless installation
 
-        ::Thread.current[:chat_sdk_slack_client] = ::Slack::Web::Client.new(
-          token: installation["bot_token"]
-        )
+        new_client = ::Slack::Web::Client.new(token: installation["bot_token"])
+        @team_clients[team_id] = new_client
+        ::Thread.current[:chat_sdk_slack_client] = new_client
       end
 
       def installation_key(team_id)
