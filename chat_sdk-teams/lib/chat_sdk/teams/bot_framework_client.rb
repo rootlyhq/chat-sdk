@@ -35,6 +35,11 @@ module ChatSDK
         authorized_request(:post, url, payload)
       end
 
+      def send_typing(service_url:, conversation_id:)
+        activity = {"type" => "typing"}
+        send_activity(service_url: service_url, conversation_id: conversation_id, activity: activity)
+      end
+
       def get_conversation_members(service_url:, conversation_id:)
         url = "#{service_url.chomp("/")}/v3/conversations/#{conversation_id}/members"
         authorized_request(:get, url)

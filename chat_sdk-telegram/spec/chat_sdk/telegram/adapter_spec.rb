@@ -271,6 +271,59 @@ RSpec.describe ChatSDK::Telegram::Adapter do
       end
     end
 
+    context "message_reaction (added)" do
+      it "parses into Reaction event with added: true" do
+        payload = {
+          "update_id" => 9,
+          "message_reaction" => {
+            "chat" => {"id" => -1001, "type" => "group"},
+            "message_id" => 300,
+            "user" => {"id" => 42, "username" => "alice"},
+            "new_reaction" => [{"type" => "emoji", "emoji" => "\u{1F44D}"}],
+            "old_reaction" => []
+          }
+        }
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.emoji).to eq("\u{1F44D}")
+        expect(event.user_id).to eq("42")
+        expect(event.message_id).to eq("300")
+        expect(event.channel_id).to eq("-1001")
+        expect(event.added?).to be true
+        expect(event.platform).to eq(:telegram)
+        expect(event.adapter_name).to eq(:telegram)
+      end
+    end
+
+    context "message_reaction (removed)" do
+      it "parses into Reaction event with added: false" do
+        payload = {
+          "update_id" => 10,
+          "message_reaction" => {
+            "chat" => {"id" => -1001, "type" => "group"},
+            "message_id" => 301,
+            "user" => {"id" => 42, "username" => "alice"},
+            "new_reaction" => [],
+            "old_reaction" => [{"type" => "emoji", "emoji" => "\u{2764}"}]
+          }
+        }
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.emoji).to eq("\u{2764}")
+        expect(event.user_id).to eq("42")
+        expect(event.message_id).to eq("301")
+        expect(event.removed?).to be true
+      end
+    end
+
     context "reply thread_id resolution" do
       it "uses reply_to_message.message_id for thread_id when replying" do
         payload = {

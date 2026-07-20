@@ -29,9 +29,28 @@ module ChatSDK
             build_direct_message(msg, msg.dig("text", "body") || "", author, from, thread_id)
           when "interactive"
             parse_interactive_message(msg, author, from, thread_id)
-          when "image", "document", "audio", "video"
+          when "reaction"
+            parse_reaction_message(msg, from, thread_id)
+          when "image", "document", "audio", "video", "sticker"
             parse_media_message(msg, author, from, thread_id)
           end
+        end
+
+        def parse_reaction_message(msg, from, thread_id)
+          reaction = msg["reaction"] || {}
+          emoji = reaction["emoji"] || ""
+
+          ChatSDK::Events::Reaction.new(
+            emoji: emoji,
+            added: !emoji.empty?,
+            user_id: from,
+            message_id: reaction["message_id"],
+            thread_id: thread_id,
+            channel_id: from,
+            platform: :whatsapp,
+            adapter_name: :whatsapp,
+            raw: msg
+          )
         end
 
         def parse_interactive_message(msg, author, channel_id, thread_id)

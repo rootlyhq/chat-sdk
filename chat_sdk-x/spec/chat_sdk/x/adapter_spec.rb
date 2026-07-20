@@ -246,6 +246,47 @@ RSpec.describe ChatSDK::X::Adapter do
       end
     end
 
+    context "favorite events (reactions)" do
+      it "parses favorite_events into Reaction event" do
+        payload = {
+          "favorite_events" => [
+            {
+              "user" => {"id_str" => "user-111"},
+              "favorited_status" => {"id_str" => "tweet-222"}
+            }
+          ]
+        }
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.emoji).to eq("heart")
+        expect(event.user_id).to eq("user-111")
+        expect(event.message_id).to eq("tweet-222")
+        expect(event.thread_id).to eq("x:post:tweet-222")
+        expect(event.added?).to be true
+        expect(event.platform).to eq(:x)
+        expect(event.adapter_name).to eq(:x)
+      end
+
+      it "skips favorites from the bot itself" do
+        payload = {
+          "favorite_events" => [
+            {
+              "user" => {"id_str" => user_id},
+              "favorited_status" => {"id_str" => "tweet-333"}
+            }
+          ]
+        }
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events).to be_empty
+      end
+    end
+
     context "invalid JSON" do
       it "returns empty array" do
         request = build_request("not json")
@@ -344,6 +385,63 @@ RSpec.describe ChatSDK::X::Adapter do
     end
   end
 
+  describe "#delete_message" do
+    it "deletes a tweet" do
+      stub_request(:delete, "https://api.x.com/2/tweets/tweet-123")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"deleted" => true}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.delete_message(channel_id: "ch1", message_id: "tweet-123") }
+        .not_to raise_error
+    end
+  end
+
+  describe "#fetch_messages" do
+    context "DM thread" do
+      it "fetches DM events for a participant" do
+        stub_request(:get, %r{https://api\.x\.com/2/dm_conversations/with/user-789/dm_events\?.*max_results=50})
+          .to_return(
+            status: 200,
+            body: JSON.generate({
+              "data" => [
+                {"id" => "dm-1", "text" => "Hello", "sender_id" => "user-789"},
+                {"id" => "dm-2", "text" => "Hi back", "sender_id" => "user-456"}
+              ],
+              "meta" => {"next_token" => "cursor-abc"}
+            }),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        messages, next_cursor = subject.fetch_messages(
+          channel_id: "user-789",
+          thread_id: "x:dm:user-789"
+        )
+
+        expect(messages.size).to eq(2)
+        expect(messages.first).to be_a(ChatSDK::Message)
+        expect(messages.first.id).to eq("dm-1")
+        expect(messages.first.text).to eq("Hello")
+        expect(messages.first.author.id).to eq("user-789")
+        expect(next_cursor).to eq("cursor-abc")
+      end
+    end
+
+    context "tweet thread" do
+      it "returns empty for tweet threads" do
+        messages, next_cursor = subject.fetch_messages(
+          channel_id: "user-456",
+          thread_id: "x:post:conv-123"
+        )
+
+        expect(messages).to eq([])
+        expect(next_cursor).to be_nil
+      end
+    end
+  end
+
   describe "#open_dm" do
     it "returns the user_id directly" do
       expect(subject.open_dm("user-789")).to eq("user-789")
@@ -353,11 +451,6 @@ RSpec.describe ChatSDK::X::Adapter do
   describe "capability gaps" do
     it "raises NotSupportedError for edit_message" do
       expect { subject.edit_message(channel_id: "C1", message_id: "M1", message: "test") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
-    it "raises NotSupportedError for delete_message" do
-      expect { subject.delete_message(channel_id: "C1", message_id: "M1") }
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
@@ -381,11 +474,6 @@ RSpec.describe ChatSDK::X::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "raises NotSupportedError for fetch_messages" do
-      expect { subject.fetch_messages(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
     it "does not support edit_messages capability" do
       expect(subject.supports?(:edit_messages)).to be false
     end
@@ -404,6 +492,14 @@ RSpec.describe ChatSDK::X::Adapter do
 
     it "supports reactions capability" do
       expect(subject.supports?(:reactions)).to be true
+    end
+
+    it "supports delete_messages capability" do
+      expect(subject.supports?(:delete_messages)).to be true
+    end
+
+    it "supports message_history capability" do
+      expect(subject.supports?(:message_history)).to be true
     end
   end
 end

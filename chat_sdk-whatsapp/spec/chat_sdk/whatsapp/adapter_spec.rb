@@ -340,6 +340,118 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       end
     end
 
+    context "reaction message" do
+      it "parses into Reaction event" do
+        payload = {
+          "object" => "whatsapp_business_account",
+          "entry" => [{
+            "id" => "BIZ_ACCOUNT_ID",
+            "changes" => [{
+              "field" => "messages",
+              "value" => {
+                "messaging_product" => "whatsapp",
+                "metadata" => {"phone_number_id" => phone_number_id},
+                "messages" => [{
+                  "from" => "15551234567",
+                  "id" => "wamid.reaction123",
+                  "timestamp" => "1677777777",
+                  "type" => "reaction",
+                  "reaction" => {
+                    "message_id" => "wamid.orig456",
+                    "emoji" => "\u{2764}"
+                  }
+                }]
+              }
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.emoji).to eq("\u{2764}")
+        expect(event.added?).to be true
+        expect(event.user_id).to eq("15551234567")
+        expect(event.message_id).to eq("wamid.orig456")
+        expect(event.channel_id).to eq("15551234567")
+        expect(event.thread_id).to eq("whatsapp:#{phone_number_id}:15551234567")
+        expect(event.platform).to eq(:whatsapp)
+      end
+
+      it "parses removal (empty emoji) as removed reaction" do
+        payload = {
+          "object" => "whatsapp_business_account",
+          "entry" => [{
+            "id" => "BIZ_ACCOUNT_ID",
+            "changes" => [{
+              "field" => "messages",
+              "value" => {
+                "messaging_product" => "whatsapp",
+                "messages" => [{
+                  "from" => "15551234567",
+                  "id" => "wamid.unreact123",
+                  "timestamp" => "1677777777",
+                  "type" => "reaction",
+                  "reaction" => {
+                    "message_id" => "wamid.orig456",
+                    "emoji" => ""
+                  }
+                }]
+              }
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.added?).to be false
+        expect(event.removed?).to be true
+      end
+    end
+
+    context "sticker message" do
+      it "parses into DirectMessage event" do
+        payload = {
+          "object" => "whatsapp_business_account",
+          "entry" => [{
+            "id" => "BIZ_ACCOUNT_ID",
+            "changes" => [{
+              "field" => "messages",
+              "value" => {
+                "messaging_product" => "whatsapp",
+                "messages" => [{
+                  "from" => "15551234567",
+                  "id" => "wamid.sticker123",
+                  "timestamp" => "1677777777",
+                  "type" => "sticker",
+                  "sticker" => {
+                    "id" => "media_sticker_id",
+                    "mime_type" => "image/webp"
+                  }
+                }]
+              }
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::DirectMessage)
+        expect(event.message.text).to include("sticker")
+        expect(event.message.text).to include("image/webp")
+      end
+    end
+
     context "non-whatsapp object" do
       it "returns empty array" do
         payload = {"object" => "instagram", "entry" => []}
@@ -399,7 +511,7 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
 
   describe "#post_message" do
     it "sends a text message" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/#{phone_number_id}/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .to_return(
           status: 200,
           body: JSON.generate({
@@ -417,7 +529,7 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
     end
 
     it "sends a card message as interactive" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/#{phone_number_id}/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .with { |req|
           body = JSON.parse(req.body)
           body["type"] == "interactive"
@@ -448,7 +560,7 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
 
   describe "#add_reaction" do
     it "sends a reaction message" do
-      stub = stub_request(:post, %r{graph\.facebook\.com/v21\.0/#{phone_number_id}/messages})
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .with { |req|
           body = JSON.parse(req.body)
           body["type"] == "reaction" && body["reaction"]["emoji"] == "\u{1F44D}"
@@ -466,7 +578,7 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
 
   describe "#remove_reaction" do
     it "sends a reaction message with empty emoji" do
-      stub = stub_request(:post, %r{graph\.facebook\.com/v21\.0/#{phone_number_id}/messages})
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .with { |req|
           body = JSON.parse(req.body)
           body["type"] == "reaction" && body["reaction"]["emoji"] == ""
@@ -636,8 +748,9 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
         expect(button_title.length).to be <= 20
       end
 
-      it "falls back to text for more than 3 buttons" do
+      it "renders more than 3 buttons as interactive list message" do
         card = ChatSDK.card(title: "Many Buttons") do
+          text "Pick an option"
           actions do
             button "One", id: "btn1"
             button "Two", id: "btn2"
@@ -647,7 +760,30 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
         end
         result = renderer.render(card)
 
-        expect(result[:text]).to be_a(String)
+        expect(result[:type]).to eq("interactive")
+        interactive = result[:interactive]
+        expect(interactive["type"]).to eq("list")
+        expect(interactive["header"]["text"]).to eq("Many Buttons")
+        expect(interactive["body"]["text"]).to include("Pick an option")
+        expect(interactive["action"]["button"]).to eq("Options")
+        rows = interactive["action"]["sections"].first["rows"]
+        expect(rows.length).to eq(4)
+        expect(rows.first["id"]).to eq("btn1")
+        expect(rows.first["title"]).to eq("One")
+      end
+
+      it "limits list rows to 10" do
+        card = ChatSDK.card(title: "Too Many") do
+          text "Options"
+          actions do
+            12.times { |i| button "Btn#{i}", id: "btn#{i}" }
+          end
+        end
+        result = renderer.render(card)
+
+        expect(result[:type]).to eq("interactive")
+        rows = result[:interactive]["action"]["sections"].first["rows"]
+        expect(rows.length).to eq(10)
       end
 
       it "renders fields as text" do
@@ -667,7 +803,7 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
 
   describe "API error handling" do
     it "raises RateLimitedError on 429" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/#{phone_number_id}/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .to_return(
           status: 429,
           body: JSON.generate({"error" => {"message" => "Rate limit hit", "code" => 80007}}),
@@ -679,7 +815,7 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
     end
 
     it "raises PlatformError on other errors" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/#{phone_number_id}/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .to_return(
           status: 400,
           body: JSON.generate({"error" => {"message" => "Invalid OAuth access token", "code" => 190}}),

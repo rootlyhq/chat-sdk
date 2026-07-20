@@ -3,7 +3,7 @@
 module ChatSDK
   module Messenger
     class ApiClient < ChatSDK::ApiClient::Base
-      BASE_URL = "https://graph.facebook.com/v21.0/"
+      BASE_URL = "https://graph.facebook.com/v25.0/"
 
       def initialize(page_access_token)
         @page_access_token = page_access_token

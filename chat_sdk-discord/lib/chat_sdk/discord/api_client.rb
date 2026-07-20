@@ -56,6 +56,11 @@ module ChatSDK
         request(:get, path)
       end
 
+      # Typing indicator
+      def trigger_typing(channel_id)
+        request(:post, "#{API_PREFIX}/channels/#{channel_id}/typing")
+      end
+
       # File upload
       def upload_file(channel_id, io, filename)
         payload = {

@@ -9,10 +9,11 @@ module ChatSDK
 
       attr_reader :client
 
-      def initialize(app_secret: nil, page_access_token: nil, verify_token: nil)
+      def initialize(app_secret: nil, page_access_token: nil, verify_token: nil, page_id: nil)
         @app_secret = app_secret || ENV["FACEBOOK_APP_SECRET"]
         @page_access_token = page_access_token || ENV["FACEBOOK_PAGE_ACCESS_TOKEN"]
         @verify_token = verify_token || ENV["FACEBOOK_VERIFY_TOKEN"]
+        @page_id = page_id || ENV["FACEBOOK_PAGE_ID"]
 
         raise ChatSDK::ConfigurationError, "Messenger app_secret required" unless @app_secret
         raise ChatSDK::ConfigurationError, "Messenger page_access_token required" unless @page_access_token
@@ -36,7 +37,7 @@ module ChatSDK
 
       def parse_events(rack_request)
         payload = read_json_body(rack_request)
-        EventParser.parse(payload)
+        EventParser.parse(payload, bot_page_id: @page_id)
       rescue JSON::ParserError
         []
       end

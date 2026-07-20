@@ -411,6 +411,19 @@ RSpec.describe ChatSDK::Discord::Adapter do
     end
   end
 
+  describe "#start_typing" do
+    it "triggers a typing indicator" do
+      stub_request(:post, "https://discord.com/api/v10/channels/ch123/typing")
+        .to_return(status: 204, body: "", headers: {})
+
+      expect { subject.start_typing(channel_id: "ch123") }.not_to raise_error
+    end
+
+    it "supports typing_indicator capability" do
+      expect(subject.supports?(:typing_indicator)).to be true
+    end
+  end
+
   describe "capability gaps" do
     it "raises NotSupportedError for ephemeral messages" do
       expect { subject.post_ephemeral(channel_id: "C1", user_id: "U1", message: "test") }
@@ -422,21 +435,12 @@ RSpec.describe ChatSDK::Discord::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "raises NotSupportedError for typing indicator" do
-      expect { subject.start_typing(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
     it "does not support ephemeral_messages capability" do
       expect(subject.supports?(:ephemeral_messages)).to be false
     end
 
     it "does not support modals capability" do
       expect(subject.supports?(:modals)).to be false
-    end
-
-    it "does not support typing_indicator capability" do
-      expect(subject.supports?(:typing_indicator)).to be false
     end
   end
 

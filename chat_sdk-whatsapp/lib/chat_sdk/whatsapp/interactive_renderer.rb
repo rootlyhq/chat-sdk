@@ -41,6 +41,8 @@ module ChatSDK
           }
 
           {type: "interactive", interactive: interactive}
+        elsif buttons.length > 3
+          render_list_message(title, body_text, buttons)
         else
           # Fallback to plain text
           fallback = [title, subtitle, *text_parts].compact.reject(&:empty?).join("\n")
@@ -50,6 +52,27 @@ module ChatSDK
           end
           {text: fallback}
         end
+      end
+
+      def render_list_message(title, body_text, buttons)
+        interactive = {
+          "type" => "list",
+          "body" => {"text" => body_text}
+        }
+        interactive["header"] = {"type" => "text", "text" => truncate(title, 60)} if title
+        interactive["action"] = {
+          "button" => "Options",
+          "sections" => [{
+            "rows" => buttons.first(10).map do |btn|
+              {
+                "id" => btn[:id],
+                "title" => truncate(btn[:text], 24)
+              }
+            end
+          }]
+        }
+
+        {type: "interactive", interactive: interactive}
       end
 
       def collect_reply_buttons(node)

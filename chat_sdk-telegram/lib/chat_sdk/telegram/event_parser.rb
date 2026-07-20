@@ -9,6 +9,8 @@ module ChatSDK
 
           if payload["callback_query"]
             parse_callback_query(payload["callback_query"])
+          elsif payload["message_reaction"]
+            parse_message_reaction(payload["message_reaction"])
           elsif payload["message"]
             parse_message(payload["message"], bot_username: bot_username)
           else
@@ -77,6 +79,46 @@ module ChatSDK
             adapter_name: :telegram,
             raw: callback
           )]
+        end
+
+        def parse_message_reaction(reaction)
+          chat_id = reaction.dig("chat", "id")&.to_s
+          message_id = reaction["message_id"]&.to_s
+          user = reaction.dig("user") || reaction.dig("actor_chat") || {}
+          user_id = user["id"]&.to_s || "unknown"
+
+          new_reactions = reaction["new_reaction"] || []
+          old_reactions = reaction["old_reaction"] || []
+
+          if new_reactions.any?
+            emoji = new_reactions.first["emoji"] || new_reactions.first.dig("custom_emoji_id") || "unknown"
+            [ChatSDK::Events::Reaction.new(
+              emoji: emoji,
+              user_id: user_id,
+              message_id: message_id,
+              thread_id: message_id,
+              channel_id: chat_id,
+              added: true,
+              platform: :telegram,
+              adapter_name: :telegram,
+              raw: reaction
+            )]
+          elsif old_reactions.any?
+            emoji = old_reactions.first["emoji"] || old_reactions.first.dig("custom_emoji_id") || "unknown"
+            [ChatSDK::Events::Reaction.new(
+              emoji: emoji,
+              user_id: user_id,
+              message_id: message_id,
+              thread_id: message_id,
+              channel_id: chat_id,
+              added: false,
+              platform: :telegram,
+              adapter_name: :telegram,
+              raw: reaction
+            )]
+          else
+            []
+          end
         end
 
         def extract_user(message)

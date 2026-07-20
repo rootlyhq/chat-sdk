@@ -7,7 +7,7 @@ require "rack/utils"
 module ChatSDK
   module X
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :direct_messages, :reactions
+      capabilities :direct_messages, :reactions, :delete_messages, :message_history
 
       attr_reader :client
 
@@ -97,6 +97,39 @@ module ChatSDK
             platform: :x,
             raw: result
           )
+        end
+      end
+
+      def delete_message(channel_id:, message_id:) # rubocop:disable Lint/UnusedMethodArgument
+        @client.delete_tweet(tweet_id: message_id)
+      end
+
+      def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50) # rubocop:disable Lint/UnusedMethodArgument
+        if thread_id&.start_with?("x:dm:")
+          participant_id = thread_id.delete_prefix("x:dm:")
+          result = @client.get_dm_events(participant_id: participant_id, cursor: cursor, limit: limit)
+          data = result["data"] || []
+          messages = data.map do |dm|
+            ChatSDK::Message.new(
+              id: dm["id"]&.to_s,
+              text: dm["text"] || "",
+              author: ChatSDK::Author.new(
+                id: dm["sender_id"] || "unknown",
+                name: dm["sender_id"] || "unknown",
+                platform: :x,
+                bot: false
+              ),
+              thread_id: thread_id,
+              channel_id: channel_id,
+              platform: :x,
+              raw: dm
+            )
+          end
+          next_cursor = result.dig("meta", "next_token")
+          [messages, next_cursor]
+        else
+          # X does not provide a robust thread-fetching API for tweets
+          [[], nil]
         end
       end
 

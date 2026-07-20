@@ -327,6 +327,43 @@ RSpec.describe ChatSDK::Teams::Adapter do
     end
   end
 
+  describe "#start_typing" do
+    before do
+      subject.register_service_url("conv-1", "https://smba.trafficmanager.net/teams/")
+
+      stub_request(:post, ChatSDK::Teams::BotFrameworkClient::TOKEN_URL)
+        .to_return(
+          status: 200,
+          body: JSON.generate({"access_token" => "test-token", "expires_in" => 3600}),
+          headers: {"Content-Type" => "application/json"}
+        )
+    end
+
+    it "sends a typing activity" do
+      stub_request(:post, "https://smba.trafficmanager.net/teams/v3/conversations/conv-1/activities")
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["type"] == "typing"
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => "typing-1"}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.start_typing(channel_id: "conv-1") }.not_to raise_error
+    end
+
+    it "supports typing_indicator capability" do
+      expect(subject.supports?(:typing_indicator)).to be true
+    end
+
+    it "raises PlatformError when no service URL is registered" do
+      expect { subject.start_typing(channel_id: "unknown-conv") }
+        .to raise_error(ChatSDK::PlatformError, /No service URL/)
+    end
+  end
+
   describe "capability gaps" do
     it "raises NotSupportedError for ephemeral messages" do
       expect { subject.post_ephemeral(channel_id: "C1", user_id: "U1", message: ChatSDK::PostableMessage.new(text: "t")) }
@@ -335,11 +372,6 @@ RSpec.describe ChatSDK::Teams::Adapter do
 
     it "raises NotSupportedError for modals" do
       expect { subject.open_modal(trigger_id: "T1", modal: ChatSDK::Cards::Node.new(:modal)) }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
-    it "raises NotSupportedError for typing indicator" do
-      expect { subject.start_typing(channel_id: "C1") }
         .to raise_error(ChatSDK::NotSupportedError)
     end
 

@@ -3,7 +3,7 @@
 module ChatSDK
   module WhatsApp
     class ApiClient < ChatSDK::ApiClient::Base
-      BASE_URL = "https://graph.facebook.com/v21.0"
+      BASE_URL = "https://graph.facebook.com/v25.0"
 
       def initialize(access_token, phone_number_id)
         @access_token = access_token

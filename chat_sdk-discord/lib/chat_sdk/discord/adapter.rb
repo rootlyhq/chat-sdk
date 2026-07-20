@@ -4,7 +4,8 @@ module ChatSDK
   module Discord
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :reactions, :file_uploads,
-        :threads, :direct_messages, :message_history, :streaming_edit
+        :threads, :direct_messages, :message_history, :streaming_edit,
+        :typing_indicator
 
       attr_reader :client
 
@@ -130,6 +131,10 @@ module ChatSDK
 
         next_cursor = messages_data.any? ? messages_data.last["id"] : nil
         [messages, next_cursor]
+      end
+
+      def start_typing(channel_id:, thread_id: nil)
+        @client.trigger_typing(channel_id)
       end
 
       def mention(user_id)

@@ -27,6 +27,16 @@ module ChatSDK
         request(:delete, "/2/users/#{user_id}/likes/#{tweet_id}")
       end
 
+      def delete_tweet(tweet_id:)
+        request(:delete, "/2/tweets/#{tweet_id}")
+      end
+
+      def get_dm_events(participant_id:, cursor: nil, limit: 50)
+        query = "max_results=#{[limit, 100].min}&dm_event.fields=id,text,sender_id,created_at"
+        query += "&pagination_token=#{cursor}" if cursor
+        request(:get, "/2/dm_conversations/with/#{participant_id}/dm_events?#{query}")
+      end
+
       private
 
       def base_url

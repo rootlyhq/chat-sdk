@@ -10,6 +10,7 @@ module ChatSDK
           events = []
           events.concat(parse_mentions(payload, bot_user_id))
           events.concat(parse_direct_messages(payload, bot_user_id))
+          events.concat(parse_favorites(payload, bot_user_id))
           events
         end
 
@@ -75,6 +76,32 @@ module ChatSDK
               message: msg,
               thread_id: "x:dm:#{sender_id}",
               channel_id: sender_id,
+              platform: :x,
+              adapter_name: :x,
+              raw: data
+            )
+          end
+        end
+
+        def parse_favorites(payload, bot_user_id)
+          fav_events = payload["favorite_events"] || []
+          return [] unless fav_events.is_a?(Array)
+
+          fav_events.filter_map do |data|
+            user = data["user"] || {}
+            user_id = user["id_str"] || user["id"]&.to_s
+            next if bot_user_id && user_id == bot_user_id
+
+            tweet = data["favorited_status"] || {}
+            tweet_id = tweet["id_str"] || tweet["id"]&.to_s
+
+            ChatSDK::Events::Reaction.new(
+              emoji: "heart",
+              user_id: user_id || "unknown",
+              message_id: tweet_id || "unknown",
+              thread_id: "x:post:#{tweet_id}",
+              channel_id: user_id,
+              added: true,
               platform: :x,
               adapter_name: :x,
               raw: data

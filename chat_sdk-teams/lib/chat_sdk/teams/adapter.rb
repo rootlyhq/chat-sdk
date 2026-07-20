@@ -4,7 +4,8 @@ module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
-        :message_history, :reactions, :file_uploads, :streaming_edit
+        :message_history, :reactions, :file_uploads, :streaming_edit,
+        :typing_indicator
 
       attr_reader :client
 
@@ -182,7 +183,11 @@ module ChatSDK
       end
 
       def start_typing(channel_id:, thread_id: nil)
-        super # raises NotSupportedError
+        service_url = service_url_for(channel_id)
+        @client.send_typing(
+          service_url: service_url,
+          conversation_id: channel_id
+        )
       end
 
       def mention(user_id)

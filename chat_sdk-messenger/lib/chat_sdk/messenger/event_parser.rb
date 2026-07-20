@@ -4,7 +4,7 @@ module ChatSDK
   module Messenger
     class EventParser
       class << self
-        def parse(payload)
+        def parse(payload, bot_page_id: nil)
           return [] unless payload.is_a?(Hash)
           return [] unless payload["object"] == "page"
 
@@ -12,7 +12,7 @@ module ChatSDK
 
           (payload["entry"] || []).each do |entry|
             (entry["messaging"] || []).each do |messaging|
-              event = parse_messaging(messaging)
+              event = parse_messaging(messaging, bot_page_id: bot_page_id)
               events << event if event
             end
           end
@@ -22,14 +22,17 @@ module ChatSDK
 
         private
 
-        def parse_messaging(messaging)
+        def parse_messaging(messaging, bot_page_id: nil)
           sender_id = messaging.dig("sender", "id")&.to_s
           return nil unless sender_id
+          return nil if bot_page_id && sender_id == bot_page_id
 
           channel_id = sender_id
           thread_id = "messenger:#{sender_id}"
 
-          if messaging["postback"]
+          if messaging["reaction"]
+            parse_reaction(messaging, sender_id, channel_id, thread_id)
+          elsif messaging["postback"]
             parse_postback(messaging, sender_id, channel_id, thread_id)
           elsif messaging["message"]
             parse_message(messaging, sender_id, channel_id, thread_id)
@@ -58,6 +61,22 @@ module ChatSDK
 
           ChatSDK::Events::DirectMessage.new(
             message: msg,
+            thread_id: thread_id,
+            channel_id: channel_id,
+            platform: :messenger,
+            adapter_name: :messenger,
+            raw: messaging
+          )
+        end
+
+        def parse_reaction(messaging, sender_id, channel_id, thread_id)
+          reaction = messaging["reaction"]
+
+          ChatSDK::Events::Reaction.new(
+            emoji: reaction["emoji"],
+            added: reaction["action"] == "react",
+            user_id: sender_id,
+            message_id: reaction["mid"],
             thread_id: thread_id,
             channel_id: channel_id,
             platform: :messenger,

@@ -254,6 +254,69 @@ RSpec.describe ChatSDK::Messenger::Adapter do
       end
     end
 
+    context "reaction event" do
+      it "parses into Reaction event" do
+        payload = {
+          "object" => "page",
+          "entry" => [{
+            "id" => "PAGE_ID",
+            "time" => 1_458_692_752_478,
+            "messaging" => [{
+              "sender" => {"id" => "USER_555"},
+              "recipient" => {"id" => "PAGE_ID"},
+              "timestamp" => 1_458_692_752_478,
+              "reaction" => {
+                "mid" => "mid.1457764197618:41d102a3e1ae206a38",
+                "action" => "react",
+                "emoji" => "\u{1F44D}"
+              }
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.emoji).to eq("\u{1F44D}")
+        expect(event.added?).to be true
+        expect(event.user_id).to eq("USER_555")
+        expect(event.message_id).to eq("mid.1457764197618:41d102a3e1ae206a38")
+        expect(event.channel_id).to eq("USER_555")
+        expect(event.thread_id).to eq("messenger:USER_555")
+        expect(event.platform).to eq(:messenger)
+      end
+
+      it "parses unreact as removed reaction" do
+        payload = {
+          "object" => "page",
+          "entry" => [{
+            "id" => "PAGE_ID",
+            "messaging" => [{
+              "sender" => {"id" => "USER_555"},
+              "recipient" => {"id" => "PAGE_ID"},
+              "reaction" => {
+                "mid" => "mid.abc123",
+                "action" => "unreact",
+                "emoji" => "\u{1F44D}"
+              }
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        event = events.first
+        expect(event).to be_a(ChatSDK::Events::Reaction)
+        expect(event.added?).to be false
+        expect(event.removed?).to be true
+      end
+    end
+
     context "non-page object" do
       it "returns empty array" do
         payload = {"object" => "instagram", "entry" => []}
@@ -267,6 +330,56 @@ RSpec.describe ChatSDK::Messenger::Adapter do
       it "returns empty array" do
         request = build_request("not json")
         expect(subject.parse_events(request)).to be_empty
+      end
+    end
+
+    context "bot message filtering" do
+      subject do
+        described_class.new(
+          app_secret: app_secret,
+          page_access_token: page_access_token,
+          verify_token: verify_token,
+          page_id: "PAGE_ID"
+        )
+      end
+
+      it "filters out events from the bot page" do
+        payload = {
+          "object" => "page",
+          "entry" => [{
+            "id" => "PAGE_ID",
+            "messaging" => [{
+              "sender" => {"id" => "PAGE_ID"},
+              "recipient" => {"id" => "USER_123"},
+              "message" => {"mid" => "mid.echo1", "text" => "Echo message"}
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events).to be_empty
+      end
+
+      it "allows events from non-bot senders" do
+        payload = {
+          "object" => "page",
+          "entry" => [{
+            "id" => "PAGE_ID",
+            "messaging" => [{
+              "sender" => {"id" => "USER_123"},
+              "recipient" => {"id" => "PAGE_ID"},
+              "message" => {"mid" => "mid.user1", "text" => "User message"}
+            }]
+          }]
+        }
+
+        request = build_request(JSON.generate(payload))
+        events = subject.parse_events(request)
+
+        expect(events.size).to eq(1)
+        expect(events.first.message.text).to eq("User message")
       end
     end
 
@@ -303,7 +416,7 @@ RSpec.describe ChatSDK::Messenger::Adapter do
 
   describe "#post_message" do
     it "sends a text message" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/me/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/me/messages})
         .to_return(
           status: 200,
           body: JSON.generate({"recipient_id" => "USER_123", "message_id" => "mid.resp123"}),
@@ -317,7 +430,7 @@ RSpec.describe ChatSDK::Messenger::Adapter do
     end
 
     it "sends a card message as template" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/me/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/me/messages})
         .with { |req|
           body = JSON.parse(req.body)
           body["message"]["attachment"].is_a?(Hash)
@@ -351,7 +464,7 @@ RSpec.describe ChatSDK::Messenger::Adapter do
 
   describe "#start_typing" do
     it "sends typing_on action" do
-      stub = stub_request(:post, %r{graph\.facebook\.com/v21\.0/me/messages})
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/me/messages})
         .with { |req|
           body = JSON.parse(req.body)
           body["sender_action"] == "typing_on"
@@ -555,7 +668,7 @@ RSpec.describe ChatSDK::Messenger::Adapter do
 
   describe "API error handling" do
     it "raises RateLimitedError on 429" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/me/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/me/messages})
         .to_return(
           status: 429,
           body: JSON.generate({"error" => {"message" => "Rate limit hit", "code" => 4}}),
@@ -567,7 +680,7 @@ RSpec.describe ChatSDK::Messenger::Adapter do
     end
 
     it "raises PlatformError on other errors" do
-      stub_request(:post, %r{graph\.facebook\.com/v21\.0/me/messages})
+      stub_request(:post, %r{graph\.facebook\.com/v25\.0/me/messages})
         .to_return(
           status: 400,
           body: JSON.generate({"error" => {"message" => "Invalid OAuth access token", "code" => 190}}),
