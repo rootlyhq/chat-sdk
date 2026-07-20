@@ -13,15 +13,37 @@ module ChatSDK
 
       attr_reader :client
 
-      def initialize(access_token: nil, consumer_secret: nil, user_id: nil)
+      def initialize(access_token: nil, consumer_secret: nil, user_id: nil,
+        client_id: nil, client_secret: nil, refresh_token: nil)
         @access_token = access_token || ENV["X_ACCESS_TOKEN"]
         @consumer_secret = consumer_secret || ENV["X_CONSUMER_SECRET"]
         @user_id = user_id || ENV["X_USER_ID"]
+        @client_id = client_id || ENV["X_CLIENT_ID"]
+        @client_secret = client_secret || ENV["X_CLIENT_SECRET"]
+        @refresh_token = refresh_token || ENV["X_REFRESH_TOKEN"]
 
-        raise ChatSDK::ConfigurationError, "X access_token required" unless @access_token
+        # Validate: need either access_token (static) or client_id + refresh_token (managed OAuth)
+        has_oauth = @client_id && @refresh_token
+        if !@access_token && !has_oauth
+          raise ChatSDK::ConfigurationError,
+            "X requires either access_token or client_id + refresh_token"
+        end
         raise ChatSDK::ConfigurationError, "X consumer_secret required" unless @consumer_secret
 
-        @client = ApiClient.new(@access_token)
+        @client = ApiClient.new(
+          access_token: @access_token,
+          client_id: @client_id,
+          client_secret: @client_secret,
+          refresh_token: @refresh_token
+        )
+      end
+
+      # Inject state store after initialization (e.g., from Chat instance).
+      # Loads any previously persisted tokens so auth survives restarts.
+      def set_state(state)
+        @state = state
+        @client.state = state
+        @client.load_stored_token if @client_id
       end
 
       def name

@@ -19,14 +19,29 @@ RSpec.describe ChatSDK::X::Adapter do
   it_behaves_like "a chat_sdk platform adapter"
 
   describe "#initialize" do
-    it "raises ConfigurationError without access_token" do
+    it "raises ConfigurationError without access_token or client_id+refresh_token" do
       expect { described_class.new(access_token: nil, consumer_secret: consumer_secret) }
-        .to raise_error(ChatSDK::ConfigurationError, /access_token required/)
+        .to raise_error(ChatSDK::ConfigurationError, /access_token or client_id \+ refresh_token/)
     end
 
     it "raises ConfigurationError without consumer_secret" do
       expect { described_class.new(access_token: access_token, consumer_secret: nil) }
         .to raise_error(ChatSDK::ConfigurationError, /consumer_secret required/)
+    end
+
+    it "accepts client_id + refresh_token without access_token" do
+      adapter = described_class.new(
+        consumer_secret: consumer_secret,
+        client_id: "my-client-id",
+        refresh_token: "my-refresh-token"
+      )
+      expect(adapter.name).to eq(:x)
+    end
+
+    it "raises ConfigurationError with client_id but no refresh_token and no access_token" do
+      expect {
+        described_class.new(consumer_secret: consumer_secret, client_id: "my-client-id")
+      }.to raise_error(ChatSDK::ConfigurationError, /access_token or client_id \+ refresh_token/)
     end
 
     it "falls back to environment variables" do
@@ -35,6 +50,9 @@ RSpec.describe ChatSDK::X::Adapter do
       allow(ENV).to receive(:[]).with("X_ACCESS_TOKEN").and_return("env-token")
       allow(ENV).to receive(:[]).with("X_CONSUMER_SECRET").and_return("env-secret")
       allow(ENV).to receive(:[]).with("X_USER_ID").and_return("env-user-id")
+      allow(ENV).to receive(:[]).with("X_CLIENT_ID").and_return(nil)
+      allow(ENV).to receive(:[]).with("X_CLIENT_SECRET").and_return(nil)
+      allow(ENV).to receive(:[]).with("X_REFRESH_TOKEN").and_return(nil)
 
       adapter = described_class.new
       expect(adapter.name).to eq(:x)
@@ -604,6 +622,285 @@ RSpec.describe ChatSDK::X::Adapter do
 
     it "supports file_uploads capability" do
       expect(subject.supports?(:file_uploads)).to be true
+    end
+  end
+
+  describe "OAuth2 token refresh" do
+    let(:client_id) { "test-client-id" }
+    let(:client_secret) { "test-client-secret" }
+    let(:refresh_token) { "initial-refresh-token" }
+    let(:state) { ChatSDK::State::Memory.new }
+
+    let(:oauth_adapter) do
+      described_class.new(
+        consumer_secret: consumer_secret,
+        user_id: user_id,
+        client_id: client_id,
+        client_secret: client_secret,
+        refresh_token: refresh_token
+      )
+    end
+
+    let(:token_response) do
+      {
+        "access_token" => "new-access-token",
+        "refresh_token" => "rotated-refresh-token",
+        "expires_in" => 7200,
+        "token_type" => "bearer"
+      }
+    end
+
+    def stub_token_refresh(response_body: token_response, status: 200)
+      stub_request(:post, "https://api.x.com/2/oauth2/token")
+        .to_return(
+          status: status,
+          body: JSON.generate(response_body),
+          headers: {"Content-Type" => "application/json"}
+        )
+    end
+
+    describe "static token mode" do
+      it "does not attempt token refresh" do
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-static-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        result = subject.post_message(channel_id: "user-456", message: "Static token works")
+        expect(result).to be_a(ChatSDK::Message)
+        expect(result.id).to eq("tweet-static-1")
+
+        # No call to token endpoint
+        expect(WebMock).not_to have_requested(:post, "https://api.x.com/2/oauth2/token")
+      end
+    end
+
+    describe "managed OAuth mode" do
+      it "refreshes token when expired and uses new token for requests" do
+        token_stub = stub_token_refresh
+
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-oauth-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        result = oauth_adapter.post_message(channel_id: "user-456", message: "OAuth works")
+        expect(result).to be_a(ChatSDK::Message)
+        expect(result.id).to eq("tweet-oauth-1")
+
+        # Token was refreshed
+        expect(token_stub).to have_been_requested.once
+      end
+
+      it "does not refresh when token is still valid" do
+        token_stub = stub_token_refresh
+
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        # First request triggers refresh
+        oauth_adapter.post_message(channel_id: "user-456", message: "First")
+        # Second request should reuse the token (not expired yet)
+        oauth_adapter.post_message(channel_id: "user-456", message: "Second")
+
+        expect(token_stub).to have_been_requested.once
+      end
+
+      it "stores rotated refresh_token" do
+        stub_token_refresh
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        oauth_adapter.set_state(state)
+        oauth_adapter.post_message(channel_id: "user-456", message: "Rotate test")
+
+        stored = state.get("x:oauth:#{client_id}")
+        expect(stored).to be_a(Hash)
+        expect(stored["access_token"]).to eq("new-access-token")
+        expect(stored["refresh_token"]).to eq("rotated-refresh-token")
+        expect(stored["expires_at"]).to be_a(Float)
+      end
+    end
+
+    describe "state persistence" do
+      it "persists token data to state store via state.set" do
+        stub_token_refresh
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        oauth_adapter.set_state(state)
+        oauth_adapter.post_message(channel_id: "user-456", message: "Persist test")
+
+        stored = state.get("x:oauth:#{client_id}")
+        expect(stored).not_to be_nil
+        expect(stored["access_token"]).to eq("new-access-token")
+        expect(stored["refresh_token"]).to eq("rotated-refresh-token")
+      end
+
+      it "loads stored token on set_state (survives restarts)" do
+        # Pre-populate state with a valid token
+        future_time = Time.now + 3600
+        state.set("x:oauth:#{client_id}", {
+          "access_token" => "stored-access-token",
+          "refresh_token" => "stored-refresh-token",
+          "expires_at" => future_time.to_f
+        })
+
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-stored-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        oauth_adapter.set_state(state)
+        result = oauth_adapter.post_message(channel_id: "user-456", message: "Stored token test")
+        expect(result.id).to eq("tweet-stored-1")
+
+        # Should NOT have refreshed — stored token is still valid
+        expect(WebMock).not_to have_requested(:post, "https://api.x.com/2/oauth2/token")
+      end
+
+      it "does not persist when no state store is configured" do
+        stub_token_refresh
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        # No set_state call — adapter has no state store
+        oauth_adapter.post_message(channel_id: "user-456", message: "No state")
+
+        # Verify the token was still refreshed (no error), just not persisted
+        expect(WebMock).to have_requested(:post, "https://api.x.com/2/oauth2/token").once
+      end
+    end
+
+    describe "public client (no client_secret)" do
+      let(:public_oauth_adapter) do
+        described_class.new(
+          consumer_secret: consumer_secret,
+          user_id: user_id,
+          client_id: client_id,
+          refresh_token: refresh_token
+        )
+      end
+
+      it "sends client_id in body and no Basic auth header" do
+        token_stub = stub_request(:post, "https://api.x.com/2/oauth2/token")
+          .with { |req|
+            body_params = URI.decode_www_form(req.body).to_h
+            body_params["client_id"] == client_id &&
+              body_params["grant_type"] == "refresh_token" &&
+              !req.headers.key?("Authorization")
+          }
+          .to_return(
+            status: 200,
+            body: JSON.generate(token_response),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-public-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        public_oauth_adapter.post_message(channel_id: "user-456", message: "Public client test")
+        expect(token_stub).to have_been_requested.once
+      end
+    end
+
+    describe "confidential client (with client_secret)" do
+      it "sends Basic auth header with encoded client_id:client_secret" do
+        expected_basic = Base64.strict_encode64("#{client_id}:#{client_secret}")
+
+        token_stub = stub_request(:post, "https://api.x.com/2/oauth2/token")
+          .with { |req|
+            body_params = URI.decode_www_form(req.body).to_h
+            req.headers["Authorization"] == "Basic #{expected_basic}" &&
+              !body_params.key?("client_id")
+          }
+          .to_return(
+            status: 200,
+            body: JSON.generate(token_response),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-conf-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        oauth_adapter.post_message(channel_id: "user-456", message: "Confidential client test")
+        expect(token_stub).to have_been_requested.once
+      end
+    end
+
+    describe "refresh failure" do
+      it "raises PlatformError when token refresh fails" do
+        stub_request(:post, "https://api.x.com/2/oauth2/token")
+          .to_return(
+            status: 400,
+            body: JSON.generate({"error" => "invalid_grant", "error_description" => "Token has been revoked"}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        expect {
+          oauth_adapter.post_message(channel_id: "user-456", message: "Should fail")
+        }.to raise_error(ChatSDK::PlatformError, /X token refresh failed.*Token has been revoked/)
+      end
+
+      it "raises PlatformError with status for non-JSON error responses" do
+        stub_request(:post, "https://api.x.com/2/oauth2/token")
+          .to_return(
+            status: 500,
+            body: "Internal Server Error",
+            headers: {"Content-Type" => "text/plain"}
+          )
+
+        expect {
+          oauth_adapter.post_message(channel_id: "user-456", message: "Should fail")
+        }.to raise_error(ChatSDK::PlatformError, /X token refresh failed.*500/)
+      end
+    end
+
+    describe "#set_state" do
+      it "injects state into the adapter and client" do
+        oauth_adapter.set_state(state)
+        # Verify state was wired by checking persistence works after a refresh
+        stub_token_refresh
+        stub_request(:post, "https://api.x.com/2/tweets")
+          .to_return(
+            status: 200,
+            body: JSON.generate({"data" => {"id" => "tweet-1"}}),
+            headers: {"Content-Type" => "application/json"}
+          )
+
+        oauth_adapter.post_message(channel_id: "user-456", message: "State wired")
+        expect(state.get("x:oauth:#{client_id}")).not_to be_nil
+      end
     end
   end
 end
