@@ -6,7 +6,7 @@ require "rack/utils"
 module ChatSDK
   module Linear
     class Adapter < ChatSDK::Adapter::Base
-      capabilities
+      capabilities :threads
 
       attr_reader :client
 
