@@ -303,9 +303,9 @@ const adapters: Adapter[] = [
     icon: <LinearIcon />,
     official: true,
     features: {
-      post: 'yes', edit: 'no', delete: 'no', ephemeral: 'no',
-      reactions: 'no', files: 'no', modals: 'no', streaming: 'no',
-      dms: 'no', history: 'no', typing: 'no',
+      post: 'yes', edit: 'yes', delete: 'yes', ephemeral: 'no',
+      reactions: 'yes', files: 'no', modals: 'no', streaming: 'yes',
+      dms: 'no', history: 'yes', typing: 'no',
     },
   },
   {

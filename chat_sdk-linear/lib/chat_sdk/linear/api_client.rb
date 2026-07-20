@@ -27,6 +27,69 @@ module ChatSDK
         graphql(query, {input: input})
       end
 
+      def update_comment(comment_id:, body:)
+        query = <<~GQL
+          mutation CommentUpdate($id: String!, $input: CommentUpdateInput!) {
+            commentUpdate(id: $id, input: $input) {
+              success
+              comment { id body }
+            }
+          }
+        GQL
+        graphql(query, {id: comment_id, input: {body: body}})
+      end
+
+      def delete_comment(comment_id:)
+        query = <<~GQL
+          mutation CommentDelete($id: String!) {
+            commentDelete(id: $id) { success }
+          }
+        GQL
+        graphql(query, {id: comment_id})
+      end
+
+      def create_reaction(comment_id:, emoji:)
+        query = <<~GQL
+          mutation ReactionCreate($input: ReactionCreateInput!) {
+            reactionCreate(input: $input) { success }
+          }
+        GQL
+        graphql(query, {input: {commentId: comment_id, emoji: emoji}})
+      end
+
+      def delete_reaction(comment_id:, emoji:)
+        query = <<~GQL
+          mutation ReactionDelete($input: ReactionCreateInput!) {
+            reactionDelete(input: $input) { success }
+          }
+        GQL
+        graphql(query, {input: {commentId: comment_id, emoji: emoji}})
+      end
+
+      def fetch_comments(issue_id:, parent_id: nil)
+        if parent_id
+          query = <<~GQL
+            query CommentThread($id: String!) {
+              comment(id: $id) {
+                id body user { id name }
+                children { nodes { id body user { id name } } }
+              }
+            }
+          GQL
+          graphql(query, {id: parent_id})
+        else
+          query = <<~GQL
+            query IssueComments($id: String!) {
+              issue(id: $id) {
+                comments { nodes { id body user { id name } } }
+              }
+            }
+          GQL
+          result = graphql(query, {id: issue_id})
+          {"data" => {"comments" => result.dig("data", "issue", "comments") || {"nodes" => []}}}
+        end
+      end
+
       private
 
       def base_url

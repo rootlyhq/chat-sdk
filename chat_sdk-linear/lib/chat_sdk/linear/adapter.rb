@@ -6,7 +6,7 @@ require "rack/utils"
 module ChatSDK
   module Linear
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :threads
+      capabilities :threads, :edit_messages, :delete_messages, :reactions, :message_history, :streaming_edit
 
       attr_reader :client
 
@@ -87,6 +87,52 @@ module ChatSDK
           platform: :linear,
           raw: result
         )
+      end
+
+      def edit_message(channel_id:, message_id:, message:)
+        msg = ChatSDK::PostableMessage.from(message)
+        text = msg.text || msg.card&.fallback_text || ""
+        @client.update_comment(comment_id: message_id, body: text)
+      end
+
+      def delete_message(channel_id:, message_id:)
+        @client.delete_comment(comment_id: message_id)
+      end
+
+      def add_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+        @client.create_reaction(comment_id: message_id, emoji: emoji)
+      end
+
+      def remove_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+        @client.delete_reaction(comment_id: message_id, emoji: emoji)
+      end
+
+      def fetch_messages(channel_id:, thread_id: nil, limit: 50) # rubocop:disable Lint/UnusedMethodArgument
+        issue_id = channel_id
+        parent_id = nil
+
+        if thread_id&.include?(":c:")
+          parts = thread_id.split(":c:")
+          parent_id = parts.last
+        end
+
+        result = @client.fetch_comments(issue_id: issue_id, parent_id: parent_id)
+        comments = result.dig("data", "comments", "nodes") || []
+
+        messages = comments.map do |comment|
+          user = comment["user"] || {}
+          ChatSDK::Message.new(
+            id: comment["id"],
+            text: comment["body"] || "",
+            author: ChatSDK::Author.new(id: user["id"] || "unknown", name: user["name"] || "unknown", platform: :linear, bot: false),
+            thread_id: "linear:#{issue_id}:c:#{comment["id"]}",
+            channel_id: channel_id,
+            platform: :linear,
+            raw: comment
+          )
+        end
+
+        [messages, nil]
       end
 
       def mention(user_id)

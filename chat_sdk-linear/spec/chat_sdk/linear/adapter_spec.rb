@@ -278,31 +278,82 @@ RSpec.describe ChatSDK::Linear::Adapter do
     end
   end
 
+  describe "#edit_message" do
+    it "updates a comment" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"commentUpdate" => {"success" => true, "comment" => {"id" => "c1", "body" => "updated"}}}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.edit_message(channel_id: "issue-1", message_id: "c1", message: "updated") }
+        .not_to raise_error
+    end
+  end
+
+  describe "#delete_message" do
+    it "deletes a comment" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"commentDelete" => {"success" => true}}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.delete_message(channel_id: "issue-1", message_id: "c1") }
+        .not_to raise_error
+    end
+  end
+
   describe "#add_reaction" do
-    it "raises NotSupportedError" do
-      expect { subject.add_reaction(channel_id: "issue-1", message_id: "comment-123", emoji: "thumbsup") }
-        .to raise_error(ChatSDK::NotSupportedError)
+    it "creates a reaction on a comment" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"reactionCreate" => {"success" => true}}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.add_reaction(channel_id: "issue-1", message_id: "c1", emoji: "thumbsup") }
+        .not_to raise_error
     end
   end
 
   describe "#remove_reaction" do
-    it "raises NotSupportedError" do
-      expect { subject.remove_reaction(channel_id: "issue-1", message_id: "comment-123", emoji: "thumbsup") }
-        .to raise_error(ChatSDK::NotSupportedError)
+    it "deletes a reaction from a comment" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"reactionDelete" => {"success" => true}}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect { subject.remove_reaction(channel_id: "issue-1", message_id: "c1", emoji: "thumbsup") }
+        .not_to raise_error
+    end
+  end
+
+  describe "#fetch_messages" do
+    it "fetches issue comments" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"issue" => {"comments" => {"nodes" => [
+            {"id" => "c1", "body" => "first comment", "user" => {"id" => "u1", "name" => "Alice"}},
+            {"id" => "c2", "body" => "second comment", "user" => {"id" => "u2", "name" => "Bob"}}
+          ]}}}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      messages, _cursor = subject.fetch_messages(channel_id: "issue-1")
+      expect(messages.length).to eq(2)
+      expect(messages.first.text).to eq("first comment")
+      expect(messages.first.author.name).to eq("Alice")
     end
   end
 
   describe "capability gaps" do
-    it "raises NotSupportedError for edit_message" do
-      expect { subject.edit_message(channel_id: "C1", message_id: "M1", message: "test") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
-    it "raises NotSupportedError for delete_message" do
-      expect { subject.delete_message(channel_id: "C1", message_id: "M1") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
     it "raises NotSupportedError for ephemeral messages" do
       expect { subject.post_ephemeral(channel_id: "C1", user_id: "U1", message: "test") }
         .to raise_error(ChatSDK::NotSupportedError)
@@ -323,18 +374,29 @@ RSpec.describe ChatSDK::Linear::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "raises NotSupportedError for fetch_messages" do
-      expect { subject.fetch_messages(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
-    end
-
     it "raises NotSupportedError for open_dm" do
       expect { subject.open_dm("U1") }
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "does not support edit_messages capability" do
-      expect(subject.supports?(:edit_messages)).to be false
+    it "supports edit_messages capability" do
+      expect(subject.supports?(:edit_messages)).to be true
+    end
+
+    it "supports delete_messages capability" do
+      expect(subject.supports?(:delete_messages)).to be true
+    end
+
+    it "supports reactions capability" do
+      expect(subject.supports?(:reactions)).to be true
+    end
+
+    it "supports message_history capability" do
+      expect(subject.supports?(:message_history)).to be true
+    end
+
+    it "supports streaming_edit capability" do
+      expect(subject.supports?(:streaming_edit)).to be true
     end
 
     it "does not support modals capability" do
@@ -347,10 +409,6 @@ RSpec.describe ChatSDK::Linear::Adapter do
 
     it "does not support direct_messages capability" do
       expect(subject.supports?(:direct_messages)).to be false
-    end
-
-    it "does not support reactions capability" do
-      expect(subject.supports?(:reactions)).to be false
     end
   end
 end
