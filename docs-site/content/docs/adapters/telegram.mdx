@@ -97,3 +97,33 @@ Telegram mentions use the `tg://user?id=` deep link format:
 ```ruby
 telegram_adapter.mention("123456")  # => "[user](tg://user?id=123456)"
 ```
+
+## Long Polling
+
+For local development or environments where setting up a webhook is not practical, use long polling as an alternative to webhooks:
+
+```ruby
+telegram.poll(timeout: 30) do |event|
+  # event is a ChatSDK::Events::Mention, DirectMessage, etc.
+  handle(event)
+end
+```
+
+The `timeout` parameter (default: 30 seconds) controls how long each `getUpdates` call waits for new messages before returning. The adapter tracks the update offset automatically. Note: you must not have a webhook set when using long polling -- call `deleteWebhook` first.
+
+## MarkdownV2 Parse Mode
+
+The adapter sends all messages using Telegram's `MarkdownV2` parse mode. This means you can use rich formatting in your message text -- bold (`*bold*`), italic (`_italic_`), code (`` `code` ``), and links (`[text](url)`). Special characters (`_`, `*`, `[`, `]`, `(`, `)`, `~`, `` ` ``, `>`, `#`, `+`, `-`, `=`, `|`, `{`, `}`, `.`, `!`) must be escaped with a backslash when used literally.
+
+## Get User
+
+Look up a Telegram user or chat by ID:
+
+```ruby
+author = telegram.get_user("123456")
+author.name   # => "alice"
+author.bot?   # => false
+author.raw    # => full Telegram getChat response
+```
+
+Returns a `ChatSDK::Author` or `nil` if the user is not found.

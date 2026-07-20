@@ -56,10 +56,14 @@ The deduplication key is derived from the event's message ID (for mention/subscr
 
 ## Multi-Process Safety
 
-For multi-process deployments (multiple dynos, Puma workers, Sidekiq processes), use `ChatSDK::State::Redis` as your state backend. Redis provides atomic operations for locks and deduplication records.
+For multi-process deployments (multiple dynos, Puma workers, Sidekiq processes), use one of the persistent state backends: `ChatSDK::State::Redis`, `ChatSDK::State::Pg`, or `ChatSDK::State::Mysql`. All three provide atomic operations for locks and deduplication records.
 
 ```ruby
 state = ChatSDK::State::Redis.new(url: ENV["REDIS_URL"])
+# or
+state = ChatSDK::State::Pg.new(url: ENV["DATABASE_URL"])
+# or
+state = ChatSDK::State::Mysql.new(url: ENV["MYSQL_URL"])
 
 bot = ChatSDK::Chat.new(
   user_name: "my-bot",

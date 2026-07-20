@@ -65,11 +65,11 @@ end
 | `file_uploads` | Yes | Via Base64-encoded attachments |
 | `reactions` | Inbound only | Parsing works, but adding/removing raises `PlatformError` |
 | `modals` | No | Raises `NotSupportedError` |
-| `typing_indicator` | No | Raises `NotSupportedError` |
+| `typing_indicator` | Yes | Via Bot Framework typing activity |
 | `streaming_edit` | Yes | |
 | `threads` | Yes | Uses `replyToId` |
 | `direct_messages` | Yes | Creates 1:1 conversations |
-| `message_history` | Declared | Returns empty (Bot Framework limitation) |
+| `message_history` | Yes | Via Microsoft Graph API (requires additional credentials) |
 
 ## Service URL Registration
 
@@ -101,3 +101,21 @@ Teams mentions use the format `<at>USER_ID</at>`:
 ```ruby
 thread.mention_user("user-id-123")  # => "<at>user-id-123</at>"
 ```
+
+## Graph API Message History
+
+The Bot Framework does not natively support fetching message history. To enable `fetch_messages`, provide Microsoft Graph API credentials:
+
+```ruby
+teams = ChatSDK::Teams::Adapter.new(
+  app_id: ENV["TEAMS_APP_ID"],
+  app_password: ENV["TEAMS_APP_PASSWORD"],
+  graph_client_id: ENV["TEAMS_GRAPH_CLIENT_ID"],
+  graph_client_secret: ENV["TEAMS_GRAPH_CLIENT_SECRET"],
+  graph_tenant_id: ENV["TEAMS_GRAPH_TENANT_ID"]
+)
+
+messages, next_cursor = teams.fetch_messages(channel_id: "chat-id-123")
+```
+
+The Graph API credentials are separate from the Bot Framework credentials. Register an Azure AD app with `Chat.Read` permissions and grant admin consent. Without these credentials, calling `fetch_messages` raises a `ConfigurationError`.

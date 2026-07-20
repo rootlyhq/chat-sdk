@@ -104,3 +104,16 @@ Mattermost mentions use the `@username` format:
 ```ruby
 mattermost_adapter.mention("alice")  # => "@alice"
 ```
+
+## Get User
+
+Look up a Mattermost user by ID:
+
+```ruby
+author = mattermost.get_user("user-id-123")
+author.name   # => "alice"
+author.bot?   # => false
+author.raw    # => full Mattermost API response
+```
+
+Returns a `ChatSDK::Author` or `nil` if the user is not found.

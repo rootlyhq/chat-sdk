@@ -67,7 +67,7 @@ end
 | `file_uploads` | Yes | Multipart upload |
 | `reactions` | Yes | URL-encoded emoji |
 | `modals` | No | Raises `NotSupportedError` |
-| `typing_indicator` | No | Raises `NotSupportedError` |
+| `typing_indicator` | Yes | Via `POST /channels/{id}/typing` |
 | `streaming_edit` | Yes | |
 | `threads` | Yes | |
 | `direct_messages` | Yes | Creates DM channels via `/users/@me/channels` |
@@ -95,3 +95,33 @@ Discord mentions use the `<@user_id>` format:
 ```ruby
 discord_adapter.mention("123456789")  # => "<@123456789>"
 ```
+
+## Gateway Mode
+
+For real-time event streaming over WebSocket (instead of HTTP interactions), use the Discord Gateway. Requires the optional `discordrb` gem.
+
+```ruby
+# Gemfile
+gem "discordrb"
+
+# Connect to the Gateway and receive events
+discord.start_gateway do |event|
+  # event is a ChatSDK::Events::Mention
+  handle(event)
+end
+```
+
+Gateway mode is useful for bots that need to react to all messages in a server without requiring slash commands or the Interactions endpoint.
+
+## Get User
+
+Look up a Discord user by ID:
+
+```ruby
+author = discord.get_user("123456789")
+author.name   # => "alice"
+author.bot?   # => false
+author.raw    # => full Discord API response
+```
+
+Returns a `ChatSDK::Author` or `nil` if the user is not found.

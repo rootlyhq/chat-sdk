@@ -26,6 +26,10 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [Microsoft Teams](adapters/teams.md) -- `gem "chat_sdk-teams"` -- Bot Framework adapter with Adaptive Cards.
 - [Google Chat](adapters/gchat.md) -- `gem "chat_sdk-gchat"` -- Google Chat API adapter with Card v2.
 - [Mattermost](adapters/mattermost.md) -- `gem "chat_sdk-mattermost"` -- Mattermost REST API adapter with message attachments.
+- [Discord](adapters/discord.md) -- `gem "chat_sdk-discord"` -- Discord adapter with Ed25519 signature verification and embeds.
+- [Telegram](adapters/telegram.md) -- `gem "chat_sdk-telegram"` -- Telegram Bot API adapter with inline keyboards and webhook verification.
+- [Twilio](adapters/twilio.md) -- `gem "chat_sdk-twilio"` -- Twilio SMS/MMS adapter with HMAC-SHA1 signature verification.
+- [Messenger](adapters/messenger.md) -- `gem "chat_sdk-messenger"` -- Facebook Messenger adapter with HMAC-SHA256 verification and templates.
 - [WhatsApp](adapters/whatsapp.md) -- `gem "chat_sdk-whatsapp"` -- WhatsApp Business Cloud API adapter with interactive message rendering.
 - [X](adapters/x.md) -- `gem "chat_sdk-x"` -- X API v2 adapter with HMAC-SHA256 webhook verification for tweets, DMs, and likes.
 - [Linear](adapters/linear.md) -- `gem "chat_sdk-linear"` -- Linear GraphQL API adapter with HMAC-SHA256 webhook verification for issue comment threading.

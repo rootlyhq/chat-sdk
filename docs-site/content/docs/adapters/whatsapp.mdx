@@ -126,3 +126,44 @@ WhatsApp has no mention syntax. `mention(user_id)` returns the phone number as-i
 ```ruby
 whatsapp_adapter.mention("+15551234567")  # => "+15551234567"
 ```
+
+## Template Messages
+
+Send pre-approved WhatsApp message templates (required for initiating conversations outside the 24-hour window):
+
+```ruby
+# Send a simple template
+whatsapp.post_template(
+  channel_id: "15551234567",
+  template_name: "order_confirmation",
+  language_code: "en"
+)
+
+# Build template components with the helper
+components = ChatSDK::WhatsApp::Adapter.template_components(
+  header: "Order #1234",
+  body_params: ["Alice", "$49.99"],
+  button_payloads: ["track_order"]
+)
+
+whatsapp.post_template(
+  channel_id: "15551234567",
+  template_name: "order_confirmation",
+  language_code: "en",
+  components: components
+)
+```
+
+The `template_components` class method builds the components array for header text, body parameter substitutions, and quick-reply button payloads.
+
+## Mark as Read
+
+Mark an incoming message as read (shows blue check marks to the sender):
+
+```ruby
+whatsapp.mark_as_read(message_id: "wamid.abc123")
+```
+
+## Auto-Chunking
+
+Messages longer than 4,096 characters are automatically split into multiple messages. The adapter splits at paragraph boundaries (`\n\n`), then line boundaries (`\n`), falling back to the character limit. Each chunk is sent as a separate message in order.

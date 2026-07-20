@@ -82,7 +82,7 @@ bot.on_new_mention do |thread, message|
 end
 ```
 
-State is stored with a 30-day TTL and uses the configured state backend (Memory or Redis).
+State is stored with a 30-day TTL and uses the configured state backend (Memory, Redis, PostgreSQL, or MySQL).
 
 ## Message
 
@@ -95,7 +95,7 @@ A `ChatSDK::Message` is a normalized representation of an incoming message.
 | `author` | `Author` | Who sent it |
 | `thread_id` | `String` | Thread identifier |
 | `channel_id` | `String` | Channel identifier |
-| `platform` | `Symbol` | `:slack`, `:teams`, `:gchat`, `:mattermost`, `:discord`, `:telegram`, `:twilio`, `:messenger`, `:whatsapp`, or `:test` |
+| `platform` | `Symbol` | `:slack`, `:teams`, `:gchat`, `:mattermost`, `:discord`, `:telegram`, `:twilio`, `:messenger`, `:whatsapp`, `:x`, `:linear`, or `:test` |
 | `attachments` | `Array` | File attachments (if any) |
 | `raw` | `Object` | Raw platform payload |
 | `timestamp` | `String` | Platform timestamp |

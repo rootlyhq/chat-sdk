@@ -20,7 +20,7 @@ Required arguments:
 |----------|------|-------------|
 | `user_name` | `String` | Display name for the bot (used in logging) |
 | `adapters` | `Hash{Symbol => Adapter}` | One or more platform adapters keyed by name |
-| `state` | `State::Base` | A state backend (Memory or Redis) |
+| `state` | `State::Base` | A state backend (Memory, Redis, Pg, or Mysql) |
 
 Optional keyword arguments are documented in [Getting Started](getting-started.md).
 
@@ -28,20 +28,30 @@ Optional keyword arguments are documented in [Getting Started](getting-started.m
 
 An adapter translates between ChatSDK's normalized API and a specific platform. Each adapter is a subclass of `ChatSDK::Adapter::Base` that implements methods like `post_message`, `edit_message`, and `parse_events`.
 
-ChatSDK ships three official adapters:
+ChatSDK ships eleven official adapters:
 
 - `ChatSDK::Slack::Adapter` -- [Slack](adapters/slack.md)
 - `ChatSDK::Teams::Adapter` -- [Microsoft Teams](adapters/teams.md)
 - `ChatSDK::GChat::Adapter` -- [Google Chat](adapters/gchat.md)
+- `ChatSDK::Mattermost::Adapter` -- [Mattermost](adapters/mattermost.md)
+- `ChatSDK::Discord::Adapter` -- [Discord](adapters/discord.md)
+- `ChatSDK::Telegram::Adapter` -- [Telegram](adapters/telegram.md)
+- `ChatSDK::Twilio::Adapter` -- [Twilio](adapters/twilio.md)
+- `ChatSDK::Messenger::Adapter` -- [Messenger](adapters/messenger.md)
+- `ChatSDK::WhatsApp::Adapter` -- [WhatsApp](adapters/whatsapp.md)
+- `ChatSDK::X::Adapter` -- [X](adapters/x.md)
+- `ChatSDK::Linear::Adapter` -- [Linear](adapters/linear.md)
 
 See [Platform Adapters](platform-adapters.md) for the full capability matrix.
 
 ## State
 
-The state backend stores thread subscriptions, event deduplication records, per-thread locks, and arbitrary key-value data. Two implementations ship out of the box:
+The state backend stores thread subscriptions, event deduplication records, per-thread locks, and arbitrary key-value data. Four implementations ship out of the box:
 
 - `ChatSDK::State::Memory` -- In-process, no dependencies. Good for development and single-process deployments.
 - `ChatSDK::State::Redis` -- Uses Redis. Required when running multiple processes or dynos.
+- `ChatSDK::State::Pg` -- Uses PostgreSQL with auto-migration and JSONB storage. Good when you already run Postgres.
+- `ChatSDK::State::Mysql` -- Uses MySQL with auto-migration and JSON storage. Good when you already run MySQL.
 
 See [State Adapters](state-adapters.md) for details.
 

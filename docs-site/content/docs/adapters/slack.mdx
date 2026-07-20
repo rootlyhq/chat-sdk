@@ -87,6 +87,7 @@ The Slack adapter supports all capabilities:
 | `threads` | Yes |
 | `direct_messages` | Yes |
 | `message_history` | Yes |
+| `scheduled_messages` | Yes |
 
 ## Direct Client Access
 
@@ -116,3 +117,104 @@ slack.mention("U12345")  # => "<@U12345>"
 ## Message IDs
 
 Slack uses timestamps (`ts`) as message IDs. The `Message#id` returned from `post` and other methods is the `ts` value (e.g., `"1234567890.123456"`).
+
+## Multi-Workspace OAuth
+
+For apps installed across multiple Slack workspaces, pass `client_id` and `client_secret` instead of a single `bot_token`. Use `set_state` to provide a state store, then implement installation lifecycle callbacks:
+
+```ruby
+slack = ChatSDK::Slack::Adapter.new(
+  client_id: ENV["SLACK_CLIENT_ID"],
+  client_secret: ENV["SLACK_CLIENT_SECRET"],
+  signing_secret: ENV["SLACK_SIGNING_SECRET"]
+)
+
+# Wire up a state store (e.g., backed by Redis or your DB)
+slack.set_state(my_state_store)
+
+# Persist installation data after OAuth completes
+slack.set_installation(team_id) { |token_data| save_to_db(team_id, token_data) }
+
+# Retrieve installation data when handling events from a workspace
+slack.get_installation(team_id) { load_from_db(team_id) }
+
+# Remove installation data on uninstall
+slack.delete_installation(team_id) { delete_from_db(team_id) }
+
+# Handle the OAuth callback in your Rack app
+slack.handle_oauth_callback(rack_request)
+```
+
+The adapter resolves the correct per-team `Slack::Web::Client` automatically when parsing inbound events.
+
+## Socket Mode
+
+For local development or firewall-restricted environments, use Socket Mode instead of HTTP webhooks. Requires the optional `faye-websocket` gem.
+
+```ruby
+# Gemfile
+gem "faye-websocket"
+
+# Start listening over WebSocket
+slack.start_socket_mode(app_token: ENV["SLACK_APP_TOKEN"]) do |event|
+  # event is a ChatSDK::Events::Mention, DirectMessage, etc.
+  handle(event)
+end
+```
+
+Generate an app-level token (starting with `xapp-`) in your Slack app under **Basic Information > App-Level Tokens** with the `connections:write` scope.
+
+## Assistants API
+
+Control the Slack Assistants thread experience with suggested prompts, status indicators, and titles:
+
+```ruby
+slack.set_suggested_prompts(channel_id: channel, thread_ts: ts,
+  prompts: [{title: "Summarize", message: "Summarize this thread"}])
+
+slack.set_assistant_status(channel_id: channel, thread_ts: ts,
+  status: "is thinking...")
+
+slack.set_assistant_title(channel_id: channel, thread_ts: ts,
+  title: "Support Bot")
+```
+
+## Home Tab
+
+Publish a Home tab view for a user using Block Kit JSON:
+
+```ruby
+slack.publish_home_view(user_id: "U12345", view: {
+  type: "home",
+  blocks: [{ type: "section", text: { type: "mrkdwn", text: "Welcome!" } }]
+})
+```
+
+Requires the `views:publish` scope on your Slack app.
+
+## Scheduled Messages
+
+Schedule a message to be posted at a future time:
+
+```ruby
+slack.schedule_message(
+  channel_id: "C12345",
+  message: "Reminder: standup in 5 minutes!",
+  post_at: Time.now.to_i + 300
+)
+```
+
+`post_at` is a Unix timestamp. The returned `Message#id` is the `scheduled_message_id`.
+
+## Get User
+
+Look up a Slack user by ID:
+
+```ruby
+author = slack.get_user("U12345")
+author.name   # => "alice"
+author.bot?   # => false
+author.raw    # => full Slack API response
+```
+
+Returns a `ChatSDK::Author` or `nil` if the user is not found.

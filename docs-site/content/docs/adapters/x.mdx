@@ -65,14 +65,14 @@ The adapter handles CRC challenge-response (GET with `crc_token`) and POST webho
 | `direct_messages` | Yes | DMs via X API v2 |
 | `reactions` | Yes | Like/unlike tweets |
 | `edit_messages` | No | Raises `NotSupportedError` |
-| `delete_messages` | No | Raises `NotSupportedError` |
+| `delete_messages` | Yes | Deletes tweets |
 | `ephemeral_messages` | No | Raises `NotSupportedError` |
 | `typing_indicator` | No | Raises `NotSupportedError` |
 | `modals` | No | Raises `NotSupportedError` |
 | `streaming_edit` | No | Raises `NotSupportedError` |
 | `threads` | No | Raises `NotSupportedError` |
-| `message_history` | No | Raises `NotSupportedError` |
-| `file_uploads` | No | Raises `NotSupportedError` |
+| `message_history` | Yes | DM history via API v2 |
+| `file_uploads` | Yes | Chunked media upload |
 
 ## Events
 
@@ -115,3 +115,69 @@ x_adapter.mention("rootly")  # => "@rootly"
 - **Tweets**: Numeric tweet IDs (e.g., `"1234567890"`)
 - **Thread IDs**: Prefixed strings -- `"x:post:{conversation_id}"` for tweets, `"x:dm:{sender_id}"` for DMs
 - **DM routing**: When `thread_id` starts with `"x:dm:"`, `post_message` sends a DM instead of a tweet
+
+## OAuth Token Refresh
+
+Instead of a static bearer token, you can use managed OAuth2 with automatic token refresh. Provide `client_id` and `refresh_token` instead of `access_token`:
+
+```ruby
+x = ChatSDK::X::Adapter.new(
+  client_id: ENV["X_CLIENT_ID"],
+  client_secret: ENV["X_CLIENT_SECRET"],
+  refresh_token: ENV["X_REFRESH_TOKEN"],
+  consumer_secret: ENV["X_CONSUMER_SECRET"],
+  user_id: ENV["X_USER_ID"]
+)
+
+# Wire up a state store so refreshed tokens survive restarts
+x.set_state(my_state_store)
+```
+
+The adapter automatically refreshes the access token before it expires (with a 60-second margin) and persists the rotated refresh token to the state store. Token refresh is thread-safe with mutex-guarded double-check locking.
+
+## Media Uploads
+
+Upload images and media to attach to tweets using a three-phase chunked upload (INIT/APPEND/FINALIZE):
+
+```ruby
+x.upload_file(
+  channel_id: nil,
+  io: File.open("photo.jpg"),
+  filename: "photo.jpg",
+  comment: "Check this out!"
+)
+```
+
+The adapter handles the chunked upload protocol automatically -- it initializes the upload with the file size and content type, appends the file data, and finalizes to get a `media_id` that is attached to the tweet.
+
+## Message History
+
+Fetch DM conversation history using cursor-based pagination:
+
+```ruby
+messages, next_cursor = x.fetch_messages(
+  channel_id: "user-id",
+  thread_id: "x:dm:user-id"
+)
+
+# Page through results
+more_messages, _ = x.fetch_messages(
+  channel_id: "user-id",
+  thread_id: "x:dm:user-id",
+  cursor: next_cursor
+)
+```
+
+Message history is available for DM threads only (`thread_id` must start with `"x:dm:"`). Tweet thread history is not supported by the X API.
+
+## Get User
+
+Look up an X user by ID:
+
+```ruby
+author = x.get_user("123456789")
+author.name   # => "rootly"
+author.raw    # => full X API v2 response
+```
+
+Returns a `ChatSDK::Author` or `nil` if the user is not found.

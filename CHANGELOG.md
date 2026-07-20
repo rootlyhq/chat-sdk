@@ -5,6 +5,87 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-20
+
+### Added
+
+- **Slack multi-workspace OAuth** with per-team token resolution — a single bot instance can serve multiple Slack workspaces
+
+### Fixed
+
+- Clear stale `Thread.current` client references and cache per-team Slack clients correctly
+
+## [0.9.0] - 2026-07-20
+
+### Added
+
+- **X OAuth2 token refresh** with automatic rotation and state persistence
+
+### Changed
+
+- Removed redundant `ensure_valid_token` call in WhatsApp `upload_media`
+
+## [0.8.1] - 2026-07-20
+
+### Changed
+
+- Extracted shared format converter helpers into `ChatSDK::Format::Converter::Base` base class
+
+## [0.8.0] - 2026-07-20
+
+### Added
+
+- **Format converters** for bidirectional markup conversion across all 11 platform adapters (e.g. Slack mrkdwn to/from Teams Adaptive Card markdown)
+
+## [0.7.0] - 2026-07-20
+
+### Added
+
+- **Infrastructure tier** — persistent connection modes for 4 platforms:
+  - Slack Socket Mode (WebSocket-based event delivery)
+  - Discord Gateway (WebSocket bot gateway)
+  - Teams Graph API client (`ChatSDK::Teams::GraphClient`)
+  - Google Chat Pub/Sub subscription support
+
+## [0.6.0] - 2026-07-20
+
+### Added
+
+- **Slack Assistants API** methods and home tab support (`update_home_tab`)
+- **Slack scheduled messages** (`schedule_message`, `list_scheduled_messages`, `delete_scheduled_message`)
+- **Telegram MarkdownV2** formatting support
+- **Telegram long-polling** mode as an alternative to webhooks
+- **WhatsApp template builder** for structured template messages
+- `get_user(user_id)` method on all adapters that support user lookup
+
+### Changed
+
+- Tier 1 capability parity — added templates, media upload, and history support across adapters that were missing them
+- Extracted `MediaTypes` module; cleaned up dead code in Teams, X, and Twilio adapters
+
+## [0.5.0] - 2026-07-19
+
+### Added
+
+- Closed capability gaps across 8 adapters — added missing edit, delete, reactions, file uploads, history, and streaming where each platform's API supports it
+- Linear adapter now supports edit, delete, reactions, history, and streaming
+
+### Changed
+
+- Updated capability matrices in all documentation to reflect new adapter support levels
+
+## [0.4.0] - 2026-07-19
+
+### Added
+
+- **X (Twitter) adapter** (`chat_sdk-x`) — X API v2 with CRC challenge validation, HMAC-SHA256 webhook verification, tweets, DMs, and likes
+- **Linear adapter** (`chat_sdk-linear`) — Linear GraphQL API with HMAC-SHA256 webhook verification and issue comment threading
+
+### Fixed
+
+- Linear adapter: added missing `:threads` capability declaration
+- Linear adapter: removed falsely declared `:reactions` capability (added back correctly in v0.5.0)
+
 ## [0.3.0] - 2026-07-19
 
 ### Added

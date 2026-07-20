@@ -122,3 +122,18 @@ thread.mention_user("12345")  # => "<users/12345>"
 gchat_adapter = bot.adapter(:gchat)
 client = gchat_adapter.client  # Google::Apps::Chat::V1::ChatService::Client
 ```
+
+## Pub/Sub Events
+
+For apps using [Google Workspace Events](https://developers.google.com/workspace/events) with a Cloud Pub/Sub subscription, use `parse_pubsub_event` to decode incoming push messages. The Chat event payload is base64-encoded inside the Pub/Sub envelope's `message.data` field:
+
+```ruby
+# In your Pub/Sub push endpoint
+post "/pubsub/gchat" do
+  events = gchat.parse_pubsub_event(request)
+  events.each { |event| handle(event) }
+  status 200
+end
+```
+
+This is an alternative to the direct webhook approach -- configure the Pub/Sub subscription in Google Cloud Console or Terraform, and point its push endpoint to your app. The adapter decodes the envelope and delegates to the same `EventParser` used for direct webhooks.
