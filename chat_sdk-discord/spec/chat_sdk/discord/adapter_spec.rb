@@ -378,6 +378,37 @@ RSpec.describe ChatSDK::Discord::Adapter do
     end
   end
 
+  describe "#get_user" do
+    it "returns an Author for a valid user" do
+      stub_request(:get, "https://discord.com/api/v10/users/user-123")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => "user-123", "username" => "alice", "bot" => false}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.get_user("user-123")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.id).to eq("user-123")
+      expect(result.name).to eq("alice")
+      expect(result.platform).to eq(:discord)
+      expect(result.bot?).to be false
+    end
+
+    it "returns an Author with bot: true for bot users" do
+      stub_request(:get, "https://discord.com/api/v10/users/bot-456")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"id" => "bot-456", "username" => "helperbot", "bot" => true}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.get_user("bot-456")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.bot?).to be true
+    end
+  end
+
   describe "#open_dm" do
     it "creates a DM channel and returns channel_id" do
       stub_request(:post, "https://discord.com/api/v10/users/@me/channels")

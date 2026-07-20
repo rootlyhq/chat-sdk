@@ -117,6 +117,19 @@ module ChatSDK
         @client.remove_reaction(channel_id, message_id, emoji)
       end
 
+      def get_user(user_id)
+        data = @client.get_user(user_id)
+        return nil unless data && data["id"]
+
+        ChatSDK::Author.new(
+          id: data["id"],
+          name: data["username"],
+          platform: :discord,
+          bot: data["bot"] || false,
+          raw: data
+        )
+      end
+
       def open_dm(user_id)
         @dm_channels[user_id] ||= @client.create_dm(user_id)["id"]
       end

@@ -153,6 +153,19 @@ module ChatSDK
         )
       end
 
+      def get_user(user_id)
+        data = @client.get_user(user_id)
+        return nil unless data && data["id"]
+
+        ChatSDK::Author.new(
+          id: data["id"],
+          name: data["username"],
+          platform: :mattermost,
+          bot: data["is_bot"] || false,
+          raw: data
+        )
+      end
+
       def open_dm(user_id)
         require_capability!(:direct_messages)
         raise ChatSDK::ConfigurationError, "bot_user_id required for DMs" unless @bot_user_id

@@ -45,6 +45,11 @@ module ChatSDK
         request(:delete, "/api/v4/reactions/#{user_id}/#{post_id}/#{emoji_name}")
       end
 
+      # Users
+      def get_user(user_id)
+        request(:get, "/api/v4/users/#{user_id}")
+      end
+
       # Channels
       def create_direct_channel(user_ids)
         request(:post, "/api/v4/channels/direct", user_ids)

@@ -143,6 +143,19 @@ module ChatSDK
         @client.unlike_tweet(user_id: @user_id, tweet_id: message_id)
       end
 
+      def get_user(user_id)
+        data = @client.get_user(user_id)
+        return nil unless data&.dig("data", "id")
+
+        ChatSDK::Author.new(
+          id: data.dig("data", "id"),
+          name: data.dig("data", "username"),
+          platform: :x,
+          bot: false,
+          raw: data
+        )
+      end
+
       def open_dm(user_id)
         user_id
       end

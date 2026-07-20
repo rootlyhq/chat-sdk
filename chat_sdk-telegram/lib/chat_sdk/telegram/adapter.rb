@@ -108,6 +108,19 @@ module ChatSDK
         )
       end
 
+      def get_user(user_id)
+        data = @client.get_chat(chat_id: user_id)
+        return nil unless data && data["id"]
+
+        ChatSDK::Author.new(
+          id: data["id"].to_s,
+          name: data["username"] || data["first_name"],
+          platform: :telegram,
+          bot: data["type"] == "bot",
+          raw: data
+        )
+      end
+
       def open_dm(user_id)
         user_id
       end
@@ -125,6 +138,21 @@ module ChatSDK
           @renderer.render(postable_message.card)
         else
           postable_message.text
+        end
+      end
+
+      # Telegram-specific: long-poll for updates instead of using webhooks.
+      # Useful for local development. Not part of the base adapter contract.
+      def poll(timeout: 30, &block)
+        offset = nil
+        loop do
+          updates = @client.get_updates(offset: offset, timeout: timeout)
+          updates = updates.is_a?(Array) ? updates : []
+          updates.each do |update|
+            offset = update["update_id"] + 1
+            events = EventParser.parse(update, bot_username: @bot_username)
+            events.each { |event| block.call(event) }
+          end
         end
       end
 

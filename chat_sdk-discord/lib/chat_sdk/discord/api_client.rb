@@ -44,6 +44,11 @@ module ChatSDK
         request(:delete, "#{API_PREFIX}/channels/#{channel_id}/messages/#{message_id}/reactions/#{encoded}/@me")
       end
 
+      # Users
+      def get_user(user_id)
+        request(:get, "#{API_PREFIX}/users/#{user_id}")
+      end
+
       # DMs
       def create_dm(user_id)
         request(:post, "#{API_PREFIX}/users/@me/channels", {"recipient_id" => user_id})

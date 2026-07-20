@@ -344,6 +344,37 @@ RSpec.describe ChatSDK::Slack::Adapter do
     end
   end
 
+  describe "#get_user" do
+    it "returns an Author for a valid user" do
+      allow(subject.client).to receive(:users_info)
+        .with(user: "U123")
+        .and_return({
+          "ok" => true,
+          "user" => {"id" => "U123", "name" => "alice", "is_bot" => false}
+        })
+
+      result = subject.get_user("U123")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.id).to eq("U123")
+      expect(result.name).to eq("alice")
+      expect(result.platform).to eq(:slack)
+      expect(result.bot?).to be false
+    end
+
+    it "returns an Author with bot: true for bot users" do
+      allow(subject.client).to receive(:users_info)
+        .with(user: "B456")
+        .and_return({
+          "ok" => true,
+          "user" => {"id" => "B456", "name" => "helperbot", "is_bot" => true}
+        })
+
+      result = subject.get_user("B456")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.bot?).to be true
+    end
+  end
+
   describe "#mention" do
     it "formats a Slack user mention" do
       expect(subject.mention("U123")).to eq("<@U123>")

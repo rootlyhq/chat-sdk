@@ -135,6 +135,19 @@ module ChatSDK
         @client.reactions_remove(channel: channel_id, timestamp: message_id, name: emoji)
       end
 
+      def get_user(user_id)
+        result = @client.users_info(user: user_id)
+        return nil unless result&.dig("user", "id")
+
+        ChatSDK::Author.new(
+          id: result.dig("user", "id"),
+          name: result.dig("user", "name"),
+          platform: :slack,
+          bot: result.dig("user", "is_bot") || false,
+          raw: result
+        )
+      end
+
       def open_dm(user_id)
         result = @client.conversations_open(users: user_id)
         result["channel"]["id"]

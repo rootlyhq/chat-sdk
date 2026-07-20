@@ -474,6 +474,37 @@ RSpec.describe ChatSDK::Telegram::Adapter do
     end
   end
 
+  describe "#get_user" do
+    it "returns an Author for a valid user" do
+      stub_request(:post, "https://api.telegram.org/bot#{bot_token}/getChat")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"ok" => true, "result" => {"id" => 42, "type" => "private", "username" => "alice", "first_name" => "Alice"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.get_user("42")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.id).to eq("42")
+      expect(result.name).to eq("alice")
+      expect(result.platform).to eq(:telegram)
+      expect(result.bot?).to be false
+    end
+
+    it "falls back to first_name when username is absent" do
+      stub_request(:post, "https://api.telegram.org/bot#{bot_token}/getChat")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"ok" => true, "result" => {"id" => 99, "type" => "private", "first_name" => "Bob"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.get_user("99")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.name).to eq("Bob")
+    end
+  end
+
   describe "#open_dm" do
     it "returns the user_id directly" do
       expect(subject.open_dm("42")).to eq("42")
@@ -691,6 +722,111 @@ RSpec.describe ChatSDK::Telegram::Adapter do
 
         expect(result).not_to have_key(:reply_markup)
       end
+    end
+  end
+
+  describe "#get_updates (ApiClient)" do
+    it "calls getUpdates with timeout" do
+      stub = stub_request(:post, "https://api.telegram.org/bot#{bot_token}/getUpdates")
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["timeout"] == 30 && !body.key?("offset")
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"ok" => true, "result" => []}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.client.get_updates(timeout: 30)
+      expect(stub).to have_been_requested
+      expect(result).to eq([])
+    end
+
+    it "passes offset when provided" do
+      stub = stub_request(:post, "https://api.telegram.org/bot#{bot_token}/getUpdates")
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["offset"] == 42 && body["timeout"] == 10
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"ok" => true, "result" => []}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      subject.client.get_updates(offset: 42, timeout: 10)
+      expect(stub).to have_been_requested
+    end
+  end
+
+  describe "#poll" do
+    it "yields parsed events from updates and advances offset" do
+      updates = [
+        {
+          "update_id" => 100,
+          "message" => {
+            "message_id" => 1,
+            "from" => {"id" => 42, "username" => "alice"},
+            "chat" => {"id" => -1001, "type" => "group"},
+            "text" => "Hello"
+          }
+        },
+        {
+          "update_id" => 101,
+          "message" => {
+            "message_id" => 2,
+            "from" => {"id" => 43, "username" => "bob"},
+            "chat" => {"id" => -1001, "type" => "group"},
+            "text" => "World"
+          }
+        }
+      ]
+
+      call_count = 0
+      allow(subject.client).to receive(:get_updates) do |**kwargs|
+        call_count += 1
+        if call_count == 1
+          expect(kwargs[:offset]).to be_nil
+          updates
+        else
+          # Second call should have offset = 102 (last update_id + 1)
+          expect(kwargs[:offset]).to eq(102)
+          raise StopIteration
+        end
+      end
+
+      collected_events = []
+      begin
+        subject.poll(timeout: 0) { |event| collected_events << event }
+      rescue StopIteration
+        # expected — breaks the loop
+      end
+
+      expect(collected_events.size).to eq(2)
+      expect(collected_events[0]).to be_a(ChatSDK::Events::SubscribedMessage)
+      expect(collected_events[0].message.text).to eq("Hello")
+      expect(collected_events[1]).to be_a(ChatSDK::Events::SubscribedMessage)
+      expect(collected_events[1].message.text).to eq("World")
+    end
+
+    it "handles non-array responses gracefully" do
+      call_count = 0
+      allow(subject.client).to receive(:get_updates) do
+        call_count += 1
+        raise StopIteration if call_count > 1
+
+        {} # non-array response
+      end
+
+      collected_events = []
+      begin
+        subject.poll(timeout: 0) { |event| collected_events << event }
+      rescue StopIteration
+        # expected
+      end
+
+      expect(collected_events).to be_empty
     end
   end
 

@@ -442,6 +442,24 @@ RSpec.describe ChatSDK::X::Adapter do
     end
   end
 
+  describe "#get_user" do
+    it "returns an Author for a valid user" do
+      stub_request(:get, "https://api.x.com/2/users/user-123?user.fields=name,username")
+        .to_return(
+          status: 200,
+          body: JSON.generate({"data" => {"id" => "user-123", "name" => "Alice Smith", "username" => "alice"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.get_user("user-123")
+      expect(result).to be_a(ChatSDK::Author)
+      expect(result.id).to eq("user-123")
+      expect(result.name).to eq("alice")
+      expect(result.platform).to eq(:x)
+      expect(result.bot?).to be false
+    end
+  end
+
   describe "#open_dm" do
     it "returns the user_id directly" do
       expect(subject.open_dm("user-789")).to eq("user-789")

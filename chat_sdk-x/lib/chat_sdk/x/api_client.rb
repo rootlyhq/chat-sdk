@@ -63,6 +63,10 @@ module ChatSDK
         request(:delete, "/2/tweets/#{tweet_id}")
       end
 
+      def get_user(user_id)
+        request(:get, "/2/users/#{user_id}?user.fields=name,username")
+      end
+
       def get_dm_events(participant_id:, cursor: nil, limit: 50)
         query = "max_results=#{[limit, 100].min}&dm_event.fields=id,text,sender_id,created_at"
         query += "&pagination_token=#{cursor}" if cursor

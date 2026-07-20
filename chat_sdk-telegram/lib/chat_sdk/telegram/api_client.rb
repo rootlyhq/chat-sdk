@@ -50,6 +50,16 @@ module ChatSDK
         request(:post, "sendChatAction", {"chat_id" => chat_id, "action" => action})
       end
 
+      def get_chat(chat_id:)
+        request(:post, "getChat", {"chat_id" => chat_id})
+      end
+
+      def get_updates(offset: nil, timeout: 30)
+        body = {"timeout" => timeout}
+        body["offset"] = offset if offset
+        request(:post, "getUpdates", body)
+      end
+
       private
 
       def api_path(method)
