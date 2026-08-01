@@ -12,15 +12,15 @@
   },
   "dependencies": {
     "@icons-pack/react-simple-icons": "^13.13.0",
-    "cnfast": "^0.0.8",
-    "fumadocs-core": "^16.11.5",
+    "cnfast": "^0.1.0",
+    "fumadocs-core": "^16.13.0",
     "fumadocs-mdx": "15.2.0",
     "fumadocs-ui": "npm:@fumadocs/base-ui@16.11.5",
     "geist": "^1.7.2",
-    "lucide-react": "^1.24.0",
+    "lucide-react": "^1.27.0",
     "next": "^16.2.12",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "shiki": "^4.3.1"
   },
   "overrides": {
@@ -30,11 +30,11 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.2",
     "@types/mdx": "^2.0.14",
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.1.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "oxlint": "^1.73.0",
-    "postcss": "^8.5.17",
+    "oxlint": "^1.76.0",
+    "postcss": "^8.5.24",
     "tailwindcss": "^4.3.2",
     "typescript": "~5.8"
   }
