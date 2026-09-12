@@ -6,7 +6,7 @@ module ChatSDK
       include ChatSDK::Adapter::MetaVerification
       include ChatSDK::Adapter::MediaTypes
 
-      capabilities :direct_messages, :file_uploads, :reactions
+      capabilities :direct_messages, :file_uploads, :reactions, :replies, :read_receipts
 
       attr_reader :client
 
@@ -92,8 +92,15 @@ module ChatSDK
         @client.send_template(to: channel_id, template_name: template_name, language_code: language_code, components: components)
       end
 
-      def mark_as_read(message_id:)
+      def mark_as_read(message_id:, channel_id: nil, thread_id: nil, message: nil) # rubocop:disable Lint/UnusedMethodArgument
         @client.mark_as_read(message_id: message_id)
+      end
+
+      def reply_message(channel_id:, message_id:, message:, thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
+        payload = prepare_message_payload(message)
+        payload[:context] = {message_id: message_id}
+        result = @client.send_message(to: channel_id, **payload)
+        parse_whatsapp_message(result, channel_id)
       end
 
       def download_media(media_id:)

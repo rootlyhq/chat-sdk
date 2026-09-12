@@ -33,21 +33,30 @@ Generate tool definitions for AI agents with preset permission levels:
 
 ```ruby
 # Create tool definitions for an agent
-tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger)
+tools = ChatSDK::AI.create_tools(preset: :messenger)
 
 # Three presets available:
 # :reader    - fetch_messages, fetch_thread (read-only)
 # :messenger - reader + post_message, send_direct_message, add_reaction, start_typing
 # :moderator - messenger + edit_message, delete_message, remove_reaction
 
-# Execute a tool call from an LLM response
-builder = ChatSDK::AI::ToolBuilder.new(chat: chat, preset: :messenger)
-result = builder.execute(:post_message, {
+# Execute a tool call from an LLM response. Executors created inside an event
+# handler automatically inherit that conversation's channel scope.
+executor = ChatSDK::AI.create_executor(chat: chat)
+result = executor.execute(:post_message, {
   adapter_name: "slack",
   channel_id: "C123",
   text: "Hello from the AI agent!"
 })
 ```
+
+AI tools are confined to the current channel by default. A thread-scoped executor permits sibling threads in that channel; pass `strict_scope: true` to allow only the exact thread. For jobs outside an event handler, pass a `ChatSDK::Thread`, `ChatSDK::Channel`, or scope hash explicitly:
+
+```ruby
+executor = ChatSDK::AI.create_executor(chat: chat, scope: thread, strict_scope: true)
+```
+
+Pass `scope: false` only when workspace-wide access is intentional. Direct-message tools are approval-controlled and are not constrained by conversation scope, matching the upstream SDK.
 
 See [Agent Tools](ai/agent-tools.md) for full details.
 

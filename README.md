@@ -82,7 +82,7 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 
 ## Features
 
-- [**Event handlers**](docs/handling-events.md) — mentions, messages, reactions, button clicks, slash commands
+- [**Event handlers**](docs/handling-events.md) — mentions, messages, edits, deletes, reactions, button clicks, slash commands
 - [**Streaming**](docs/streaming.md) — stream LLM responses with progressive message editing and throttled updates
 - [**Cards DSL**](docs/cards.md) — Ruby block-based interactive cards (Block Kit, Adaptive Cards, Google Chat Cards)
 - [**Actions**](docs/actions.md) — handle button clicks and dropdown selections
@@ -91,7 +91,8 @@ See the [Getting Started guide](docs/getting-started.md) for a full walkthrough.
 - [**Emoji & reactions**](docs/emoji.md) — cross-platform emoji reactions
 - [**Direct messages**](docs/direct-messages.md) — initiate DMs programmatically
 - [**Ephemeral messages**](docs/ephemeral-messages.md) — user-only visible messages
-- [**Concurrency**](docs/concurrency.md) — distributed locking with configurable conflict policies (drop, force, callable)
+- [**Conversation history**](docs/conversation-history.md) — unified user, thread, and channel history APIs
+- [**Concurrency**](docs/concurrency.md) — drop, queue, debounce, burst, or concurrently process overlapping messages
 
 ## Cards DSL
 

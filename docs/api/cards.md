@@ -7,7 +7,7 @@ The cards system consists of `Cards::Builder`, `Cards::Node`, and context classe
 Top-level entry point for building cards:
 
 ```ruby
-card = ChatSDK.card(title: "My Card", subtitle: "Optional") do
+card = ChatSDK.card(title: "My Card", subtitle: "Optional", width: :full) do
   text "Content here"
 end
 ```
@@ -28,6 +28,8 @@ Block-based DSL for constructing card nodes.
 | `fields(&block)` | Block | Add key-value fields |
 | `section(title = nil, &block)` | `String?`, Block | Add a grouped section |
 | `actions(&block)` | Block | Add interactive elements |
+| `table(headers:, rows:, ...)` | keyword args | Add tabular data |
+| `chart(title:, type:, ...)` | keyword args | Add a pie, bar, line, or area chart |
 
 ## Cards::FieldsContext
 
@@ -64,8 +66,8 @@ end
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
-| `button(text, id:, style:, value:)` | `String`, keyword args | Add a button |
-| `link_button(text, url:)` | `String`, `String` | Add a link button |
+| `button(text, id:, style:, value:, tooltip:)` | `String`, keyword args | Add a button |
+| `link_button(text, url:, id:, tooltip:)` | `String`, keyword args | Add a link button |
 | `select(id:, placeholder:, &block)` | keyword args, Block | Add a select menu |
 
 ## Cards::SelectContext
@@ -104,7 +106,7 @@ The immutable tree node that represents a card element.
 
 | Type | Attributes | Children |
 |------|-----------|----------|
-| `:card` | `title`, `subtitle` | Any node types |
+| `:card` | `title`, `subtitle`, `width` | Any node types |
 | `:text` | `content` | None |
 | `:divider` | None | None |
 | `:image` | `url`, `alt` | None |
@@ -116,3 +118,5 @@ The immutable tree node that represents a card element.
 | `:link_button` | `text`, `url` | None |
 | `:select` | `id`, `placeholder` | `:option` nodes |
 | `:option` | `text`, `value`, `description` | None |
+| `:table` | `headers`, `rows`, `align`, `caption`, `page_size` | None |
+| `:chart` | `title`, `chart_type`, `segments`, `categories`, `series` | None |

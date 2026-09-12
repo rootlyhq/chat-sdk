@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "date"
+
 module ChatSDK
   module Slack
     class ModalRenderer
@@ -49,8 +51,35 @@ module ChatSDK
           }
           el[:placeholder] = {type: "plain_text", text: node.attributes[:placeholder]} if node.attributes[:placeholder]
           el
+        when :date
+          el = {type: "datepicker", action_id: node.attributes[:id]}
+          initial_date = valid_initial_date(node.attributes[:initial_value])
+          el[:initial_date] = initial_date if initial_date
+          el[:placeholder] = {type: "plain_text", text: node.attributes[:placeholder]} if node.attributes[:placeholder]
+          el
+        when :number
+          el = {
+            type: "number_input",
+            action_id: node.attributes[:id],
+            is_decimal_allowed: !!node.attributes[:decimal]
+          }
+          el[:min_value] = node.attributes[:min].to_s unless node.attributes[:min].nil?
+          el[:max_value] = node.attributes[:max].to_s unless node.attributes[:max].nil?
+          el[:initial_value] = node.attributes[:initial_value].to_s unless node.attributes[:initial_value].nil?
+          el[:placeholder] = {type: "plain_text", text: node.attributes[:placeholder]} if node.attributes[:placeholder]
+          el
         end
         block
+      end
+
+      def valid_initial_date(value)
+        return unless value
+
+        parsed = Date.iso8601(value.to_s)
+        value.to_s if parsed.iso8601 == value.to_s
+      rescue Date::Error
+        ChatSDK::Log.warn("Ignoring invalid modal initial date: #{value.inspect}")
+        nil
       end
 
       def render_text(node)

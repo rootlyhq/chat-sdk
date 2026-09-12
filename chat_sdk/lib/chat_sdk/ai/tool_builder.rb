@@ -72,6 +72,7 @@ module ChatSDK
             properties: {
               adapter_name: {type: "string", description: "Adapter name"},
               channel_id: {type: "string", description: "Channel ID"},
+              thread_id: {type: "string", description: "Thread ID (optional)"},
               message_id: {type: "string", description: "Message ID to edit"},
               text: {type: "string", description: "New message text"}
             },
@@ -86,6 +87,7 @@ module ChatSDK
             properties: {
               adapter_name: {type: "string", description: "Adapter name"},
               channel_id: {type: "string", description: "Channel ID"},
+              thread_id: {type: "string", description: "Thread ID (optional)"},
               message_id: {type: "string", description: "Message ID to delete"}
             },
             required: %w[adapter_name channel_id message_id]
@@ -99,6 +101,7 @@ module ChatSDK
             properties: {
               adapter_name: {type: "string", description: "Adapter name"},
               channel_id: {type: "string", description: "Channel ID"},
+              thread_id: {type: "string", description: "Thread ID (optional)"},
               message_id: {type: "string", description: "Message ID"},
               emoji: {type: "string", description: "Emoji name (e.g., 'thumbsup')"}
             },
@@ -113,6 +116,7 @@ module ChatSDK
             properties: {
               adapter_name: {type: "string", description: "Adapter name"},
               channel_id: {type: "string", description: "Channel ID"},
+              thread_id: {type: "string", description: "Thread ID (optional)"},
               message_id: {type: "string", description: "Message ID"},
               emoji: {type: "string", description: "Emoji name"}
             },
@@ -145,8 +149,19 @@ module ChatSDK
         tool_names = PRESETS[@preset]
         tool_names.each_with_object({}) do |name, tools|
           defn = TOOL_DEFINITIONS[name].dup
-          defn[:requires_approval] = @require_approval && !defn[:read_only]
+          defn[:requires_approval] = approval_required?(name, defn)
           tools[name] = defn
+        end
+      end
+
+      private
+
+      def approval_required?(name, definition)
+        return false if definition[:read_only] || @require_approval == false
+        return true unless @require_approval.is_a?(Hash)
+
+        @require_approval.fetch(name) do
+          @require_approval.fetch(name.to_s, true)
         end
       end
     end

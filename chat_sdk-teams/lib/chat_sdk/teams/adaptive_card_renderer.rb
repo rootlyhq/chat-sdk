@@ -37,16 +37,18 @@ module ChatSDK
           end
         end
 
-        wrap_card(body)
+        wrap_card(body, width: node.attributes[:width])
       end
 
-      def wrap_card(body)
-        {
+      def wrap_card(body, width: nil)
+        card = {
           "type" => "AdaptiveCard",
           "$schema" => "http://adaptivecards.io/schemas/adaptive-card.json",
-          "version" => "1.4",
+          "version" => "1.5",
           "body" => body
         }
+        card["msteams"] = {"width" => "full"} if width.to_s == "full"
+        card
       end
 
       def render_node(node)
@@ -60,6 +62,8 @@ module ChatSDK
         when :button then render_action_submit(node)
         when :link_button then render_action_open_url(node)
         when :select then render_select(node)
+        when :table then render_table(node)
+        when :chart then render_chart(node)
         end
       end
 
@@ -141,6 +145,7 @@ module ChatSDK
           "data" => {"action" => node.attributes[:id]}
         }
         action["data"]["value"] = node.attributes[:value] if node.attributes[:value]
+        action["tooltip"] = node.attributes[:tooltip] if node.attributes[:tooltip]
         if node.attributes[:style] == :primary
           action["style"] = "positive"
         elsif node.attributes[:style] == :danger
@@ -150,11 +155,14 @@ module ChatSDK
       end
 
       def render_action_open_url(node)
-        {
+        action = {
           "type" => "Action.OpenUrl",
           "title" => node.attributes[:text],
           "url" => node.attributes[:url]
         }
+        action["id"] = node.attributes[:id] if node.attributes[:id]
+        action["tooltip"] = node.attributes[:tooltip] if node.attributes[:tooltip]
+        action
       end
 
       def render_select(node)
@@ -170,6 +178,34 @@ module ChatSDK
         }
         input["placeholder"] = node.attributes[:placeholder] if node.attributes[:placeholder]
         input
+      end
+
+      def render_table(node)
+        rows = [Array(node.attributes[:headers]), *Array(node.attributes[:rows])]
+        {
+          "type" => "Container",
+          "items" => rows.each_with_index.map do |row, index|
+            {
+              "type" => "ColumnSet",
+              "columns" => Array(row).map do |cell|
+                {
+                  "type" => "Column",
+                  "width" => "stretch",
+                  "items" => [{"type" => "TextBlock", "text" => cell.to_s, "weight" => ("bolder" if index.zero?), "wrap" => true}.compact]
+                }
+              end
+            }
+          end
+        }
+      end
+
+      def render_chart(node)
+        {
+          "type" => "TextBlock",
+          "text" => node.fallback_text,
+          "wrap" => true,
+          "fontType" => "Monospace"
+        }
       end
     end
   end

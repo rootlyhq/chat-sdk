@@ -13,7 +13,7 @@ state = ChatSDK::State::Memory.new
 # Create the bot
 bot = ChatSDK::Chat.new(
   user_name: "my-bot",
-  adapters: { slack: slack },
+  adapters: {slack: slack},
   state: state,
   log_level: :debug
 )

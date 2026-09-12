@@ -37,6 +37,37 @@ RSpec.describe ChatSDK::Thread do
     end
   end
 
+  describe "#reply" do
+    it "replies to a specific message" do
+      message = ChatSDK::Message.new(
+        id: "M123", text: "question", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+
+      thread.reply(message, "answer")
+
+      expect(adapter.replies_sent.first[:message_id]).to eq("M123")
+      expect(adapter.replies_sent.first[:message].text).to eq("answer")
+    end
+  end
+
+  describe "#mark_as_read" do
+    it "marks the current inbound message as read" do
+      message = ChatSDK::Message.new(
+        id: "M123", text: "hello", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+      current_thread = described_class.new(
+        id: "T123", channel_id: "C123", adapter: adapter, chat: bot,
+        current_message: message
+      )
+
+      current_thread.mark_as_read
+
+      expect(adapter.read_receipts_sent.first[:message_id]).to eq("M123")
+    end
+  end
+
   describe "#state / #set_state" do
     it "stores and retrieves state" do
       thread.set_state({count: 1})

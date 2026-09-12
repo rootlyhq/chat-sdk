@@ -77,5 +77,43 @@ RSpec.describe ChatSDK::AI::ToolExecutor do
       result = executor.execute(:fetch_thread, {adapter_name: "test", channel_id: "C1", thread_id: "T1"})
       expect(result).to eq([])
     end
+
+    it "blocks access outside an explicit conversation scope" do
+      scoped = described_class.new(chat: chat, scope: {adapter_name: :test, channel_id: "C1", thread_id: "T1"})
+
+      expect do
+        scoped.execute(:fetch_messages, {adapter_name: "test", channel_id: "C2"})
+      end.to raise_error(ChatSDK::Error, /tool call blocked/)
+    end
+
+    it "allows sibling threads in the scoped channel by default" do
+      scoped = described_class.new(chat: chat, scope: {adapter_name: :test, channel_id: "C1", thread_id: "T1"})
+
+      expect do
+        scoped.execute(:fetch_thread, {adapter_name: "test", channel_id: "C1", thread_id: "T2"})
+      end.not_to raise_error
+    end
+
+    it "blocks sibling threads in strict scope mode" do
+      scoped = described_class.new(
+        chat: chat,
+        scope: {adapter_name: :test, channel_id: "C1", thread_id: "T1"},
+        strict_scope: true
+      )
+
+      expect do
+        scoped.execute(:fetch_thread, {adapter_name: "test", channel_id: "C1", thread_id: "T2"})
+      end.to raise_error(ChatSDK::Error, /tool call blocked/)
+    end
+
+    it "inherits the currently handled conversation" do
+      thread = chat.channel("C1", adapter_name: :test).thread("T1")
+
+      ChatSDK::AI::ConversationScope.with(thread) do
+        expect do
+          executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C2"})
+        end.to raise_error(ChatSDK::Error, /tool call blocked/)
+      end
+    end
   end
 end

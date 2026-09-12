@@ -18,7 +18,7 @@ class ChatChannel < ApplicationCable::Channel
     )
 
     # Broadcast user's message
-    html = ApplicationController.render(partial: "chat/message", locals: { message: message, from_bot: false })
+    html = ApplicationController.render(partial: "chat/message", locals: {message: message, from_bot: false})
     ActionCable.server.broadcast("chat_sdk_web_#{@channel_id}", html)
 
     # Dispatch to ChatSDK bot

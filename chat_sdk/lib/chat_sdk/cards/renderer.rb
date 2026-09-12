@@ -16,6 +16,8 @@ module ChatSDK
         when :button then "[#{node.attributes[:text]}]"
         when :link_button then "[#{node.attributes[:text]}](#{node.attributes[:url]})"
         when :select then "_#{node.attributes[:placeholder] || "Select"}_"
+        when :table then render_table(node)
+        when :chart then render_chart(node)
         else ""
         end
       end
@@ -43,6 +45,23 @@ module ChatSDK
 
       def render_actions(node)
         node.children.map { |c| render(c) }.join(" | ")
+      end
+
+      def render_table(node)
+        headers = Array(node.attributes[:headers]).map(&:to_s)
+        rows = Array(node.attributes[:rows]).map { |row| Array(row).map(&:to_s) }
+        parts = []
+        parts << node.attributes[:caption].to_s if node.attributes[:caption]
+        unless headers.empty?
+          parts << "| #{headers.join(" | ")} |"
+          parts << "| #{headers.map { "---" }.join(" | ")} |"
+        end
+        parts.concat(rows.map { |row| "| #{row.join(" | ")} |" })
+        parts.join("\n")
+      end
+
+      def render_chart(node)
+        node.fallback_text
       end
     end
   end

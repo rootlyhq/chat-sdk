@@ -94,6 +94,21 @@ select_input id: "team", label: "Team", placeholder: "Select a team" do
 end
 ```
 
+### date_input
+
+```ruby
+date_input id: "due", label: "Due date", initial_value: "2026-09-12", optional: true
+```
+
+### number_input
+
+```ruby
+number_input id: "count", label: "Count", min: 1, max: 100, initial_value: 10
+number_input id: "ratio", label: "Ratio", decimal: true
+```
+
+Slack renders these as native date-picker and number inputs.
+
 ### static_text
 
 Non-interactive text content within the modal.

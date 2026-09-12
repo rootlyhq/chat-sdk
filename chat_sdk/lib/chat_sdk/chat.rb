@@ -2,13 +2,14 @@
 
 module ChatSDK
   class Chat
-    attr_reader :config, :state
+    attr_reader :config, :state, :history
 
     def initialize(user_name:, adapters:, state:, **options)
       @config = Config.new(user_name: user_name, adapters: adapters, state: state, **options)
       @state = state
       @adapters = adapters
       @registry = EventRegistry.new
+      @history = History.new(self)
       @webhooks = {}
       @dispatcher = Dispatcher.new(chat: self, config: @config, state: @state, registry: @registry)
 
@@ -30,6 +31,14 @@ module ChatSDK
 
     def on_direct_message(&block)
       @registry.register(:direct_message, &block)
+    end
+
+    def on_message_updated(&block)
+      @registry.register(:message_updated, &block)
+    end
+
+    def on_message_deleted(&block)
+      @registry.register(:message_deleted, &block)
     end
 
     def on_reaction(emojis = nil, &block)
@@ -61,6 +70,11 @@ module ChatSDK
       Channel.new(id: channel_id, adapter: adp, chat: self)
     end
 
+    def thread(id, channel_id:, adapter_name: nil)
+      adp = adapter_name ? adapter(adapter_name) : @adapters.values.first
+      Thread.new(id: id, channel_id: channel_id, adapter: adp, chat: self)
+    end
+
     # Webhook endpoints (Rack apps)
     def webhooks
       @webhook_accessor ||= WebhookAccessor.new(self, @adapters)
@@ -70,6 +84,11 @@ module ChatSDK
     def dispatch(event, adapter_name:)
       adp = adapter(adapter_name)
       @dispatcher.dispatch(event, adapter: adp, adapter_name: adapter_name)
+    end
+
+    # Deprecated compatibility alias for Vercel Chat SDK's former API.
+    def transcripts
+      history.user
     end
 
     private

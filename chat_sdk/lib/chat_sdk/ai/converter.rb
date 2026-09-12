@@ -10,7 +10,7 @@ module ChatSDK
         def to_ai_messages(messages, include_names: false, &transform)
           messages
             .sort_by { |m| m.timestamp || m.id }
-            .reject { |m| m.text.nil? || m.text.strip.empty? }
+            .reject { |m| blank_message?(m) }
             .filter_map { |m| convert_message(m, include_names: include_names, &transform) }
         end
 
@@ -19,16 +19,22 @@ module ChatSDK
         def convert_message(message, include_names: false)
           role = message.author&.bot? ? ROLE_ASSISTANT : ROLE_USER
 
-          content = message.text
+          content = message.text.to_s
           if include_names && role == ROLE_USER && message.author
             content = "[#{message.author.name}]: #{content}"
           end
 
           result = {role: role, content: content}
 
-          if message.attachments&.any?
-            parts = [{type: "text", text: content}]
-            message.attachments.each do |att|
+          if message.attachments&.any? || message.links&.any?
+            parts = []
+            parts << {type: "text", text: content} unless content.strip.empty?
+            Array(message.links).each do |link|
+              url = link.is_a?(Hash) ? (link[:url] || link["url"]) : link.to_s
+              title = link.is_a?(Hash) ? (link[:title] || link["title"]) : nil
+              parts << {type: "text", text: title ? "[#{title}](#{url})" : url}
+            end
+            Array(message.attachments).each do |att|
               parts << attachment_to_part(att)
             end
             result[:content] = parts
@@ -36,6 +42,11 @@ module ChatSDK
 
           result = yield(result, message) if block_given?
           result
+        end
+
+        def blank_message?(message)
+          text_blank = message.text.nil? || message.text.strip.empty?
+          text_blank && !message.attachments&.any? && !message.links&.any?
         end
 
         def attachment_to_part(attachment)

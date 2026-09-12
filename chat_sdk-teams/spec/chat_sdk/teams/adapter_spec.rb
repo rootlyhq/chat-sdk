@@ -439,7 +439,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         result = renderer.render(node)
 
         expect(result["type"]).to eq("AdaptiveCard")
-        expect(result["version"]).to eq("1.4")
+        expect(result["version"]).to eq("1.5")
         expect(result["body"].size).to eq(1)
         expect(result["body"][0]["type"]).to eq("TextBlock")
         expect(result["body"][0]["text"]).to eq("Hello world")

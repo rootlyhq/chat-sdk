@@ -19,7 +19,7 @@ module ChatSDK
           author: ChatSDK::Author.new(id: "bot", name: "Bot", platform: :web, bot: true),
           thread_id: thread_id || channel_id, channel_id: channel_id, platform: :web
         )
-        html = ApplicationController.render(partial: "chat/message", locals: { message: result, from_bot: true })
+        html = ApplicationController.render(partial: "chat/message", locals: {message: result, from_bot: true})
         ActionCable.server.broadcast("chat_sdk_web_#{channel_id}", html)
         result
       end
@@ -31,7 +31,7 @@ module ChatSDK
           author: ChatSDK::Author.new(id: "bot", name: "Bot", platform: :web, bot: true),
           thread_id: channel_id, channel_id: channel_id, platform: :web
         )
-        html = ApplicationController.render(partial: "chat/message", locals: { message: result, from_bot: true })
+        html = ApplicationController.render(partial: "chat/message", locals: {message: result, from_bot: true})
         turbo = %(<turbo-stream action="replace" target="message-#{message_id}"><template>#{html}</template></turbo-stream>)
         ActionCable.server.broadcast("chat_sdk_web_#{channel_id}", turbo)
       end
@@ -49,7 +49,7 @@ module ChatBot
     @instance ||= begin
       bot = ChatSDK::Chat.new(
         user_name: "demo-bot",
-        adapters: { web: ChatSDK::Web::Adapter.new },
+        adapters: {web: ChatSDK::Web::Adapter.new},
         state: ChatSDK::State::Memory.new
       )
 

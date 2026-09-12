@@ -13,6 +13,8 @@ module ChatSDK
       private
 
       def render_card(node)
+        @used_native_table = false
+        @chart_count = 0
         node.children.map { |child| render_node(child) }.compact
       end
 
@@ -24,6 +26,8 @@ module ChatSDK
         when :fields then render_fields(node)
         when :section then render_section(node)
         when :actions then render_actions(node)
+        when :table then render_table(node)
+        when :chart then render_chart(node)
         end
       end
 
@@ -93,7 +97,7 @@ module ChatSDK
           type: "button",
           text: {type: "plain_text", text: node.attributes[:text]},
           url: node.attributes[:url],
-          action_id: "link_#{node.attributes[:url].hash.abs}"
+          action_id: node.attributes[:id] || "link_#{node.attributes[:url].hash.abs}"
         }
       end
 
@@ -118,6 +122,75 @@ module ChatSDK
           opt[:description] = {type: "plain_text", text: node.attributes[:description]}
         end
         opt
+      end
+
+      def render_table(node)
+        headers = Array(node.attributes[:headers])
+        rows = Array(node.attributes[:rows])
+        char_count = (headers + rows.flatten).sum { |cell| cell.to_s.length }
+        if @used_native_table || rows.length > 100 || headers.length > 20 || char_count > 10_000
+          return fallback_block(ChatSDK::Cards::Renderer.new.render(node))
+        end
+
+        @used_native_table = true
+        rendered_rows = [headers, *rows].map do |row|
+          Array(row).map { |cell| {type: "raw_text", text: cell.to_s.empty? ? " " : cell.to_s} }
+        end
+        return {type: "table", rows: rendered_rows} if rows.empty?
+
+        block = {
+          type: "data_table",
+          caption: node.attributes[:caption] || "Table",
+          rows: rendered_rows
+        }
+        block[:page_size] = node.attributes[:page_size].to_i.clamp(1, 100) if node.attributes[:page_size]
+        block
+      end
+
+      def render_chart(node)
+        return fallback_block(node.fallback_text) if @chart_count >= 2
+
+        block = chart_block(node)
+        return fallback_block(node.fallback_text) unless block
+
+        @chart_count += 1
+        block
+      end
+
+      def chart_block(node)
+        title = node.attributes[:title].to_s
+        return if title.empty? || title.length > 50
+
+        type = node.attributes[:chart_type].to_sym
+        if type == :pie
+          segments = Array(node.attributes[:segments])
+          return unless segments.length.between?(1, 12) && segments.all? { |segment| valid_chart_label?(value_for(segment, :label)) && value_for(segment, :value).to_f.positive? }
+
+          return {type: "data_visualization", title: title, chart: {type: "pie", segments: segments}}
+        end
+
+        categories = Array(node.attributes[:categories])
+        series = Array(node.attributes[:series])
+        return unless %i[bar area line].include?(type)
+        return unless categories.length.between?(1, 20) && categories.all? { |category| valid_chart_label?(category) }
+        return unless series.length.between?(1, 12) && series.all? { |item| valid_chart_label?(value_for(item, :name)) }
+
+        axis = {categories: categories}
+        axis[:x_label] = node.attributes[:x_label] if node.attributes[:x_label]
+        axis[:y_label] = node.attributes[:y_label] if node.attributes[:y_label]
+        {type: "data_visualization", title: title, chart: {type: type.to_s, series: series, axis_config: axis}}
+      end
+
+      def valid_chart_label?(label)
+        label.to_s.length.between?(1, 20)
+      end
+
+      def value_for(hash, key)
+        hash[key] || hash[key.to_s]
+      end
+
+      def fallback_block(text)
+        {type: "section", text: {type: "mrkdwn", text: "```#{text}```"}}
       end
     end
   end

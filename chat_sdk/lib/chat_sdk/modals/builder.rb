@@ -32,6 +32,22 @@ module ChatSDK
         @children << ChatSDK::Cards::Node.new(:input, attributes: attrs, children: ctx.nodes)
       end
 
+      def date_input(id:, label:, initial_value: nil, placeholder: nil, optional: false)
+        attrs = {id: id, label: label, input_type: :date, optional: optional}
+        attrs[:initial_value] = initial_value if initial_value
+        attrs[:placeholder] = placeholder if placeholder
+        @children << ChatSDK::Cards::Node.new(:input, attributes: attrs)
+      end
+
+      def number_input(id:, label:, min: nil, max: nil, initial_value: nil, placeholder: nil, decimal: false, optional: false)
+        attrs = {id: id, label: label, input_type: :number, decimal: decimal, optional: optional}
+        attrs[:min] = min unless min.nil?
+        attrs[:max] = max unless max.nil?
+        attrs[:initial_value] = initial_value unless initial_value.nil?
+        attrs[:placeholder] = placeholder if placeholder
+        @children << ChatSDK::Cards::Node.new(:input, attributes: attrs)
+      end
+
       def static_text(content)
         @children << ChatSDK::Cards::Node.new(:text, attributes: {content: content})
       end

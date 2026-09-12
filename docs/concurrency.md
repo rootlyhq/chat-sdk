@@ -1,6 +1,45 @@
 # Concurrency
 
-ChatSDK is designed to handle concurrent events safely, even across multiple processes. It uses per-thread locking and event deduplication to prevent race conditions.
+ChatSDK is designed to handle concurrent events safely, even across multiple processes. It uses per-thread locking, queueing, and event deduplication to prevent race conditions.
+
+## Strategies
+
+Configure how overlapping messages on the same thread are handled with `concurrency`:
+
+| Strategy | Behavior |
+|----------|----------|
+| `:drop` | Process the first message and discard overlapping messages (default) |
+| `:force` | Replace the existing lock and process immediately |
+| `:queue` | Process the first message, then collapse pending messages into the latest one |
+| `:debounce` | Wait for a quiet period and process only the latest message |
+| `:burst` | Collapse messages received during a fixed window into the latest one |
+| `:concurrent` | Process messages independently, optionally with a per-thread limit |
+
+```ruby
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: {slack: slack},
+  state: state,
+  concurrency: {
+    strategy: :queue,
+    max_queue_size: 10,
+    on_queue_full: :drop_oldest,
+    queue_entry_ttl_ms: 90_000,
+    max_lock_lifetime_ms: 600_000
+  }
+)
+```
+
+For `:queue`, `:debounce`, and `:burst`, message handlers may accept a third argument. It reports the messages collapsed into the current call:
+
+```ruby
+bot.on_new_mention do |thread, message, context|
+  skipped = context&.fetch(:skipped, []) || []
+  thread.post("Processing #{message.text}; #{skipped.length} earlier messages were combined")
+end
+```
+
+Use `debounce_ms` to configure the quiet/fixed window. Use `max_concurrent` with `:concurrent`. Set `lock_scope: :channel` to serialize all threads in a channel instead of locking each thread independently.
 
 ## Per-Thread Locking
 
@@ -9,9 +48,9 @@ When an event arrives, ChatSDK acquires a lock scoped to the thread (identified 
 ```ruby
 bot = ChatSDK::Chat.new(
   user_name: "my-bot",
-  adapters: { slack: slack },
+  adapters: {slack: slack},
   state: ChatSDK::State::Redis.new,
-  on_lock_conflict: :drop  # default
+  on_lock_conflict: :drop # deprecated compatibility option
 )
 ```
 
@@ -37,7 +76,7 @@ bot = ChatSDK::Chat.new(
 )
 ```
 
-Locks have a 30-second TTL to prevent deadlocks if a handler crashes.
+Locks have a 30-second TTL and are renewed while handlers run. Renewal stops after `max_lock_lifetime_ms` so a hung handler cannot retain a lock forever.
 
 ## Event Deduplication
 

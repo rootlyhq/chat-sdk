@@ -3,10 +3,10 @@
 module ChatSDK
   class Message
     attr_reader :id, :text, :author, :thread_id, :channel_id,
-      :platform, :attachments, :raw, :timestamp
+      :platform, :attachments, :links, :reply_to, :subject, :raw, :timestamp
 
     def initialize(id:, text:, author:, thread_id:, channel_id:, platform:,
-      attachments: [], raw: nil, timestamp: nil)
+      attachments: [], links: [], reply_to: nil, subject: nil, raw: nil, timestamp: nil)
       @id = id
       @text = text
       @author = author
@@ -14,6 +14,9 @@ module ChatSDK
       @channel_id = channel_id
       @platform = platform
       @attachments = attachments
+      @links = links
+      @reply_to = reply_to
+      @subject = subject
       @raw = raw
       @timestamp = timestamp
     end
