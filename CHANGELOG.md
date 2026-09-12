@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-12
+
+### Security
+
+- Telegram webhooks now fail closed when `secret_token` is missing; set `allow_unverified_webhooks: true` only when verification is intentionally handled elsewhere
+
 ### Added
 
 - Vercel Chat SDK 4.40-aligned core APIs: overlapping-message concurrency strategies, lock heartbeats, unified history access, message edit/delete lifecycle callbacks, normalized reply context, native replies, and read receipts
