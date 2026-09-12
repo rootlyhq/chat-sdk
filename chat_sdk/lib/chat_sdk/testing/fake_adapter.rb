@@ -5,11 +5,13 @@ module ChatSDK
     class FakeAdapter < Adapter::Base
       capabilities :edit_messages, :delete_messages, :ephemeral_messages,
         :file_uploads, :reactions, :modals, :typing_indicator,
-        :streaming_edit, :threads, :direct_messages, :message_history
+        :streaming_edit, :threads, :direct_messages, :message_history,
+        :replies, :read_receipts
 
       attr_reader :posted_messages, :edited_messages, :deleted_messages,
         :ephemeral_messages_sent, :reactions_added, :reactions_removed,
-        :files_uploaded, :modals_opened, :typing_started, :dm_channels
+        :files_uploaded, :modals_opened, :typing_started, :dm_channels,
+        :replies_sent, :read_receipts_sent
 
       def initialize
         reset!
@@ -54,6 +56,18 @@ module ChatSDK
         record
       end
 
+      def reply_message(channel_id:, message_id:, message:, thread_id: nil)
+        record = RecordedCall.new(:reply_message, channel_id: channel_id, message_id: message_id, message: message, thread_id: thread_id)
+        @replies_sent << record
+        record
+      end
+
+      def mark_as_read(channel_id:, message_id:, thread_id: nil, message: nil)
+        record = RecordedCall.new(:mark_as_read, channel_id: channel_id, message_id: message_id, thread_id: thread_id, message: message)
+        @read_receipts_sent << record
+        record
+      end
+
       def delete_message(channel_id:, message_id:)
         record = RecordedCall.new(:delete_message, channel_id: channel_id, message_id: message_id)
         @deleted_messages << record
@@ -91,6 +105,14 @@ module ChatSDK
       end
 
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
+        [[], nil]
+      end
+
+      def fetch_channel_messages(channel_id:, cursor: nil, limit: 50)
+        [[], nil]
+      end
+
+      def list_threads(channel_id:, cursor: nil, limit: 50)
         [[], nil]
       end
 
@@ -189,6 +211,8 @@ module ChatSDK
         @modals_opened = []
         @typing_started = []
         @dm_channels = []
+        @replies_sent = []
+        @read_receipts_sent = []
       end
     end
   end

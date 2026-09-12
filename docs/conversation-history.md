@@ -1,6 +1,42 @@
 # Conversation History
 
-ChatSDK lets you fetch previous messages from a thread or channel. This is useful for building context-aware bots that need to read back conversation history.
+ChatSDK exposes history through `bot.history`, with user-, thread-, and channel-scoped APIs. This is useful for building context-aware bots that need to read back conversation history across platforms.
+
+## Unified History API
+
+```ruby
+thread_page = bot.history.thread.list(thread, limit: 20)
+channel_page = bot.history.channel.list_messages(channel, limit: 50)
+threads_page = bot.history.channel.list_threads(channel, limit: 50)
+```
+
+Each page is a hash containing the result (`:messages` or `:threads`) and `:next_cursor`.
+
+`bot.transcripts` remains available as a deprecated alias for `bot.history.user`.
+
+## User History
+
+User history can combine a person's conversations across platforms. By default, the normalized author email is the identity key; configure a resolver when your adapters use another identity:
+
+```ruby
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: {slack: slack},
+  state: state,
+  history: {
+    user: {
+      identity: ->(_thread, message) { message.author.email },
+      retention: 30 * 24 * 60 * 60,
+      max_per_user: 200
+    }
+  }
+)
+
+bot.history.user.append(thread, message)
+entries = bot.history.user.list(user_key: "person@example.com", limit: 20)
+prompt = bot.history.user.to_prompt_entries(entries)
+bot.history.user.delete(user_key: "person@example.com")
+```
 
 ## Fetching Messages
 

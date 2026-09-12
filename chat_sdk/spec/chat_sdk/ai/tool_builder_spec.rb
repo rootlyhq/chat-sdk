@@ -37,6 +37,17 @@ RSpec.describe ChatSDK::AI::ToolBuilder do
       expect(tools[:post_message][:requires_approval]).to be false
     end
 
+    it "supports per-tool approval overrides" do
+      tools = described_class.new(
+        preset: :messenger,
+        require_approval: {post_message: false}
+      ).build
+
+      expect(tools[:post_message][:requires_approval]).to be false
+      expect(tools[:send_direct_message][:requires_approval]).to be true
+      expect(tools[:fetch_messages][:requires_approval]).to be false
+    end
+
     it "raises on unknown preset" do
       expect { described_class.new(preset: :unknown) }
         .to raise_error(ChatSDK::ConfigurationError, /Unknown preset/)

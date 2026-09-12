@@ -10,8 +10,8 @@ state = ChatSDK::State::Memory.new
 
 bot = ChatSDK::Chat.new(
   user_name: "rack-bot",
-  adapters:  { slack: slack },
-  state:     state,
+  adapters: {slack: slack},
+  state: state,
   log_level: :debug
 )
 
@@ -29,7 +29,7 @@ bot.on_new_message(/deploy/i) do |thread, message|
     end
     actions do
       button "Approve", id: "deploy_approve", style: :primary
-      button "Reject",  id: "deploy_reject",  style: :danger
+      button "Reject", id: "deploy_reject", style: :danger
     end
   end
   thread.post(card)

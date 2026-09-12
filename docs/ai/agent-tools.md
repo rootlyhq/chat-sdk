@@ -46,6 +46,13 @@ tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger, require_approva
 
 # Without approval -- all tools have requires_approval: false
 tools = ChatSDK::AI.create_tools(chat: chat, preset: :messenger, require_approval: false)
+
+# Per-tool approval -- unspecified write tools remain gated
+tools = ChatSDK::AI.create_tools(
+  chat: chat,
+  preset: :messenger,
+  require_approval: {post_message: false}
+)
 ```
 
 Read-only tools (`fetch_messages`, `fetch_thread`) never require approval regardless of the setting.

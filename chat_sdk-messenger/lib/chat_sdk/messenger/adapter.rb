@@ -5,7 +5,7 @@ module ChatSDK
     class Adapter < ChatSDK::Adapter::Base
       include ChatSDK::Adapter::MetaVerification
 
-      capabilities :typing_indicator, :direct_messages, :file_uploads
+      capabilities :typing_indicator, :direct_messages, :file_uploads, :read_receipts
 
       attr_reader :client
 
@@ -68,6 +68,10 @@ module ChatSDK
 
       def start_typing(channel_id:, thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
         @client.send_action(recipient_id: channel_id, action: "typing_on")
+      end
+
+      def mark_as_read(channel_id:, message_id:, thread_id: nil, message: nil) # rubocop:disable Lint/UnusedMethodArgument
+        @client.send_action(recipient_id: channel_id, action: "mark_seen")
       end
 
       def mention(user_id)

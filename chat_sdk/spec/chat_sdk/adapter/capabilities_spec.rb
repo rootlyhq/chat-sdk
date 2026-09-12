@@ -49,7 +49,7 @@ RSpec.describe ChatSDK::Adapter::Capabilities do
         edit_messages delete_messages ephemeral_messages
         file_uploads reactions modals typing_indicator
         streaming_edit threads direct_messages
-        scheduled_messages message_history
+        scheduled_messages message_history replies read_receipts
       ]
       expect(ChatSDK::Adapter::Capabilities::KNOWN).to match_array(expected)
     end

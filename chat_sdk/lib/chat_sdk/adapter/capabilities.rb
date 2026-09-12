@@ -7,7 +7,7 @@ module ChatSDK
         edit_messages delete_messages ephemeral_messages
         file_uploads reactions modals typing_indicator
         streaming_edit threads direct_messages
-        scheduled_messages message_history
+        scheduled_messages message_history replies read_receipts
       ].freeze
 
       def self.included(base)

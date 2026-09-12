@@ -6,7 +6,7 @@ module ChatSDK
   module Telegram
     class Adapter < ChatSDK::Adapter::Base
       capabilities :edit_messages, :delete_messages, :reactions, :file_uploads,
-        :typing_indicator, :streaming_edit, :direct_messages
+        :typing_indicator, :streaming_edit, :direct_messages, :replies
 
       attr_reader :client
 
@@ -62,6 +62,18 @@ module ChatSDK
           text: text,
           reply_markup: reply_markup,
           reply_to_message_id: thread_id
+        )
+
+        parse_telegram_message(result, channel_id)
+      end
+
+      def reply_message(channel_id:, message_id:, message:, thread_id: nil)
+        text, reply_markup = prepare_message_payload(message)
+        result = @client.send_message(
+          chat_id: channel_id,
+          text: text,
+          reply_markup: reply_markup,
+          reply_to_message_id: message_id
         )
 
         parse_telegram_message(result, channel_id)

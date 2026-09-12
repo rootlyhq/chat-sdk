@@ -42,6 +42,22 @@ module ChatSDK
       def set_if_absent(key, value, ttl: nil)
         raise NotImplementedError
       end
+
+      def enqueue(key, value, max_size:, drop: :drop_oldest)
+        raise NotImplementedError
+      end
+
+      def drain_queue(key)
+        raise NotImplementedError
+      end
+
+      def queue_depth(key)
+        raise NotImplementedError
+      end
+
+      def extend_lock(key, owner:, ttl:)
+        raise NotImplementedError
+      end
     end
   end
 end

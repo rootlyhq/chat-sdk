@@ -36,6 +36,7 @@ module ChatSDK
             thread_id: thread_id,
             channel_id: chat_id,
             platform: :telegram,
+            reply_to: build_reply_to(message["reply_to_message"], chat_id),
             raw: message
           )
 
@@ -145,7 +146,28 @@ module ChatSDK
         def mention?(text, bot_username)
           return false unless bot_username
 
-          text.include?("@#{bot_username}")
+          /(?<!\w)@#{Regexp.escape(bot_username)}(?![\w-])/i.match?(text)
+        end
+
+        def build_reply_to(reply, chat_id)
+          return unless reply
+
+          user = extract_user(reply)
+          ChatSDK::Message.new(
+            id: reply["message_id"]&.to_s,
+            text: reply["text"] || reply["caption"] || "",
+            author: ChatSDK::Author.new(
+              id: user[:id],
+              name: user[:name],
+              platform: :telegram,
+              bot: !!reply.dig("from", "is_bot"),
+              locale: user[:locale]
+            ),
+            thread_id: resolve_thread_id(reply),
+            channel_id: chat_id,
+            platform: :telegram,
+            raw: reply
+          )
         end
 
         def parse_bot_command(message, user, chat_id, thread_id)

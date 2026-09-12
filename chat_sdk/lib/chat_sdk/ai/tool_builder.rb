@@ -145,8 +145,19 @@ module ChatSDK
         tool_names = PRESETS[@preset]
         tool_names.each_with_object({}) do |name, tools|
           defn = TOOL_DEFINITIONS[name].dup
-          defn[:requires_approval] = @require_approval && !defn[:read_only]
+          defn[:requires_approval] = approval_required?(name, defn)
           tools[name] = defn
+        end
+      end
+
+      private
+
+      def approval_required?(name, definition)
+        return false if definition[:read_only] || @require_approval == false
+        return true unless @require_approval.is_a?(Hash)
+
+        @require_approval.fetch(name) do
+          @require_approval.fetch(name.to_s, true)
         end
       end
     end

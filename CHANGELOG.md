@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Vercel Chat SDK 4.40-aligned core APIs: overlapping-message concurrency strategies, lock heartbeats, unified history access, message edit/delete lifecycle callbacks, normalized reply context, native replies, and read receipts
+- Card tables and charts, Teams full-width cards and button tooltips, and date/number modal inputs
+- Normalized author email/system metadata and attachment-only AI message conversion
+
+### Changed
+
+- Redis, PostgreSQL, MySQL, and memory state adapters now support persistent concurrency queues and lock renewal
+- Telegram mention parsing avoids email and partial-username false positives
+
 ## [1.0.0] - 2026-07-20
 
 ### Added

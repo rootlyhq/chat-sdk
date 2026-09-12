@@ -425,6 +425,23 @@ RSpec.describe ChatSDK::Telegram::Adapter do
     end
   end
 
+  describe "#reply_message" do
+    it "replies to the target message" do
+      stub = stub_request(:post, "https://api.telegram.org/bot#{bot_token}/sendMessage")
+        .with { |request| JSON.parse(request.body)["reply_to_message_id"] == "321" }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"ok" => true, "result" => {"message_id" => 503, "text" => "Reply"}}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.reply_message(channel_id: "-1001", message_id: "321", message: "Reply")
+
+      expect(stub).to have_been_requested
+      expect(result.id).to eq("503")
+    end
+  end
+
   describe "#delete_message" do
     it "deletes a message" do
       stub_request(:post, "https://api.telegram.org/bot#{bot_token}/deleteMessage")
@@ -558,6 +575,10 @@ RSpec.describe ChatSDK::Telegram::Adapter do
 
     it "does not support message_history capability" do
       expect(subject.supports?(:message_history)).to be false
+    end
+
+    it "supports native replies" do
+      expect(subject.supports?(:replies)).to be true
     end
   end
 

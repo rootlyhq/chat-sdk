@@ -31,6 +31,16 @@ module ChatSDK
         raise NotImplementedError
       end
 
+      def reply_message(channel_id:, message_id:, message:, thread_id: nil)
+        require_capability!(:replies)
+        raise NotImplementedError
+      end
+
+      def mark_as_read(channel_id:, message_id:, thread_id: nil, message: nil)
+        require_capability!(:read_receipts)
+        raise NotImplementedError
+      end
+
       def edit_message(channel_id:, message_id:, message:)
         require_capability!(:edit_messages)
         raise NotImplementedError
@@ -68,6 +78,16 @@ module ChatSDK
 
       def fetch_messages(channel_id:, thread_id: nil, cursor: nil, limit: 50)
         require_capability!(:message_history)
+        raise NotImplementedError
+      end
+
+      def fetch_channel_messages(channel_id:, cursor: nil, limit: 50)
+        require_capability!(:message_history)
+        fetch_messages(channel_id: channel_id, cursor: cursor, limit: limit)
+      end
+
+      def list_threads(channel_id:, cursor: nil, limit: 50)
+        require_capability!(:threads)
         raise NotImplementedError
       end
 

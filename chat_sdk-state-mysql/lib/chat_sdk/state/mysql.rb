@@ -74,6 +74,15 @@ module ChatSDK
         true
       end
 
+      def extend_lock(key, owner:, ttl:)
+        stmt = @conn.prepare(
+          "UPDATE chat_sdk_locks SET expires_at = DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND) " \
+          "WHERE key_prefix = ? AND lock_key = ? AND owner = ? AND expires_at > NOW()"
+        )
+        stmt.execute(@key_prefix, key, owner)
+        @conn.affected_rows > 0
+      end
+
       # Key-value store
 
       def get(key)
@@ -138,6 +147,52 @@ module ChatSDK
         @conn.affected_rows > 0
       end
 
+      def enqueue(key, value, max_size:, drop: :drop_oldest)
+        @conn.query("START TRANSACTION")
+        count_stmt = @conn.prepare(
+          "SELECT id FROM chat_sdk_queues WHERE key_prefix = ? AND queue_key = ? ORDER BY id FOR UPDATE"
+        )
+        ids = count_stmt.execute(@key_prefix, key).map { |row| row["id"] }
+        if ids.length >= max_size && drop.to_sym == :drop_newest
+          @conn.query("COMMIT")
+          return ids.length
+        end
+
+        insert = @conn.prepare("INSERT INTO chat_sdk_queues (key_prefix, queue_key, value) VALUES (?, ?, ?)")
+        insert.execute(@key_prefix, key, JSON.generate(value))
+        overflow = ids.length + 1 - max_size
+        if overflow.positive?
+          placeholders = Array.new(overflow, "?").join(", ")
+          remove = @conn.prepare("DELETE FROM chat_sdk_queues WHERE id IN (#{placeholders})")
+          remove.execute(*ids.first(overflow))
+        end
+        @conn.query("COMMIT")
+        [ids.length + 1, max_size].min
+      rescue
+        @conn.query("ROLLBACK")
+        raise
+      end
+
+      def drain_queue(key)
+        @conn.query("START TRANSACTION")
+        select = @conn.prepare(
+          "SELECT id, value FROM chat_sdk_queues WHERE key_prefix = ? AND queue_key = ? ORDER BY id FOR UPDATE"
+        )
+        rows = select.execute(@key_prefix, key).to_a
+        delete = @conn.prepare("DELETE FROM chat_sdk_queues WHERE key_prefix = ? AND queue_key = ?")
+        delete.execute(@key_prefix, key)
+        @conn.query("COMMIT")
+        rows.map { |row| JSON.parse(row["value"]) }
+      rescue
+        @conn.query("ROLLBACK")
+        raise
+      end
+
+      def queue_depth(key)
+        stmt = @conn.prepare("SELECT COUNT(*) AS count FROM chat_sdk_queues WHERE key_prefix = ? AND queue_key = ?")
+        stmt.execute(@key_prefix, key).first["count"].to_i
+      end
+
       # Cleanup
 
       def clear
@@ -147,6 +202,8 @@ module ChatSDK
         s2.execute(@key_prefix)
         s3 = @conn.prepare("DELETE FROM chat_sdk_cache WHERE key_prefix = ?")
         s3.execute(@key_prefix)
+        s4 = @conn.prepare("DELETE FROM chat_sdk_queues WHERE key_prefix = ?")
+        s4.execute(@key_prefix)
       end
 
       def cleanup_expired
@@ -191,6 +248,17 @@ module ChatSDK
             value JSON NOT NULL,
             expires_at TIMESTAMP NULL DEFAULT NULL,
             PRIMARY KEY (key_prefix, cache_key)
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        SQL
+        @conn.query(<<~SQL)
+          CREATE TABLE IF NOT EXISTS chat_sdk_queues (
+            id BIGINT NOT NULL AUTO_INCREMENT,
+            key_prefix VARCHAR(255) NOT NULL,
+            queue_key VARCHAR(512) NOT NULL,
+            value JSON NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            INDEX chat_sdk_queues_lookup (key_prefix, queue_key, id)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         SQL
       end

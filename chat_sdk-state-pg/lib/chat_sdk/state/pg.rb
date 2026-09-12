@@ -74,6 +74,15 @@ module ChatSDK
         true
       end
 
+      def extend_lock(key, owner:, ttl:)
+        result = @conn.exec_params(
+          "UPDATE chat_sdk_locks SET expires_at = NOW() + ($4 * INTERVAL '1 second') " \
+          "WHERE key_prefix = $1 AND lock_key = $2 AND owner = $3 AND expires_at > NOW()",
+          [@key_prefix, key, owner, ttl.to_f]
+        )
+        result.cmd_tuples > 0
+      end
+
       # Key-value store
 
       def get(key)
@@ -124,12 +133,56 @@ module ChatSDK
         result.cmd_tuples > 0
       end
 
+      def enqueue(key, value, max_size:, drop: :drop_oldest)
+        @conn.transaction do |conn|
+          conn.exec_params("SELECT pg_advisory_xact_lock(hashtext($1))", ["#{@key_prefix}:#{key}"])
+          depth = conn.exec_params(
+            "SELECT COUNT(*) AS count FROM chat_sdk_queues WHERE key_prefix = $1 AND queue_key = $2",
+            [@key_prefix, key]
+          )[0]["count"].to_i
+          return depth if depth >= max_size && drop.to_sym == :drop_newest
+
+          conn.exec_params(
+            "INSERT INTO chat_sdk_queues (key_prefix, queue_key, value) VALUES ($1, $2, $3::jsonb)",
+            [@key_prefix, key, JSON.generate(value)]
+          )
+          conn.exec_params(
+            "DELETE FROM chat_sdk_queues WHERE id IN (" \
+            "SELECT id FROM chat_sdk_queues WHERE key_prefix = $1 AND queue_key = $2 " \
+            "ORDER BY id ASC LIMIT (SELECT GREATEST(COUNT(*) - $3, 0) FROM chat_sdk_queues " \
+            "WHERE key_prefix = $1 AND queue_key = $2))",
+            [@key_prefix, key, max_size]
+          )
+          [depth + 1, max_size].min
+        end
+      end
+
+      def drain_queue(key)
+        @conn.transaction do |conn|
+          rows = conn.exec_params(
+            "DELETE FROM chat_sdk_queues WHERE id IN (" \
+            "SELECT id FROM chat_sdk_queues WHERE key_prefix = $1 AND queue_key = $2 ORDER BY id ASC FOR UPDATE) " \
+            "RETURNING value, id",
+            [@key_prefix, key]
+          ).to_a.sort_by { |row| row["id"].to_i }
+          rows.map { |row| JSON.parse(row["value"].is_a?(String) ? row["value"] : JSON.generate(row["value"])) }
+        end
+      end
+
+      def queue_depth(key)
+        @conn.exec_params(
+          "SELECT COUNT(*) AS count FROM chat_sdk_queues WHERE key_prefix = $1 AND queue_key = $2",
+          [@key_prefix, key]
+        )[0]["count"].to_i
+      end
+
       # Cleanup
 
       def clear
         @conn.exec_params("DELETE FROM chat_sdk_subscriptions WHERE key_prefix = $1", [@key_prefix])
         @conn.exec_params("DELETE FROM chat_sdk_locks WHERE key_prefix = $1", [@key_prefix])
         @conn.exec_params("DELETE FROM chat_sdk_cache WHERE key_prefix = $1", [@key_prefix])
+        @conn.exec_params("DELETE FROM chat_sdk_queues WHERE key_prefix = $1", [@key_prefix])
       end
 
       def cleanup_expired
@@ -169,6 +222,17 @@ module ChatSDK
             expires_at TIMESTAMP,
             PRIMARY KEY (key_prefix, cache_key)
           );
+
+          CREATE TABLE IF NOT EXISTS chat_sdk_queues (
+            id BIGSERIAL PRIMARY KEY,
+            key_prefix VARCHAR(255) NOT NULL,
+            queue_key VARCHAR(512) NOT NULL,
+            value JSONB NOT NULL,
+            created_at TIMESTAMP DEFAULT NOW()
+          );
+
+          CREATE INDEX IF NOT EXISTS chat_sdk_queues_lookup
+            ON chat_sdk_queues (key_prefix, queue_key, id);
         SQL
       end
     end

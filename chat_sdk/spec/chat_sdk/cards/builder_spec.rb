@@ -84,5 +84,27 @@ RSpec.describe ChatSDK::Cards::Builder do
       expect(card.fallback_text).to include("Server down")
       expect(card.fallback_text).to include("Service: api")
     end
+
+    it "builds tables and charts with fallback text" do
+      card = ChatSDK.card(title: "Metrics", width: :full) do
+        table headers: ["Service", "Status"], rows: [["api", "healthy"]]
+        chart title: "Traffic", type: :pie, segments: [{label: "API", value: 42}]
+      end
+
+      expect(card.attributes[:width]).to eq(:full)
+      expect(card.children.map(&:type)).to eq(%i[table chart])
+      expect(card.fallback_text).to include("Service | Status")
+      expect(card.fallback_text).to include("API: 42")
+    end
+
+    it "keeps button tooltips" do
+      card = ChatSDK.card do
+        actions do
+          button "Approve", id: "approve", tooltip: "Approve the request"
+        end
+      end
+
+      expect(card.children.first.children.first.attributes[:tooltip]).to eq("Approve the request")
+    end
   end
 end

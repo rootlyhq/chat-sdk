@@ -141,6 +141,30 @@ actions do
 end
 ```
 
+Buttons and link buttons also accept `tooltip:`. Teams renders it as native hover text; other adapters may ignore it.
+
+## Tables and Charts
+
+Cards can include structured tables and charts:
+
+```ruby
+ChatSDK.card(title: "Service health", width: :full) do
+  table(
+    headers: ["Service", "Status"],
+    rows: [["API", "Healthy"], ["Worker", "Degraded"]],
+    caption: "Current status"
+  )
+
+  chart(
+    title: "Traffic split",
+    type: :pie,
+    segments: [{label: "API", value: 70}, {label: "Web", value: 30}]
+  )
+end
+```
+
+Charts support `:pie`, `:bar`, `:line`, and `:area`. For series charts, pass `categories:` and `series:`. Slack renders native data visualization blocks where supported; other adapters provide a readable fallback. `width: :full` enables full-width cards on Teams.
+
 In your action handler:
 
 ```ruby

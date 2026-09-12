@@ -24,6 +24,24 @@ thread.post(ChatSDK.card(title: "Info") { text "Details" })
 
 Returns a `ChatSDK::Message` with the posted message's ID.
 
+### reply(target, content)
+
+Replies to a specific message using the platform's native reply context. `target` may be a `Message` or message ID.
+
+```ruby
+thread.reply(message, "Answering this message")
+```
+
+### mark_as_read(message = nil)
+
+Marks a message as read on adapters with read-receipt support. With no argument, it uses the current inbound message associated with the handler's thread.
+
+```ruby
+bot.on_direct_message do |thread, _message|
+  thread.mark_as_read
+end
+```
+
 ### post_ephemeral(content, user_id:)
 
 Posts a message visible only to the specified user.

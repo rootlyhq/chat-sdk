@@ -2,13 +2,14 @@
 
 module ChatSDK
   class Thread
-    attr_reader :id, :channel_id, :adapter, :chat
+    attr_reader :id, :channel_id, :adapter, :chat, :current_message
 
-    def initialize(id:, channel_id:, adapter:, chat:)
+    def initialize(id:, channel_id:, adapter:, chat:, current_message: nil)
       @id = id
       @channel_id = channel_id
       @adapter = adapter
       @chat = chat
+      @current_message = current_message
     end
 
     def subscribe
@@ -26,6 +27,28 @@ module ChatSDK
     def post(content)
       message = PostableMessage.from(content)
       adapter.post_message(channel_id: channel_id, message: message, thread_id: id)
+    end
+
+    def reply(target, content)
+      target_id = target.is_a?(ChatSDK::Message) ? target.id : target.to_s
+      if target.is_a?(ChatSDK::Message) && target.thread_id != id
+        raise ArgumentError, "cannot reply to a message from another thread"
+      end
+
+      message = PostableMessage.from(content)
+      adapter.reply_message(channel_id: channel_id, thread_id: id, message_id: target_id, message: message)
+    end
+
+    def mark_as_read(message = nil)
+      target = message
+      target ||= current_message
+      raise ArgumentError, "a message or message ID is required" unless target
+      if target.is_a?(ChatSDK::Message) && target.thread_id != id
+        raise ArgumentError, "cannot mark a message from another thread as read"
+      end
+
+      message_id = target.is_a?(ChatSDK::Message) ? target.id : target.to_s
+      adapter.mark_as_read(channel_id: channel_id, thread_id: id, message_id: message_id, message: target.is_a?(ChatSDK::Message) ? target : nil)
     end
 
     def post_ephemeral(content, user_id:)

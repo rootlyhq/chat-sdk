@@ -13,6 +13,18 @@ module ChatSDK
           return 0
         end
       LUA
+      LOCK_EXTEND_SCRIPT = <<~LUA
+        if redis.call("GET", KEYS[1]) == ARGV[1] then
+          return redis.call("PEXPIRE", KEYS[1], ARGV[2])
+        else
+          return 0
+        end
+      LUA
+      QUEUE_DRAIN_SCRIPT = <<~LUA
+        local values = redis.call("LRANGE", KEYS[1], 0, -1)
+        redis.call("DEL", KEYS[1])
+        return values
+      LUA
 
       def initialize(url: nil, client: nil)
         @client = client || RedisClient.config(url: url || ENV["REDIS_URL"] || "redis://localhost:6379").new_client
@@ -49,6 +61,10 @@ module ChatSDK
         true
       end
 
+      def extend_lock(key, owner:, ttl:)
+        @client.call("EVAL", LOCK_EXTEND_SCRIPT, 1, lock_key(key), owner, (ttl * 1000).to_i) == 1
+      end
+
       # Key-value store
       def get(key)
         value = @client.call("GET", kv_key(key))
@@ -79,6 +95,25 @@ module ChatSDK
         result == "OK"
       end
 
+      def enqueue(key, value, max_size:, drop: :drop_oldest)
+        qkey = queue_storage_key(key)
+        if drop.to_sym == :drop_newest && @client.call("LLEN", qkey) >= max_size
+          return @client.call("LLEN", qkey)
+        end
+
+        @client.call("RPUSH", qkey, JSON.generate(value))
+        @client.call("LTRIM", qkey, -max_size, -1)
+        @client.call("LLEN", qkey)
+      end
+
+      def drain_queue(key)
+        @client.call("EVAL", QUEUE_DRAIN_SCRIPT, 1, queue_storage_key(key)).map { |value| JSON.parse(value) }
+      end
+
+      def queue_depth(key)
+        @client.call("LLEN", queue_storage_key(key))
+      end
+
       def clear
         keys = @client.call("KEYS", "chat_sdk:*")
         @client.call("DEL", *keys) if keys.any?
@@ -96,6 +131,10 @@ module ChatSDK
 
       def kv_key(key)
         "chat_sdk:kv:#{key}"
+      end
+
+      def queue_storage_key(key)
+        "chat_sdk:queue:#{key}"
       end
     end
   end

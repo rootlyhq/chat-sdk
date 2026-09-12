@@ -69,6 +69,20 @@ RSpec.describe ChatSDK::Modals::Builder do
       expect(text_node.attributes[:content]).to eq("Read the instructions carefully.")
     end
 
+    it "builds date and number inputs" do
+      modal = described_class.new(title: "Schedule") do
+        date_input id: "due", label: "Due date", initial_value: "2026-09-12"
+        number_input id: "count", label: "Count", min: 1, max: 10, initial_value: 2
+      end.build
+
+      expect(modal.children[0].attributes).to include(
+        id: "due", input_type: :date, initial_value: "2026-09-12"
+      )
+      expect(modal.children[1].attributes).to include(
+        id: "count", input_type: :number, min: 1, max: 10, initial_value: 2
+      )
+    end
+
     it "builds a complex modal with multiple inputs" do
       builder = described_class.new(title: "Incident", submit_label: "Create", callback_id: "incident:create") do
         static_text "Fill out the form below."

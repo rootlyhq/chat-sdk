@@ -9,6 +9,7 @@ module ChatSDK
         @expirations = {}
         @subscriptions = Set.new
         @locks = {}
+        @queues = {}
       end
 
       def subscribe(thread_id)
@@ -47,6 +48,16 @@ module ChatSDK
         end
       end
 
+      def extend_lock(key, owner:, ttl:)
+        @mutex.synchronize do
+          expire_if_needed(key)
+          return false unless @locks[key] && @locks[key][:owner] == owner
+
+          @locks[key][:expires_at] = Time.now.to_f + ttl
+          true
+        end
+      end
+
       def get(key)
         @mutex.synchronize do
           expire_if_needed(key)
@@ -80,12 +91,32 @@ module ChatSDK
         end
       end
 
+      def enqueue(key, value, max_size:, drop: :drop_oldest)
+        @mutex.synchronize do
+          queue = (@queues[key] ||= [])
+          return queue.length if queue.length >= max_size && drop.to_sym == :drop_newest
+
+          queue << value
+          queue.shift while queue.length > max_size
+          queue.length
+        end
+      end
+
+      def drain_queue(key)
+        @mutex.synchronize { @queues.delete(key) || [] }
+      end
+
+      def queue_depth(key)
+        @mutex.synchronize { Array(@queues[key]).length }
+      end
+
       def clear
         @mutex.synchronize do
           @store.clear
           @expirations.clear
           @subscriptions.clear
           @locks.clear
+          @queues.clear
         end
       end
 

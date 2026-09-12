@@ -230,5 +230,67 @@ RSpec.describe ChatSDK::Dispatcher do
 
       expect(received_thread).to be_a(ChatSDK::Thread)
     end
+
+    it "routes message updates with the previous message and without deduping them" do
+      bot = build_bot
+      received = []
+      bot.on_message_updated { |_thread, message, previous| received << [message.text, previous&.text] }
+      original = make_mention(message_id: "edited-message")
+      bot.dispatch(original, adapter_name: :test)
+
+      updated_message = ChatSDK::Message.new(
+        id: "edited-message", text: "after", author: original.message.author,
+        thread_id: "T1", channel_id: "C1", platform: :test
+      )
+      event = ChatSDK::Events::MessageUpdated.new(
+        message: updated_message, previous_message: original.message,
+        thread_id: "T1", channel_id: "C1", platform: :test, adapter_name: :test
+      )
+      bot.dispatch(event, adapter_name: :test)
+
+      expect(received).to eq([["after", "hello"]])
+    end
+
+    it "routes message deletes as lifecycle events" do
+      bot = build_bot
+      received = nil
+      bot.on_message_deleted { |event| received = event }
+      event = ChatSDK::Events::MessageDeleted.new(
+        message_id: "deleted-message", thread_id: "T1", channel_id: "C1",
+        platform: :test, adapter_name: :test
+      )
+
+      bot.dispatch(event, adapter_name: :test)
+
+      expect(received.message_id).to eq("deleted-message")
+      expect(received.thread).to be_a(ChatSDK::Thread)
+    end
+  end
+
+  describe "concurrency: queue" do
+    it "collapses queued messages into the latest message with skipped context" do
+      bot = build_bot(concurrency: :queue)
+      entered = Queue.new
+      release = Queue.new
+      received = []
+      bot.on_new_mention do |_thread, message, context|
+        received << [message.text, context&.dig(:skipped)&.map(&:text)]
+        if message.text == "first"
+          entered << true
+          release.pop
+        end
+      end
+
+      worker = ::Thread.new do
+        bot.dispatch(make_mention(text: "first", message_id: "queue-1"), adapter_name: :test)
+      end
+      entered.pop
+      bot.dispatch(make_mention(text: "second", message_id: "queue-2"), adapter_name: :test)
+      bot.dispatch(make_mention(text: "third", message_id: "queue-3"), adapter_name: :test)
+      release << true
+      worker.join
+
+      expect(received).to eq([["first", nil], ["third", ["second"]]])
+    end
   end
 end
