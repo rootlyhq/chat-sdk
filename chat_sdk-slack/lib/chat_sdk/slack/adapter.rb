@@ -9,11 +9,12 @@ module ChatSDK
         :scheduled_messages
 
       def initialize(bot_token: nil, signing_secret: nil,
-        client_id: nil, client_secret: nil)
+        client_id: nil, client_secret: nil, proxy: nil)
         @bot_token = bot_token || ENV["SLACK_BOT_TOKEN"]
         @signing_secret = signing_secret || ENV["SLACK_SIGNING_SECRET"]
         @client_id = client_id || ENV["SLACK_CLIENT_ID"]
         @client_secret = client_secret || ENV["SLACK_CLIENT_SECRET"]
+        @proxy = proxy || ENV["HTTPS_PROXY"] || ENV["https_proxy"]
 
         unless @bot_token || @client_id
           raise ChatSDK::ConfigurationError, "Slack bot_token or client_id required"
@@ -24,7 +25,7 @@ module ChatSDK
           ::Slack.configure do |config|
             config.token = @bot_token
           end
-          @client = ::Slack::Web::Client.new(token: @bot_token)
+          @client = build_client(token: @bot_token)
         end
 
         @renderer = BlockKitRenderer.new
@@ -71,7 +72,7 @@ module ChatSDK
       def handle_oauth_callback(code:, redirect_uri: nil)
         raise ChatSDK::ConfigurationError, "client_id required for OAuth" unless @client_id
 
-        temp_client = ::Slack::Web::Client.new
+        temp_client = build_client
         params = {
           client_id: @client_id,
           client_secret: @client_secret,
@@ -353,6 +354,13 @@ module ChatSDK
 
       private
 
+      def build_client(token: nil)
+        options = {}
+        options[:token] = token if token
+        options[:proxy] = @proxy if @proxy
+        options.empty? ? ::Slack::Web::Client.new : ::Slack::Web::Client.new(options)
+      end
+
       def resolve_team_client(team_id)
         return unless @client_id && @state
 
@@ -365,7 +373,7 @@ module ChatSDK
         installation = get_installation(team_id)
         return unless installation
 
-        new_client = ::Slack::Web::Client.new(token: installation["bot_token"])
+        new_client = build_client(token: installation["bot_token"])
         @team_clients[team_id] = new_client
         ::Thread.current[:chat_sdk_slack_client] = new_client
       end

@@ -34,9 +34,12 @@ bot = ChatSDK::Chat.new(
 
 bot.history.user.append(thread, message)
 entries = bot.history.user.list(user_key: "person@example.com", limit: 20)
+count = bot.history.user.count(user_key: "person@example.com")
 prompt = bot.history.user.to_prompt_entries(entries)
 bot.history.user.delete(user_key: "person@example.com")
 ```
+
+`list` returns the latest 50 entries by default; pass `limit: nil` for all retained entries. Set `max_per_user: false` to disable count-based eviction while keeping the configured retention TTL. History records use their own UUID and preserve the provider ID as `platform_message_id`.
 
 ## Fetching Messages
 

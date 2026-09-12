@@ -34,6 +34,16 @@ RSpec.describe ChatSDK::Slack::Adapter do
     it "returns a Slack::Web::Client" do
       expect(subject.client).to be_a(::Slack::Web::Client)
     end
+
+    it "configures an egress proxy" do
+      adapter = described_class.new(
+        bot_token: bot_token,
+        signing_secret: signing_secret,
+        proxy: "http://proxy.internal:8080"
+      )
+
+      expect(adapter.client.proxy).to eq("http://proxy.internal:8080")
+    end
   end
 
   describe "#verify_request!" do

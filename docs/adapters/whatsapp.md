@@ -78,6 +78,8 @@ whatsapp_adapter = bot.adapter(:whatsapp)
 client = whatsapp_adapter.client  # ApiClient
 ```
 
+Inbound media downloads only send the bearer token to the configured Graph API origin or approved Meta media hosts. Downloads use a 30-second timeout and reject responses larger than 25 MB.
+
 ## Cards Rendering
 
 Cards render as WhatsApp interactive button messages (up to 3 reply buttons). Link buttons fall back to plain text.

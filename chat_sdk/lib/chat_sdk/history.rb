@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "time"
+require "securerandom"
 
 module ChatSDK
   class History
@@ -30,12 +31,16 @@ module ChatSDK
         entry
       end
 
-      def list(user_key:, limit: nil, platforms: nil, thread_id: nil, roles: nil)
+      def list(user_key:, limit: 50, platforms: nil, thread_id: nil, roles: nil)
         entries = Array(@chat.state.get(storage_key(user_key)))
         entries = entries.select { |entry| Array(platforms).map(&:to_s).include?(entry["platform"].to_s) } if platforms
         entries = entries.select { |entry| entry["thread_id"] == thread_id } if thread_id
         entries = entries.select { |entry| Array(roles).map(&:to_s).include?(entry["role"].to_s) } if roles
         limit ? entries.last(limit) : entries
+      end
+
+      def count(user_key:)
+        Array(@chat.state.get(storage_key(user_key))).length
       end
 
       def delete(user_key:)
@@ -62,7 +67,8 @@ module ChatSDK
       def normalize_entry(thread, message, user_key)
         if message.is_a?(Message)
           {
-            "id" => message.id,
+            "id" => SecureRandom.uuid,
+            "platform_message_id" => message.id,
             "user_key" => user_key,
             "role" => message.author&.bot? ? "assistant" : "user",
             "text" => message.text.to_s,
@@ -73,7 +79,8 @@ module ChatSDK
         else
           data = message.transform_keys(&:to_sym)
           {
-            "id" => data[:id],
+            "id" => SecureRandom.uuid,
+            "platform_message_id" => data[:platform_message_id] || data[:id],
             "user_key" => user_key,
             "role" => (data[:role] || "assistant").to_s,
             "text" => data[:text].to_s,

@@ -10,10 +10,17 @@ module ChatSDK
 
       attr_reader :client
 
-      def initialize(bot_token: nil, secret_token: nil, bot_username: nil)
+      def initialize(bot_token: nil, secret_token: nil, bot_username: nil, allowed_user_ids: nil, allow_unverified_webhooks: nil)
         @bot_token = bot_token || ENV["TELEGRAM_BOT_TOKEN"]
         @secret_token = secret_token || ENV["TELEGRAM_WEBHOOK_SECRET_TOKEN"]
         @bot_username = bot_username || ENV["TELEGRAM_BOT_USERNAME"]
+        configured_user_ids = allowed_user_ids || ENV["TELEGRAM_ALLOWED_USER_IDS"]&.split(",")
+        @allowed_user_ids = configured_user_ids&.map(&:to_s)&.to_set
+        @allow_unverified_webhooks = if allow_unverified_webhooks.nil?
+          ENV["TELEGRAM_ALLOW_UNVERIFIED_WEBHOOKS"] == "true"
+        else
+          allow_unverified_webhooks
+        end
 
         raise ChatSDK::ConfigurationError, "Telegram bot_token required" unless @bot_token
 
@@ -27,7 +34,12 @@ module ChatSDK
 
       # Inbound
       def verify_request!(rack_request)
-        return true unless @secret_token
+        return true if !@secret_token && @allow_unverified_webhooks
+
+        unless @secret_token
+          raise ChatSDK::SignatureVerificationError,
+            "Telegram secret_token required; set allow_unverified_webhooks: true to explicitly disable verification"
+        end
 
         header_token = rack_request.get_header("HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN")
 
@@ -48,6 +60,8 @@ module ChatSDK
 
       def parse_events(rack_request)
         payload = read_json_body(rack_request)
+        return [] unless allowed_user?(payload)
+
         EventParser.parse(payload, bot_username: @bot_username)
       rescue JSON::ParserError
         []
@@ -162,6 +176,8 @@ module ChatSDK
           updates = updates.is_a?(Array) ? updates : []
           updates.each do |update|
             offset = update["update_id"] + 1
+            next unless allowed_user?(update)
+
             events = EventParser.parse(update, bot_username: @bot_username)
             events.each { |event| block.call(event) }
           end
@@ -169,6 +185,18 @@ module ChatSDK
       end
 
       private
+
+      def allowed_user?(payload)
+        return true unless @allowed_user_ids
+
+        user_id = payload.dig("callback_query", "from", "id") ||
+          payload.dig("message_reaction", "user", "id") ||
+          payload.dig("message", "from", "id") ||
+          payload.dig("edited_message", "from", "id") ||
+          payload.dig("channel_post", "from", "id") ||
+          payload.dig("edited_channel_post", "from", "id")
+        user_id && @allowed_user_ids.include?(user_id.to_s)
+      end
 
       def prepare_message_payload(message)
         msg = ChatSDK::PostableMessage.from(message)

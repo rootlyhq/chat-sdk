@@ -83,9 +83,18 @@ RSpec.describe ChatSDK::Telegram::Adapter do
         .to raise_error(ChatSDK::SignatureVerificationError, /Missing Telegram secret token/)
     end
 
-    it "skips verification when no secret_token is configured" do
+    it "requires verification by default when no secret_token is configured" do
       adapter = described_class.new(bot_token: bot_token, secret_token: nil)
       request = build_request('{"update_id":1}')
+
+      expect { adapter.verify_request!(request) }
+        .to raise_error(ChatSDK::SignatureVerificationError, /secret_token required/)
+    end
+
+    it "allows verification to be explicitly disabled" do
+      adapter = described_class.new(bot_token: bot_token, secret_token: nil, allow_unverified_webhooks: true)
+      request = build_request('{"update_id":1}')
+
       expect(adapter.verify_request!(request)).to be(true)
     end
   end
@@ -107,6 +116,46 @@ RSpec.describe ChatSDK::Telegram::Adapter do
         "CONTENT_TYPE" => "application/json"
       )
       Rack::Request.new(env)
+    end
+
+    it "drops updates from users outside the allowlist" do
+      adapter = described_class.new(
+        bot_token: bot_token,
+        secret_token: secret_token,
+        bot_username: bot_username,
+        allowed_user_ids: ["42"]
+      )
+      payload = {
+        "update_id" => 1,
+        "message" => {
+          "message_id" => 100,
+          "from" => {"id" => 99, "username" => "mallory"},
+          "chat" => {"id" => 99, "type" => "private"},
+          "text" => "hello"
+        }
+      }
+
+      expect(adapter.parse_events(build_request(JSON.generate(payload)))).to eq([])
+    end
+
+    it "accepts updates from allowlisted users" do
+      adapter = described_class.new(
+        bot_token: bot_token,
+        secret_token: secret_token,
+        bot_username: bot_username,
+        allowed_user_ids: ["42"]
+      )
+      payload = {
+        "update_id" => 1,
+        "message" => {
+          "message_id" => 100,
+          "from" => {"id" => 42, "username" => "alice"},
+          "chat" => {"id" => 42, "type" => "private"},
+          "text" => "hello"
+        }
+      }
+
+      expect(adapter.parse_events(build_request(JSON.generate(payload))).size).to eq(1)
     end
 
     context "message with bot_command entity" do

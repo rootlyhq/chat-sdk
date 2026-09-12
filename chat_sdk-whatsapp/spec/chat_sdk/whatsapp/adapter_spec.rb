@@ -985,6 +985,39 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       expect(result).to be_nil
     end
 
+    it "refuses to send the access token to an untrusted media host" do
+      malicious_url = "https://example.com/steal-token"
+      stub_request(:get, %r{graph\.facebook\.com/v25\.0/#{media_id}})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"url" => malicious_url, "id" => media_id}),
+          headers: {"Content-Type" => "application/json"}
+        )
+      malicious_request = stub_request(:get, malicious_url)
+
+      expect { subject.download_media(media_id: media_id) }
+        .to raise_error(ChatSDK::PlatformError, /untrusted media URL/)
+      expect(malicious_request).not_to have_been_requested
+    end
+
+    it "rejects media larger than 25 MB" do
+      stub_request(:get, %r{graph\.facebook\.com/v25\.0/#{media_id}})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"url" => media_url, "id" => media_id}),
+          headers: {"Content-Type" => "application/json"}
+        )
+      stub_request(:get, media_url)
+        .to_return(
+          status: 200,
+          body: "x",
+          headers: {"Content-Length" => ((25 * 1024 * 1024) + 1).to_s}
+        )
+
+      expect { subject.download_media(media_id: media_id) }
+        .to raise_error(ChatSDK::PlatformError, /25 MB download limit/)
+    end
+
     it "raises PlatformError when the media metadata request fails" do
       stub_request(:get, %r{graph\.facebook\.com/v25\.0/#{media_id}})
         .to_return(

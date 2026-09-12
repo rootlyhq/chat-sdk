@@ -11,8 +11,8 @@ module ChatSDK
         ToolBuilder.new(preset: preset, require_approval: require_approval).build
       end
 
-      def create_executor(chat:)
-        ToolExecutor.new(chat: chat)
+      def create_executor(chat:, scope: nil, strict_scope: false)
+        ToolExecutor.new(chat: chat, scope: scope, strict_scope: strict_scope)
       end
     end
   end

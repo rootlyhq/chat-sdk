@@ -18,7 +18,8 @@ require "chat_sdk/slack"
 
 slack = ChatSDK::Slack::Adapter.new(
   bot_token: ENV["SLACK_BOT_TOKEN"],       # or set SLACK_BOT_TOKEN env var
-  signing_secret: ENV["SLACK_SIGNING_SECRET"] # or set SLACK_SIGNING_SECRET env var
+  signing_secret: ENV["SLACK_SIGNING_SECRET"], # or set SLACK_SIGNING_SECRET env var
+  proxy: ENV["HTTPS_PROXY"]                # optional Web API egress proxy
 )
 ```
 
@@ -30,6 +31,7 @@ Both parameters fall back to environment variables if not provided.
 |----------|-------------|
 | `SLACK_BOT_TOKEN` | Bot User OAuth Token (starts with `xoxb-`) |
 | `SLACK_SIGNING_SECRET` | Signing Secret from your Slack app settings |
+| `HTTPS_PROXY` | Optional HTTP(S) proxy used for Slack Web API and upload requests |
 
 ## Slack App Setup
 
