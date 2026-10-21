@@ -298,8 +298,16 @@ RSpec.describe ChatSDK::GitLab::Adapter do
       expect(WebMock).to have_requested(:post, endpoint).once
     end
 
-    it "adds and removes the bot's award emoji" do
+    it "edits, deletes, and reacts to notes from the requested discussion" do
+      discussion_endpoint = "#{api_url}/projects/42/merge_requests/3/discussions/abcdef"
+      note_endpoint = "#{api_url}/projects/42/merge_requests/3/notes/501"
       award_endpoint = "#{api_url}/projects/42/merge_requests/3/notes/501/award_emoji"
+      stub_request(:get, discussion_endpoint)
+        .to_return(status: 200, body: JSON.generate({"notes" => [note_response]}), headers: {"Content-Type" => "application/json"})
+      stub_request(:put, note_endpoint)
+        .with(body: {"body" => "Edited"})
+        .to_return(status: 200, body: JSON.generate(note_response(body: "Edited")), headers: {"Content-Type" => "application/json"})
+      stub_request(:delete, note_endpoint).to_return(status: 204)
       stub_request(:post, award_endpoint)
         .with(body: {"name" => "thumbsup"})
         .to_return(status: 201, body: '{"name":"thumbsup"}', headers: {"Content-Type" => "application/json"})
@@ -307,11 +315,51 @@ RSpec.describe ChatSDK::GitLab::Adapter do
         .to_return(status: 200, body: '[{"id":700,"name":"thumbsup","user":{"id":99}}]', headers: {"Content-Type" => "application/json"})
       stub_request(:delete, "#{award_endpoint}/700").to_return(status: 204)
 
+      edited = adapter.edit_message(
+        channel_id: channel_id,
+        thread_id: thread_id,
+        message_id: "501",
+        message: "Edited"
+      )
+      deleted = adapter.delete_message(channel_id: channel_id, thread_id: thread_id, message_id: "501")
       adapter.add_reaction(channel_id: channel_id, thread_id: thread_id, message_id: "501", emoji: "thumbs_up")
       adapter.remove_reaction(channel_id: channel_id, thread_id: thread_id, message_id: "501", emoji: "thumbs_up")
 
+      expect(edited.text).to eq("Edited")
+      expect(deleted).to eq({})
       expect(WebMock).to have_requested(:post, award_endpoint).once
       expect(WebMock).to have_requested(:delete, "#{award_endpoint}/700").once
+    end
+
+    it "rejects notes outside the requested discussion before mutation" do
+      discussion_endpoint = "#{api_url}/projects/42/merge_requests/3/discussions/abcdef"
+      note_endpoint = "#{api_url}/projects/42/merge_requests/3/notes/501"
+      award_endpoint = "#{note_endpoint}/award_emoji"
+      stub_request(:get, discussion_endpoint)
+        .to_return(
+          status: 200,
+          body: JSON.generate({"notes" => [note_response(id: 502)]}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect do
+        adapter.edit_message(channel_id: channel_id, thread_id: thread_id, message_id: "501", message: "Edited")
+      end.to raise_error(ArgumentError, /does not belong to discussion/)
+      expect do
+        adapter.delete_message(channel_id: channel_id, thread_id: thread_id, message_id: "501")
+      end.to raise_error(ArgumentError, /does not belong to discussion/)
+      expect do
+        adapter.add_reaction(channel_id: channel_id, thread_id: thread_id, message_id: "501", emoji: "thumbs_up")
+      end.to raise_error(ArgumentError, /does not belong to discussion/)
+      expect do
+        adapter.remove_reaction(channel_id: channel_id, thread_id: thread_id, message_id: "501", emoji: "thumbs_up")
+      end.to raise_error(ArgumentError, /does not belong to discussion/)
+
+      expect(WebMock).to have_requested(:get, discussion_endpoint).times(4)
+      expect(WebMock).not_to have_requested(:put, note_endpoint)
+      expect(WebMock).not_to have_requested(:delete, note_endpoint)
+      expect(WebMock).not_to have_requested(:post, award_endpoint)
+      expect(WebMock).not_to have_requested(:delete, "#{award_endpoint}/700")
     end
 
     it "uses the GitLab page cursor for note history" do

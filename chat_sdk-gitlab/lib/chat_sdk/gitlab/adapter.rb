@@ -158,6 +158,7 @@ module ChatSDK
       def edit_message(channel_id:, message_id:, message:, thread_id: nil)
         thread = validated_thread!(channel_id, thread_id)
         validate_message_id!(message_id)
+        validate_discussion_note!(thread, message_id)
         note = @client.request_api(
           :put,
           "#{noteable_path(thread)}/notes/#{message_id}",
@@ -169,12 +170,14 @@ module ChatSDK
       def delete_message(channel_id:, message_id:, thread_id: nil)
         thread = validated_thread!(channel_id, thread_id)
         validate_message_id!(message_id)
+        validate_discussion_note!(thread, message_id)
         @client.request_api(:delete, "#{noteable_path(thread)}/notes/#{message_id}")
       end
 
       def add_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
         thread = validated_thread!(channel_id, thread_id)
         validate_message_id!(message_id)
+        validate_discussion_note!(thread, message_id)
         award_path = "#{noteable_path(thread)}/notes/#{message_id}/award_emoji"
         name = to_gitlab_emoji(emoji)
 
@@ -189,6 +192,7 @@ module ChatSDK
       def remove_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
         thread = validated_thread!(channel_id, thread_id)
         validate_message_id!(message_id)
+        validate_discussion_note!(thread, message_id)
         resolve_bot_identity unless @bot_user_id
         raise ChatSDK::ConfigurationError, "GitLab bot user ID is required to remove reactions" unless @bot_user_id
 
@@ -314,6 +318,19 @@ module ChatSDK
 
       def validate_message_id!(message_id)
         raise ArgumentError, "Invalid GitLab note ID: #{message_id}" unless NOTE_ID_PATTERN.match?(message_id.to_s)
+      end
+
+      def validate_discussion_note!(thread, message_id)
+        discussion_id = thread[:discussion_id]
+        return unless discussion_id
+
+        discussion = @client.request_api(
+          :get,
+          "#{noteable_path(thread)}/discussions/#{discussion_id}"
+        )
+        return if Array(discussion["notes"]).any? { |note| note["id"].to_s == message_id.to_s }
+
+        raise ArgumentError, "GitLab note #{message_id} does not belong to discussion #{discussion_id}"
       end
 
       def noteable_path(thread)
