@@ -15,6 +15,7 @@ module ChatSDK
         @update_interval = update_interval
         @ai_generated = ai_generated
         @buffer = +""
+        @delivered_text = +""
         @message_id = nil
         @message = nil
         @last_flush_at = nil
@@ -37,7 +38,7 @@ module ChatSDK
           block.call(self)
         end
         flush
-        message_with_text(@message, @buffer)
+        message_with_text(@message, @delivered_text)
       end
 
       private
@@ -68,6 +69,7 @@ module ChatSDK
           message: PostableMessage.new(text: @placeholder, ai_generated: @ai_generated),
           thread_id: thread_id
         )
+        @delivered_text = @placeholder.dup
         @message = result if result.is_a?(ChatSDK::Message)
         @message_id = result.id if result.respond_to?(:id)
       end
@@ -90,6 +92,7 @@ module ChatSDK
             message: PostableMessage.new(text: @buffer.dup, ai_generated: @ai_generated),
             thread_id: thread_id
           )
+          @delivered_text = @buffer.dup
         elsif !@message_id
           result = adapter.post_message(
             channel_id: channel_id,
@@ -98,6 +101,7 @@ module ChatSDK
           )
           @message = result if result.is_a?(ChatSDK::Message)
           @message_id = result.id if result.respond_to?(:id)
+          @delivered_text = @buffer.dup
         end
 
         @last_flush_at = Time.now.to_f
