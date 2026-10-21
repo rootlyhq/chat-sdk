@@ -181,7 +181,7 @@ module ChatSDK
             offset = update["update_id"] + 1
             next unless allowed_user?(update)
 
-            events = EventParser.parse(update, bot_username: @bot_username)
+            events = EventParser.parse(update, bot_username: @bot_username, mention_on_reply: @mention_on_reply)
             events.each { |event| block.call(event) }
           end
         end

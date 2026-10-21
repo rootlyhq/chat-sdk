@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- X mention events defer classification when mention entities are unavailable; Telegram polling honors reply mention settings and truncation preserves spoiler and code-span boundaries; WhatsApp outbound thread IDs must match the target channel
 - Telegram reply-to-bot mention handling now distinguishes forum topic roots, and MarkdownV2 truncation preserves complete links, code spans, and entities
 - WhatsApp inbound sender identifiers now fall back from empty phone fields to contact IDs, and outbound thread IDs are validated before sending
 - X mention events now set `message.is_mention` from the bot user ID in platform mention entities
