@@ -323,7 +323,7 @@ module ChatSDK
             handler.block.call(thread, event.message, context)
           when :message_updated
             handler.block.call(thread, event.message, event.previous_message)
-          when :reaction, :action, :slash_command, :message_deleted
+          when :reaction, :action, :slash_command, :message_deleted, :installed, :uninstalled
             add_thread_to_event(event, thread)
             handler.block.call(event)
           end

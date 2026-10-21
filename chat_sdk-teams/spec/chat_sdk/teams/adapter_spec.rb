@@ -92,6 +92,84 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(subject.verify_request!(request)).to be(true)
     end
 
+    it "trusts only HTTPS service URLs matching the verified serviceurl claim" do
+      state = ChatSDK::State::Memory.new
+      subject.set_state(state)
+      allow(subject.client).to receive(:send_activity).and_return({"id" => "reply-1"})
+      existing_url = "https://existing.example/teams/"
+      subject.register_service_url("mismatch-conversation", existing_url)
+      cases = [
+        {
+          conversation_id: "matching-conversation",
+          service_url: "https://smba.trafficmanager.net/teams/",
+          claim: "https://smba.trafficmanager.net/teams/",
+          expected_url: "https://smba.trafficmanager.net/teams/"
+        },
+        {
+          conversation_id: "normalized-trailing-slash-conversation",
+          service_url: "https://smba.trafficmanager.net/amer",
+          claim: "https://smba.trafficmanager.net/amer/",
+          expected_url: "https://smba.trafficmanager.net/amer"
+        },
+        {
+          conversation_id: "normalized-case-conversation",
+          service_url: "https://smba.trafficmanager.net/amer",
+          claim: "HTTPS://SMBA.TRAFFICMANAGER.NET/amer",
+          expected_url: "https://smba.trafficmanager.net/amer"
+        },
+        {
+          conversation_id: "mismatch-conversation",
+          service_url: "https://attacker.example/teams/",
+          claim: "https://smba.trafficmanager.net/teams/",
+          expected_url: existing_url
+        },
+        {
+          conversation_id: "insecure-conversation",
+          service_url: "http://smba.trafficmanager.net/teams/",
+          claim: "http://smba.trafficmanager.net/teams/",
+          expected_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL
+        }
+      ]
+
+      cases.each do |test_case|
+        token = build_jwt({"serviceurl" => test_case.fetch(:claim)})
+        activity = {
+          "type" => "message",
+          "text" => "hello",
+          "from" => {"id" => "user-1"},
+          "conversation" => {"id" => test_case.fetch(:conversation_id)},
+          "serviceUrl" => test_case.fetch(:service_url)
+        }
+        env = Rack::MockRequest.env_for(
+          "/api/messages",
+          :method => "POST",
+          :input => JSON.generate(activity),
+          "CONTENT_TYPE" => "application/json",
+          "HTTP_AUTHORIZATION" => "Bearer #{token}"
+        )
+        request = Rack::Request.new(env)
+
+        subject.verify_request!(request)
+        expect(request.env[ChatSDK::Teams::Adapter::VERIFIED_JWT_CLAIMS_ENV_KEY])
+          .to include("serviceurl" => test_case.fetch(:claim))
+        subject.parse_events(request)
+
+        conversation_id = test_case.fetch(:conversation_id)
+        subject.post_message(channel_id: conversation_id, message: "reply")
+        expect(subject.client).to have_received(:send_activity).with(
+          service_url: test_case.fetch(:expected_url),
+          conversation_id: conversation_id,
+          activity: anything
+        )
+      end
+
+      expect(state.get("chat_sdk:teams:service_url:matching-conversation"))
+        .to eq("https://smba.trafficmanager.net/teams/")
+      expect(state.get("chat_sdk:teams:service_url:normalized-trailing-slash-conversation"))
+        .to eq("https://smba.trafficmanager.net/amer")
+      expect(state.get("chat_sdk:teams:service_url:insecure-conversation")).to be_nil
+    end
+
     it "rejects missing authorization header" do
       env = Rack::MockRequest.env_for(
         "/api/messages",
@@ -327,6 +405,27 @@ RSpec.describe ChatSDK::Teams::Adapter do
     end
   end
 
+  describe "#upload_file" do
+    it "normalizes the parent reply id for a channel thread" do
+      service_url = "https://smba.trafficmanager.net/teams/"
+      subject.register_service_url("conv-1", service_url)
+      allow(subject.client).to receive(:send_activity).and_return({"id" => "upload-1"})
+
+      subject.upload_file(
+        channel_id: "conv-1",
+        io: double(read: "file contents"),
+        filename: "report.txt",
+        thread_id: "conv-1;messageid=parent-1"
+      )
+
+      expect(subject.client).to have_received(:send_activity).with(
+        service_url: service_url,
+        conversation_id: "conv-1",
+        activity: hash_including("replyToId" => "parent-1")
+      )
+    end
+  end
+
   describe "#start_typing" do
     before do
       subject.register_service_url("conv-1", "https://smba.trafficmanager.net/teams/")
@@ -358,9 +457,15 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(subject.supports?(:typing_indicator)).to be true
     end
 
-    it "raises PlatformError when no service URL is registered" do
-      expect { subject.start_typing(channel_id: "unknown-conv") }
-        .to raise_error(ChatSDK::PlatformError, /No service URL/)
+    it "uses the default service URL when no conversation URL is registered" do
+      allow(subject.client).to receive(:send_typing)
+
+      subject.start_typing(channel_id: "unknown-conv")
+
+      expect(subject.client).to have_received(:send_typing).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        conversation_id: "unknown-conv"
+      )
     end
   end
 
@@ -507,7 +612,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         approve = action_set["actions"][0]
         expect(approve["type"]).to eq("Action.Submit")
         expect(approve["title"]).to eq("Approve")
-        expect(approve["data"]).to eq({"action" => "btn:approve", "value" => "yes"})
+        expect(approve["data"]).to eq({"actionId" => "btn:approve", "value" => "yes"})
         expect(approve["style"]).to eq("positive")
 
         reject = action_set["actions"][1]
@@ -611,9 +716,16 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(result.id).to eq("msg-card-1")
     end
 
-    it "raises PlatformError when no service URL is registered" do
-      expect { subject.post_message(channel_id: "unknown-conv", message: "Hello") }
-        .to raise_error(ChatSDK::PlatformError, /No service URL/)
+    it "uses the default service URL when no conversation URL is registered" do
+      allow(subject.client).to receive(:send_activity).and_return({"id" => "message-1"})
+
+      subject.post_message(channel_id: "unknown-conv", message: "Hello")
+
+      expect(subject.client).to have_received(:send_activity).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        conversation_id: "unknown-conv",
+        activity: hash_including("text" => "Hello")
+      )
     end
   end
 

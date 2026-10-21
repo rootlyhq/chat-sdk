@@ -133,6 +133,16 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
     end
   end
 
+  describe "webhook response" do
+    it "returns an adapter response after dispatching parsed events" do
+      response = [200, {"content-type" => "application/json"}, ['{"statusCode":200}']]
+      allow(test_adapter).to receive(:webhook_response).and_return(response)
+
+      expect(endpoint.call(env)).to eq(response)
+      expect(test_adapter).to have_received(:webhook_response).with([])
+    end
+  end
+
   describe "handler error" do
     it "does not propagate handler errors and returns 200" do
       event = ChatSDK::Events::Mention.new(
