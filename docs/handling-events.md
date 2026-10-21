@@ -146,6 +146,37 @@ end
 
 The event exposes `adapter_name`, `installation_id`, `team_id`, `tenant_id`, `conversation_id`, `action`, `user` (`ChatSDK::Author`), and `raw`. Teams actions include `add`, `add-upgrade`, `remove`, and `remove-upgrade`. These events are not derived from generic `conversationUpdate` membership changes.
 
+## Slack assistant, App Home and membership events
+
+Slack assistant thread, Home tab, and channel membership events are available through event-object handlers:
+
+```ruby
+slack = bot.adapter(:slack)
+
+bot.on_assistant_thread_started do |event|
+  slack.set_suggested_prompts(
+    channel_id: event.channel_id,
+    thread_id: event.thread_ts,
+    prompts: [{title: "Summarize", message: "Summarize this thread"}]
+  )
+end
+
+bot.on_app_home_opened do |event|
+  slack.publish_home_view(user_id: event.user_id, view: {
+    type: "home",
+    blocks: [{type: "section", text: {type: "mrkdwn", text: "Welcome!"}}]
+  })
+end
+```
+
+These Slack-only handlers receive:
+
+- `on_assistant_thread_started` and `on_assistant_context_changed`: `thread_id`, `channel_id`, `thread_ts`, `user_id`, and `context` (`ChatSDK::Events::AssistantContext` with `channel_id`, `team_id`, `enterprise_id`, `thread_entry_point`, and `force_search`)
+- `on_app_home_opened`: `user_id`, `channel_id`, and optional `tab`
+- `on_member_joined_channel`: `user_id`, `channel_id`, and optional `inviter_id`
+
+Subscribe to the Slack events `assistant_thread_started`, `assistant_thread_context_changed`, `app_home_opened`, and `member_joined_channel` in your app's Event Subscriptions settings.
+
 ## on_slash_command
 
 Fires when a user types a slash command (e.g., `/deploy`).
@@ -178,6 +209,10 @@ end
 | `on_slash_command(command)` | `\|event\|` | Slash command invoked |
 | `on_installed` | `\|event\|` | Teams bot installation or upgrade that adds it |
 | `on_uninstalled` | `\|event\|` | Teams bot removal or upgrade that removes it |
+| `on_assistant_thread_started` | `\|event\|` | Slack assistant thread starts |
+| `on_assistant_context_changed` | `\|event\|` | Slack assistant thread context changes |
+| `on_app_home_opened` | `\|event\|` | Slack Home tab opens |
+| `on_member_joined_channel` | `\|event\|` | A member joins a Slack channel |
 
 ## Multiple Handlers
 

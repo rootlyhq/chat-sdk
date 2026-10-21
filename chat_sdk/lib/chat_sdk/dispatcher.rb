@@ -5,6 +5,13 @@ require "time"
 
 module ChatSDK
   class Dispatcher
+    LIFECYCLE_EVENT_TYPES = %i[
+      assistant_thread_started
+      assistant_context_changed
+      app_home_opened
+      member_joined_channel
+    ].freeze
+
     LockHeartbeat = Struct.new(:thread, :mutex, :condition, :stop, :ownership_lost) do
       def ownership_lost?
         mutex.synchronize { ownership_lost }
@@ -25,6 +32,12 @@ module ChatSDK
     def dispatch(event, adapter:, adapter_name:)
       ChatSDK::Instrumentation.instrument("dispatch.chat_sdk", adapter: adapter_name, event_type: event.type) do
         if %i[message_updated message_deleted].include?(event.type)
+          return execute_event(event, build_thread(event, adapter), adapter_name: adapter_name)
+        end
+
+        if LIFECYCLE_EVENT_TYPES.include?(event.type)
+          return unless dedupe(event, adapter_name, adapter.concurrency_scope(event))
+
           return execute_event(event, build_thread(event, adapter), adapter_name: adapter_name)
         end
 
@@ -328,6 +341,8 @@ module ChatSDK
             handler.block.call(thread, event.message, event.previous_message)
           when :reaction, :action, :slash_command, :message_deleted, :installed, :uninstalled
             add_thread_to_event(event, thread)
+            handler.block.call(event)
+          when *LIFECYCLE_EVENT_TYPES
             handler.block.call(event)
           end
         end

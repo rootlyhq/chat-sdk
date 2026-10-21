@@ -215,13 +215,13 @@ Generate an app-level token (starting with `xapp-`) in your Slack app under **Ba
 Control the Slack Assistants thread experience with suggested prompts, status indicators, and titles:
 
 ```ruby
-slack.set_suggested_prompts(channel_id: channel, thread_ts: ts,
+slack.set_suggested_prompts(channel_id: channel, thread_id: ts,
   prompts: [{title: "Summarize", message: "Summarize this thread"}])
 
-slack.set_assistant_status(channel_id: channel, thread_ts: ts,
+slack.set_assistant_status(channel_id: channel, thread_id: ts,
   status: "is thinking...")
 
-slack.set_assistant_title(channel_id: channel, thread_ts: ts,
+slack.set_assistant_title(channel_id: channel, thread_id: ts,
   title: "Support Bot")
 ```
 

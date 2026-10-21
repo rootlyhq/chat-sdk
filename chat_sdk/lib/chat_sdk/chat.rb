@@ -76,6 +76,22 @@ module ChatSDK
       @registry.register(:uninstalled, &block)
     end
 
+    def on_assistant_thread_started(&block)
+      @registry.register(:assistant_thread_started, &block)
+    end
+
+    def on_assistant_context_changed(&block)
+      @registry.register(:assistant_context_changed, &block)
+    end
+
+    def on_app_home_opened(&block)
+      @registry.register(:app_home_opened, &block)
+    end
+
+    def on_member_joined_channel(&block)
+      @registry.register(:member_joined_channel, &block)
+    end
+
     # Adapter access
     def adapter(name)
       @adapters.fetch(name) { raise ChatSDK::ConfigurationError, "Unknown adapter: #{name}" }

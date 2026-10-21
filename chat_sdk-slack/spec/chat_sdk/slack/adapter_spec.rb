@@ -293,6 +293,112 @@ RSpec.describe ChatSDK::Slack::Adapter do
       end
     end
 
+    context "assistant_thread_started event" do
+      it "parses a raw Slack thread ID and context" do
+        payload = {
+          "type" => "event_callback",
+          "event_id" => "Ev123",
+          "event" => {
+            "type" => "assistant_thread_started",
+            "event_ts" => "1234567890.123456",
+            "assistant_thread" => {
+              "user_id" => "U123",
+              "channel_id" => "D789",
+              "thread_ts" => "1234567890.654321",
+              "context" => {"channel_id" => "C456", "team_id" => "T789"}
+            }
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::AssistantThreadStarted)
+        expect(event.thread_id).to eq("1234567890.654321")
+        expect(event.thread_ts).to eq("1234567890.654321")
+        expect(event.channel_id).to eq("D789")
+        expect(event.context.channel_id).to eq("C456")
+        expect(event.context.team_id).to eq("T789")
+        expect(event.raw["event_id"]).to eq("Ev123")
+        expect(event.timestamp).to eq(Time.at(1_234_567_890.123456))
+      end
+    end
+
+    context "assistant_thread_context_changed event" do
+      it "parses the assistant thread context" do
+        payload = {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "assistant_thread_context_changed",
+            "event_ts" => "1234567890.123456",
+            "assistant_thread" => {
+              "user_id" => "U123",
+              "channel_id" => "D789",
+              "thread_ts" => "1234567890.654321",
+              "context" => {"team_id" => "T789"}
+            }
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::AssistantContextChanged)
+        expect(event.context.team_id).to eq("T789")
+      end
+    end
+
+    context "app_home_opened event" do
+      it "parses home tab opens and ignores other tabs" do
+        payload = {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "app_home_opened",
+            "user" => "U123",
+            "channel" => "D789",
+            "tab" => "home",
+            "event_ts" => "1234567890.123456"
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::AppHomeOpened)
+        expect(event.user_id).to eq("U123")
+        expect(event.channel_id).to eq("D789")
+        expect(event.tab).to eq("home")
+        expect(subject.parse_events(build_request(JSON.generate(
+          payload.merge("event" => payload["event"].merge("tab" => "messages"))
+        )))).to eq([])
+      end
+    end
+
+    context "member_joined_channel event" do
+      it "parses the member and inviter IDs" do
+        payload = {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "member_joined_channel",
+            "user" => "U123",
+            "channel" => "C789",
+            "inviter" => "U456",
+            "event_ts" => "1234567890.123456"
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::MemberJoinedChannel)
+        expect(event.user_id).to eq("U123")
+        expect(event.channel_id).to eq("C789")
+        expect(event.inviter_id).to eq("U456")
+      end
+    end
+
+    it "ignores assistant thread events with missing assistant_thread data" do
+      payload = {"type" => "event_callback", "event" => {"type" => "assistant_thread_started"}}
+
+      expect(subject.parse_events(build_request(JSON.generate(payload)))).to eq([])
+    end
+
     context "message event (channel)" do
       it "parses into a SubscribedMessage event" do
         payload = {
@@ -1244,6 +1350,31 @@ RSpec.describe ChatSDK::Slack::Adapter do
       }
     end
 
+    def event_callback_payload(team_id:, event_id:, event:, authorizations: nil, enterprise_id: nil)
+      payload = {"type" => "event_callback", "team_id" => team_id, "event_id" => event_id}
+      payload["authorizations"] = authorizations if authorizations
+      payload["enterprise_id"] = enterprise_id if enterprise_id
+      payload["event"] = event
+      payload
+    end
+
+    def chat_for_adapter(adapter)
+      ChatSDK::Chat.new(user_name: "bot", adapters: {slack: adapter}, state: ChatSDK::State::Memory.new)
+    end
+
+    def dispatch_lifecycle_payload(adapter:, chat:, payload:)
+      events = adapter.parse_events(request_for(payload))
+      expect(events.size).to eq(1)
+      chat.dispatch(events.first, adapter_name: :slack)
+      events.first
+    end
+
+    def stub_slack_api_call(token)
+      stub_request(:post, %r{\Ahttps://slack\.com/api/})
+        .with(headers: {"Authorization" => "Bearer #{token}"})
+        .to_return(status: 200, body: '{"ok":true}', headers: {"Content-Type" => "application/json"})
+    end
+
     it "resolves workspace event installations using the provider token" do
       provider = double("installation provider")
       allow(provider).to receive(:get_installation)
@@ -1540,6 +1671,174 @@ RSpec.describe ChatSDK::Slack::Adapter do
       expect {
         described_class.new(installation_provider: "not-a-provider", signing_secret: signing_secret)
       }.to raise_error(ChatSDK::ConfigurationError, /installation_provider must respond/)
+    end
+
+    describe "lifecycle event dispatch" do
+      it "dispatches app_home_opened using the provider team token" do
+        provider = double("installation provider")
+        allow(provider).to receive(:get_installation)
+          .with("T_HOME", enterprise_install: false)
+          .and_return({"bot_token" => "xoxb-home"})
+        adapter = described_class.new(
+          installation_provider: provider,
+          webhook_verifier: ->(_request, _body) { true }
+        )
+        chat = chat_for_adapter(adapter)
+        api_request = stub_slack_api_call("xoxb-home")
+        received_event = nil
+        chat.on_app_home_opened do |event|
+          received_event = event
+          adapter.publish_home_view(user_id: event.user_id, view: {type: "home", blocks: []})
+        end
+        payload = event_callback_payload(
+          team_id: "T_HOME",
+          event_id: "EvHome",
+          event: {
+            "type" => "app_home_opened",
+            "user" => "U_HOME",
+            "channel" => "D_HOME",
+            "tab" => "home",
+            "event_ts" => "1234567890.123456"
+          }
+        )
+
+        event = dispatch_lifecycle_payload(adapter: adapter, chat: chat, payload: payload)
+
+        expect(event).to be_a(ChatSDK::Events::AppHomeOpened)
+        expect(event).to have_attributes(user_id: "U_HOME", channel_id: "D_HOME", tab: "home")
+        expect(received_event).to be(event)
+        expect(provider).to have_received(:get_installation).with("T_HOME", enterprise_install: false).once
+        expect(api_request).to have_been_requested.once
+      end
+
+      it "dispatches member_joined_channel using the provider team token" do
+        provider = double("installation provider")
+        allow(provider).to receive(:get_installation)
+          .with("T_MEMBER", enterprise_install: false)
+          .and_return({"bot_token" => "xoxb-member"})
+        adapter = described_class.new(
+          installation_provider: provider,
+          webhook_verifier: ->(_request, _body) { true }
+        )
+        chat = chat_for_adapter(adapter)
+        api_request = stub_slack_api_call("xoxb-member")
+        received_event = nil
+        chat.on_member_joined_channel do |event|
+          received_event = event
+          adapter.client.auth_test
+        end
+        payload = event_callback_payload(
+          team_id: "T_MEMBER",
+          event_id: "EvMember",
+          event: {
+            "type" => "member_joined_channel",
+            "user" => "U_MEMBER",
+            "channel" => "C_MEMBER",
+            "inviter" => "U_INVITER",
+            "event_ts" => "1234567890.123456"
+          }
+        )
+
+        event = dispatch_lifecycle_payload(adapter: adapter, chat: chat, payload: payload)
+
+        expect(event).to be_a(ChatSDK::Events::MemberJoinedChannel)
+        expect(event).to have_attributes(user_id: "U_MEMBER", channel_id: "C_MEMBER", inviter_id: "U_INVITER")
+        expect(received_event).to be(event)
+        expect(provider).to have_received(:get_installation).with("T_MEMBER", enterprise_install: false).once
+        expect(api_request).to have_been_requested.once
+      end
+
+      it "dispatches assistant_thread_started using the provider team token" do
+        provider = double("installation provider")
+        allow(provider).to receive(:get_installation)
+          .with("T_ASSISTANT", enterprise_install: false)
+          .and_return({"bot_token" => "xoxb-assistant"})
+        adapter = described_class.new(
+          installation_provider: provider,
+          webhook_verifier: ->(_request, _body) { true }
+        )
+        chat = chat_for_adapter(adapter)
+        api_request = stub_slack_api_call("xoxb-assistant")
+        prompts = [{title: "Welcome", message: "Start here"}]
+        received_event = nil
+        chat.on_assistant_thread_started do |event|
+          received_event = event
+          adapter.set_suggested_prompts(
+            channel_id: event.channel_id,
+            thread_id: event.thread_ts,
+            prompts: prompts
+          )
+        end
+        payload = event_callback_payload(
+          team_id: "T_ASSISTANT",
+          event_id: "EvAssistant",
+          event: {
+            "type" => "assistant_thread_started",
+            "assistant_thread" => {
+              "channel_id" => "C_ASSISTANT",
+              "thread_ts" => "1234567890.123456",
+              "user_id" => "U_ASSISTANT",
+              "context" => {"team_id" => "T_ASSISTANT"}
+            },
+            "event_ts" => "1234567890.123456"
+          }
+        )
+
+        event = dispatch_lifecycle_payload(adapter: adapter, chat: chat, payload: payload)
+
+        expect(event).to be_a(ChatSDK::Events::AssistantThreadStarted)
+        expect(event).to have_attributes(
+          channel_id: "C_ASSISTANT",
+          thread_ts: "1234567890.123456",
+          user_id: "U_ASSISTANT"
+        )
+        expect(event.context.team_id).to eq("T_ASSISTANT")
+        expect(received_event).to be(event)
+        expect(provider).to have_received(:get_installation).with("T_ASSISTANT", enterprise_install: false).once
+        expect(api_request).to have_been_requested.once
+      end
+
+      it "uses the authorized enterprise installation for lifecycle events" do
+        provider = double("installation provider")
+        allow(provider).to receive(:get_installation)
+          .with("E_GRID", enterprise_install: true)
+          .and_return({"bot_token" => "xoxb-enterprise"})
+        adapter = described_class.new(
+          installation_provider: provider,
+          webhook_verifier: ->(_request, _body) { true }
+        )
+        chat = chat_for_adapter(adapter)
+        api_request = stub_slack_api_call("xoxb-enterprise")
+        received_event = nil
+        chat.on_app_home_opened do |event|
+          received_event = event
+          adapter.publish_home_view(user_id: event.user_id, view: {type: "home", blocks: []})
+        end
+        payload = event_callback_payload(
+          team_id: "T_TOP_LEVEL",
+          event_id: "EvEnterpriseHome",
+          enterprise_id: "E_TOP_LEVEL",
+          authorizations: [{
+            "team_id" => "T_AUTHORIZED",
+            "enterprise_id" => "E_GRID",
+            "is_enterprise_install" => true
+          }],
+          event: {
+            "type" => "app_home_opened",
+            "user" => "U_ENTERPRISE",
+            "channel" => "D_ENTERPRISE",
+            "tab" => "home",
+            "event_ts" => "1234567890.123456"
+          }
+        )
+
+        event = dispatch_lifecycle_payload(adapter: adapter, chat: chat, payload: payload)
+
+        expect(event).to be_a(ChatSDK::Events::AppHomeOpened)
+        expect(received_event).to be(event)
+        expect(provider).to have_received(:get_installation).with("E_GRID", enterprise_install: true).once
+        expect(api_request).to have_been_requested.once
+      end
     end
   end
 
@@ -1899,6 +2198,56 @@ RSpec.describe ChatSDK::Slack::Adapter do
 
       expect(client_a).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
       expect(client_b).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
+    end
+
+    it "dispatches lifecycle events parsed from Socket Mode with the provider token" do
+      token = "xoxb-socket-lifecycle"
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("T_SOCKET", enterprise_install: false)
+        .and_return({"bot_token" => token})
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+      chat = ChatSDK::Chat.new(user_name: "bot", adapters: {slack: adapter}, state: ChatSDK::State::Memory.new)
+      api_request = stub_request(:post, %r{\Ahttps://slack\.com/api/})
+        .with(headers: {"Authorization" => "Bearer #{token}"})
+        .to_return(status: 200, body: '{"ok":true}', headers: {"Content-Type" => "application/json"})
+      received_event = nil
+      chat.on_app_home_opened do |event|
+        received_event = event
+        adapter.publish_home_view(user_id: event.user_id, view: {type: "home", blocks: []})
+      end
+
+      socket_parser = ChatSDK::Slack::SocketMode.new(app_token: "xapp-test-token", bot_client: nil)
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new).and_return(socket_double)
+      socket_callback = nil
+      allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
+      adapter.start_socket_mode(app_token: "xapp-test-token") do |event|
+        chat.dispatch(event, adapter_name: :slack)
+      end
+
+      payload = {
+        "type" => "event_callback",
+        "team_id" => "T_SOCKET",
+        "event_id" => "EvSocketLifecycle",
+        "event" => {
+          "type" => "app_home_opened",
+          "user" => "U_SOCKET",
+          "channel" => "D_SOCKET",
+          "tab" => "home",
+          "event_ts" => "1234567890.123456"
+        }
+      }
+      envelope = {"type" => "events_api", "payload" => payload}
+      ws_event = double("ws_event", data: JSON.generate(envelope))
+      socket_parser.send(:handle_message, ws_event) do |event, event_payload|
+        socket_callback.call(event, event_payload)
+      end
+
+      expect(received_event).to be_a(ChatSDK::Events::AppHomeOpened)
+      expect(received_event).to have_attributes(user_id: "U_SOCKET", channel_id: "D_SOCKET", tab: "home")
+      expect(provider).to have_received(:get_installation).with("T_SOCKET", enterprise_install: false).once
+      expect(api_request).to have_been_requested.once
     end
 
     it "uses the event workspace client for Socket Mode mention classification" do
