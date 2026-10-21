@@ -15,7 +15,7 @@ module ChatSDK
         @phone_number_id = phone_number_id
       end
 
-      def send_message(to:, type:, **payload)
+      def send_message(to:, type:, phone_number_id: @phone_number_id, **payload)
         body = {
           "messaging_product" => "whatsapp",
           "recipient_type" => "individual",
@@ -23,18 +23,19 @@ module ChatSDK
           "type" => type
         }.merge(payload)
 
-        request(:post, "#{@phone_number_id}/messages", body)
+        request(:post, "#{phone_number_id}/messages", body)
       end
 
-      def send_reaction(to:, message_id:, emoji:)
+      def send_reaction(to:, message_id:, emoji:, phone_number_id: @phone_number_id)
         send_message(
           to: to,
           type: "reaction",
+          phone_number_id: phone_number_id,
           reaction: {message_id: message_id, emoji: emoji}
         )
       end
 
-      def send_template(to:, template_name:, language_code: "en", components: nil)
+      def send_template(to:, template_name:, language_code: "en", components: nil, phone_number_id: @phone_number_id)
         body = {
           "messaging_product" => "whatsapp",
           "to" => to,
@@ -45,11 +46,11 @@ module ChatSDK
           }
         }
         body["template"]["components"] = components if components
-        request(:post, "#{@phone_number_id}/messages", body)
+        request(:post, "#{phone_number_id}/messages", body)
       end
 
-      def mark_as_read(message_id:)
-        request(:post, "#{@phone_number_id}/messages", {
+      def mark_as_read(message_id:, phone_number_id: @phone_number_id)
+        request(:post, "#{phone_number_id}/messages", {
           "messaging_product" => "whatsapp",
           "status" => "read",
           "message_id" => message_id
@@ -69,8 +70,8 @@ module ChatSDK
           .tap { |response| validate_media_response!(response) }
       end
 
-      def upload_media(io:, filename:, content_type:)
-        response = upload_connection.post("#{@phone_number_id}/media") do |req|
+      def upload_media(io:, filename:, content_type:, phone_number_id: @phone_number_id)
+        response = upload_connection.post("#{phone_number_id}/media") do |req|
           req.body = {
             "messaging_product" => "whatsapp",
             "file" => Faraday::Multipart::FilePart.new(io, content_type, filename),

@@ -193,6 +193,54 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       end
     end
 
+    it "falls back to the contact BSUID when phone identifiers are empty" do
+      payload = {
+        "object" => "whatsapp_business_account",
+        "entry" => [{
+          "changes" => [{
+            "field" => "messages",
+            "value" => {
+              "messages" => [{
+                "from" => "",
+                "from_user_id" => "",
+                "id" => "wamid.bsuid",
+                "type" => "text",
+                "text" => {"body" => "Hello"}
+              }],
+              "contacts" => [{
+                "wa_id" => "",
+                "user_id" => "US.13491208655302741918"
+              }]
+            }
+          }]
+        }]
+      }
+
+      events = subject.parse_events(build_request(JSON.generate(payload)))
+
+      expect(events.first.channel_id).to eq("US.13491208655302741918")
+      expect(events.first.message.author.id).to eq("US.13491208655302741918")
+    end
+
+    it "falls back to the contact phone ID when the sender is empty" do
+      payload = {
+        "object" => "whatsapp_business_account",
+        "entry" => [{
+          "changes" => [{
+            "field" => "messages",
+            "value" => {
+              "messages" => [{"from" => "", "id" => "wamid.phone", "type" => "text"}],
+              "contacts" => [{"wa_id" => "15551234567"}]
+            }
+          }]
+        }]
+      }
+
+      events = subject.parse_events(build_request(JSON.generate(payload)))
+
+      expect(events.first.channel_id).to eq("15551234567")
+    end
+
     context "interactive button reply" do
       it "parses into Action event" do
         payload = {
@@ -526,6 +574,39 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       expect(result).to be_a(ChatSDK::Message)
       expect(result.id).to eq("wamid.resp123")
       expect(result.platform).to eq(:whatsapp)
+    end
+
+    it "uses the numeric phone number ID from the thread" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/987654321/messages})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"messages" => [{"id" => "wamid.thread"}]}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.post_message(
+        channel_id: "15551234567",
+        message: "Hello!",
+        thread_id: "whatsapp:987654321:15551234567"
+      )
+
+      expect(stub).to have_been_requested
+      expect(result.thread_id).to eq("whatsapp:987654321:15551234567")
+    end
+
+    it "rejects a nonnumeric phone number ID before making a request" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/.*/messages})
+        .to_return(status: 200, body: JSON.generate({"messages" => [{"id" => "wamid"}]}))
+
+      expect {
+        subject.post_message(
+          channel_id: "15551234567",
+          message: "Hello!",
+          thread_id: "whatsapp:not-numeric:15551234567"
+        )
+      }.to raise_error(ChatSDK::Error, /Invalid WhatsApp phone number ID/)
+
+      expect(stub).not_to have_been_requested
     end
 
     it "sends a card message as interactive" do
