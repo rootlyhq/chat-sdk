@@ -38,7 +38,7 @@ Threads are typically created via `Channel#thread` rather than directly.
 
 ### post(content)
 
-Posts a message to the thread. Accepts a `String`, `Cards::Node`, or `PostableMessage`.
+Posts a message to the thread. Accepts a `String`, `Cards::Node`, `PostableMessage`, or `StreamingPlan`.
 
 ```ruby
 thread.post("Hello!")
@@ -62,9 +62,9 @@ thread.post_ephemeral("Only you see this", user_id: "U123")
 
 Raises `NotSupportedError` if the adapter does not support `:ephemeral_messages`.
 
-### post\_stream(placeholder: nil, &block)
+### post\_stream(source = nil, placeholder: nil, **plan_options, &block)
 
-Posts a streaming message that is updated incrementally via edits. Creates a `Streaming::Stream` object using the chat's `streaming_update_interval` config.
+Posts a streaming message from an enumerable source or a block. The block receives a writer that accepts chunks with `<<`. Supports the `StreamingPlan` options `group_tasks`, `end_with`, `update_interval`, and `ai_generated`. Returns the posted `ChatSDK::Message`.
 
 ```ruby
 thread.post_stream(placeholder: "Loading...") do |stream|
@@ -72,26 +72,29 @@ thread.post_stream(placeholder: "Loading...") do |stream|
   stream << "second chunk "
   stream << "done."
 end
+
+thread.post_stream(chunks, group_tasks: :plan)
+thread.post(ChatSDK::StreamingPlan.new(chunks, group_tasks: :plan))
 ```
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `placeholder` | `String` | No | `nil` | Initial message text posted before streaming begins |
 
-The block receives a `Streaming::Stream` that supports `<<` to append text chunks. The stream flushes edits at the configured `streaming_update_interval`.
+The block receives a writer that supports `<<` to append stream chunks. Text is available to the core post-and-edit fallback; structured task and plan chunks are sent only by adapters that support them.
 
-### post\_ai\_stream(enumerable, placeholder: "Thinking...")
+### post\_ai\_stream(enumerable, placeholder: "Thinking...", **plan\_options)
 
-Streams an AI response (from any `Enumerable` that yields string chunks) into the thread.
+Streams an AI response (from any `Enumerable` that yields strings or streaming chunks) into the thread. Accepts the same plan options as `post_stream` and returns the posted `ChatSDK::Message`.
 
 ```ruby
 chunks = ai_client.chat_stream(messages: msgs)
-thread.post_ai_stream(chunks, placeholder: "Thinking...")
+thread.post_ai_stream(chunks, placeholder: "Thinking...", ai_generated: true)
 ```
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `enumerable` | `Enumerable` | Yes | -- | An enumerable yielding string chunks |
+| `enumerable` | `Enumerable` | Yes | -- | An enumerable yielding strings or streaming chunks |
 | `placeholder` | `String` | No | `"Thinking..."` | Initial placeholder text |
 
 Delegates to `ChatSDK::AI::StreamHandler.stream_to_thread`.

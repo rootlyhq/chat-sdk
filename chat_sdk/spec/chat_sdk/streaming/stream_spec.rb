@@ -22,11 +22,13 @@ RSpec.describe ChatSDK::Streaming::Stream do
     it "posts placeholder message, yields stream, and final flush edits message" do
       stream = build_stream(placeholder: "Thinking...")
 
-      stream.run do |s|
+      result = stream.run do |s|
         s << "Hello "
         s << "world"
       end
 
+      expect(result.id).to eq("msg_1")
+      expect(result.text).to eq("Hello world")
       expect(adapter.posted_messages.size).to eq(1)
       posted = adapter.posted_messages.first
       expect(posted[:message].text).to eq("Thinking...")
@@ -39,6 +41,32 @@ RSpec.describe ChatSDK::Streaming::Stream do
       expect(last_edit[:channel_id]).to eq(channel_id)
       expect(last_edit[:message_id]).to eq("msg_1")
     end
+
+    it "returns the placeholder text when no chunks are produced" do
+      result = build_stream(placeholder: "Thinking...").run
+
+      expect(result.id).to eq("msg_1")
+      expect(result.text).to eq("Thinking...")
+    end
+  end
+
+  it "returns the posted message" do
+    message = build_stream.run(["Hello"])
+
+    expect(message).to be_a(ChatSDK::Message)
+    expect(message.id).to eq("msg_1")
+    expect(message.text).to eq("Hello")
+  end
+
+  it "returns the final text without a placeholder" do
+    message = build_stream.run(["first", " ", "second"])
+
+    expect(message.id).to eq("msg_1")
+    expect(message.text).to eq("first second")
+  end
+
+  it "returns nil when it posts no message" do
+    expect(build_stream.run).to be_nil
   end
 
   describe "legacy edit method signatures" do
@@ -166,7 +194,7 @@ RSpec.describe ChatSDK::Streaming::Stream do
       end.new
     end
 
-    it "posts single message at end instead of edits" do
+    it "returns placeholder text when edits are unsupported" do
       stream = described_class.new(
         adapter: no_edit_adapter,
         channel_id: channel_id,
@@ -175,10 +203,13 @@ RSpec.describe ChatSDK::Streaming::Stream do
         update_interval: 0
       )
 
-      stream.run do |s|
+      result = stream.run do |s|
         s << "Result "
         s << "here"
       end
+
+      expect(result.id).to eq("msg_1")
+      expect(result.text).to eq("Thinking...")
 
       # Placeholder is posted first
       expect(no_edit_adapter.posts.size).to eq(1)
