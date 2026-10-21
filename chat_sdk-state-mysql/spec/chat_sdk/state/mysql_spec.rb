@@ -1,21 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
-require "uri"
 
 def mysql_url
   ENV["MYSQL_URL"] || "mysql2://root@localhost/chat_sdk_dev"
 end
 
 def mysql_options
-  uri = URI.parse(mysql_url)
-  {
-    host: uri.host,
-    port: uri.port,
-    username: uri.user && URI.decode_www_form_component(uri.user),
-    password: uri.password && URI.decode_www_form_component(uri.password),
-    database: URI.decode_www_form_component(uri.path.delete_prefix("/"))
-  }
+  ChatSDK::State::Mysql.parse_url(mysql_url)
 end
 
 def mysql_available?
