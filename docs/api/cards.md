@@ -67,9 +67,11 @@ end
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
-| `button(text, id:, style:, value:, tooltip:, visible_to:)` | `String`, keyword args | Add a button, optionally restricted to user IDs |
-| `link_button(text, url:, id:, tooltip:, visible_to:)` | `String`, keyword args | Add a link button, optionally restricted to user IDs |
+| `button(text, id:, style:, value:, tooltip:, visible_to:)` | `String`, keyword args | Add a button; `visible_to` is a Slack-only display hint |
+| `link_button(text, url:, id:, tooltip:, visible_to:)` | `String`, keyword args | Add a link button; `visible_to` is a Slack-only display hint |
 | `select(id:, placeholder:, &block)` | keyword args, Block | Add a select menu |
+
+`visible_to` is a display hint rendered natively only by Slack. Other platforms still show the button, so action handlers must check `event.user` before acting.
 
 ## Cards::SelectContext
 

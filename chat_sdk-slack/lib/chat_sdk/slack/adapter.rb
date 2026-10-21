@@ -38,6 +38,8 @@ module ChatSDK
 
       # Returns the per-request client (multi-workspace) or the static client (single-workspace).
       def client
+        return @client unless @client_id
+
         ::Thread.current[:chat_sdk_slack_client] || @client
       end
 
@@ -57,6 +59,7 @@ module ChatSDK
           "bot_user_id" => bot_user_id,
           "team_name" => team_name
         })
+        invalidate_bot_user_id(team_id)
       end
 
       def get_installation(team_id)
@@ -67,6 +70,7 @@ module ChatSDK
 
       def delete_installation(team_id)
         @team_clients.delete(team_id)
+        invalidate_bot_user_id(team_id)
         return unless @state
 
         @state.delete(installation_key(team_id))
@@ -157,12 +161,7 @@ module ChatSDK
         end
 
         events = EventParser.parse(parsed)
-        events.each do |event|
-          next unless %i[mention subscribed_message direct_message].include?(event.type)
-
-          event.message.is_mention = classify_mention(event, parsed)
-        end
-        events
+        classify_message_events(events, parsed)
       end
 
       # Outbound
@@ -352,9 +351,13 @@ module ChatSDK
       def start_socket_mode(app_token: nil, &block)
         app_token ||= ENV["SLACK_APP_TOKEN"]
         raise ChatSDK::ConfigurationError, "Slack app_token required for socket mode" unless app_token
+        raise ArgumentError, "start requires a block" unless block
 
         @socket_mode = SocketMode.new(app_token: app_token, bot_client: client)
-        @socket_mode.start(&block)
+        @socket_mode.start do |event|
+          classify_message_events([event], event.raw)
+          block.call(event)
+        end
       end
 
       def stop_socket_mode
@@ -382,6 +385,15 @@ module ChatSDK
         options.empty? ? ::Slack::Web::Client.new : ::Slack::Web::Client.new(options)
       end
 
+      def classify_message_events(events, payload)
+        events.each do |event|
+          next unless %i[mention subscribed_message direct_message].include?(event.type)
+
+          event.message.is_mention = classify_mention(event, payload)
+        end
+        events
+      end
+
       def classify_mention(event, payload)
         bot_user_id = resolve_bot_user_id(event)
         return true if event.type == :mention && bot_user_id.nil?
@@ -389,7 +401,8 @@ module ChatSDK
 
         raw_event = payload["event"] || {}
         text = raw_event["text"].to_s
-        text_mentions_bot = ChatSDK::Format::Mentions.mask_code_spans(text).include?("<@#{bot_user_id}>")
+        masked_text = ChatSDK::Format::Mentions.mask_code_spans(text)
+        text_mentions_bot = /<@#{Regexp.escape(bot_user_id)}(?:\|[^>]*)?>/.match?(masked_text)
         text_mentions_bot || rich_text_mentions_bot?(raw_event["blocks"], bot_user_id)
       end
 
@@ -409,12 +422,18 @@ module ChatSDK
           cache_key = @client_id ? (concurrency_scope(event) || :default) : :default
           return @bot_user_ids[cache_key] if @bot_user_ids.key?(cache_key)
 
-          @bot_user_ids[cache_key] = begin
+          bot_user_id = begin
             current_client.auth_test["user_id"]
           rescue ::Slack::Web::Api::Errors::SlackError, Faraday::Error, SocketError, Timeout::Error
             nil
           end
+          @bot_user_ids[cache_key] = bot_user_id if bot_user_id
+          bot_user_id
         end
+      end
+
+      def invalidate_bot_user_id(team_id)
+        @bot_user_id_mutex.synchronize { @bot_user_ids.delete(team_id) }
       end
 
       def rich_text_mentions_bot?(blocks, bot_user_id)
