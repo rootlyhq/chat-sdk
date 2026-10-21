@@ -2,6 +2,8 @@
 
 module ChatSDK
   class Thread
+    include Adapter::Invocation
+
     attr_reader :id, :channel_id, :adapter, :chat, :current_message
 
     def initialize(id:, channel_id:, adapter:, chat:, current_message: nil)
@@ -73,19 +75,19 @@ module ChatSDK
 
     def edit(message_id, content)
       message = PostableMessage.from(content)
-      adapter.edit_message(channel_id: channel_id, message_id: message_id, message: message, thread_id: id)
+      call_adapter(:edit_message, channel_id: channel_id, message_id: message_id, message: message, thread_id: id)
     end
 
     def delete(message_id)
-      adapter.delete_message(channel_id: channel_id, message_id: message_id, thread_id: id)
+      call_adapter(:delete_message, channel_id: channel_id, message_id: message_id, thread_id: id)
     end
 
     def react(message_id, emoji)
-      adapter.add_reaction(channel_id: channel_id, message_id: message_id, emoji: emoji, thread_id: id)
+      call_adapter(:add_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji, thread_id: id)
     end
 
     def unreact(message_id, emoji)
-      adapter.remove_reaction(channel_id: channel_id, message_id: message_id, emoji: emoji, thread_id: id)
+      call_adapter(:remove_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji, thread_id: id)
     end
 
     def post_ai_stream(enumerable, placeholder: "Thinking...")
