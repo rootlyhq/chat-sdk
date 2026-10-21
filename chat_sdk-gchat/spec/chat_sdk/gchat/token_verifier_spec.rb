@@ -187,6 +187,20 @@ RSpec.describe ChatSDK::GChat::TokenVerifier do
       2.times { expect(verify_request(disabled_adapter, body: pubsub_body)).to be(true) }
     end
 
+    it "does not decode an envelope missing subscription as a Pub/Sub push" do
+      adapter = new_adapter(endpoint_url: endpoint_url)
+      envelope = {
+        "message" => {"data" => Base64.strict_encode64(direct_event_body)}
+      }
+      request = request_for(
+        body: JSON.generate(envelope),
+        token: oidc_token(audience: endpoint_url)
+      )
+
+      expect(adapter.verify_request!(request)).to be(true)
+      expect(adapter.parse_events(request)).to be_empty
+    end
+
     it "accepts unverified direct webhooks only when verification is disabled and warns once" do
       adapter = new_adapter(disable_signature_verification: true)
 
@@ -251,6 +265,32 @@ RSpec.describe ChatSDK::GChat::TokenVerifier do
     end
   end
 
+  describe "standard webhook endpoint" do
+    it "verifies and dispatches Pub/Sub events decoded from the envelope" do
+      adapter = new_adapter(
+        pubsub_audience: pubsub_audience,
+        pubsub_service_account_email: pubsub_service_account_email
+      )
+      chat = ChatSDK::Chat.new(
+        user_name: "gchat-test",
+        adapters: {gchat: adapter},
+        state: ChatSDK::State::Memory.new
+      )
+      dispatched_message = nil
+      chat.on_new_mention { |_thread, message| dispatched_message = message }
+      endpoint = ChatSDK::Webhook::Endpoint.new(chat: chat, adapter: adapter, adapter_name: :gchat)
+      request = request_for(
+        body: pubsub_body(event: JSON.parse(direct_event_body)),
+        token: oidc_token(audience: pubsub_audience, email: pubsub_service_account_email)
+      )
+
+      status, = endpoint.call(request.env)
+
+      expect(status).to eq(200)
+      expect(dispatched_message.id).to eq("MSG1")
+    end
+  end
+
   def project_token(audience: project_number, issuer: chat_issuer)
     signed_token("iss" => issuer, "aud" => audience)
   end
@@ -288,9 +328,9 @@ RSpec.describe ChatSDK::GChat::TokenVerifier do
     Rack::Request.new(env)
   end
 
-  def pubsub_body
+  def pubsub_body(event: {})
     JSON.generate(
-      "message" => {"data" => Base64.strict_encode64("{}")},
+      "message" => {"data" => Base64.strict_encode64(JSON.generate(event))},
       "subscription" => "projects/example/subscriptions/gchat"
     )
   end

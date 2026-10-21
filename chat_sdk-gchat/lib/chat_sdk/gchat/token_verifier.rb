@@ -40,7 +40,7 @@ module ChatSDK
         rack_request.body.rewind
 
         payload = parse_request_body(body)
-        if pubsub_push?(payload)
+        if PubSubPush.pubsub_push?(payload)
           verify_pubsub!(bearer_token(rack_request))
         else
           verify_direct!(bearer_token(rack_request))
@@ -160,13 +160,6 @@ module ChatSDK
         JSON.parse(body)
       rescue JSON::ParserError
         nil
-      end
-
-      def pubsub_push?(payload)
-        return false unless payload.is_a?(Hash)
-
-        message = payload["message"]
-        message.is_a?(Hash) && message.key?("data") && payload.key?("subscription")
       end
 
       def bearer_token(rack_request)

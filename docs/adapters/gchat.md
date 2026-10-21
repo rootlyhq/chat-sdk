@@ -77,7 +77,7 @@ Direct Google Chat webhooks support two authentication audience modes:
 
 When both direct-webhook options are configured, either token mode is accepted. The endpoint URL is never inferred from the incoming request.
 
-Pub/Sub pushes use a separate verifier. Configure both `pubsub_audience` and `pubsub_service_account_email` (or their environment variables) to validate the OIDC audience and exact, verified service-account email. Configuring a direct-webhook verifier does not authenticate Pub/Sub pushes.
+The normal webhook endpoint also accepts Pub/Sub pushes. Configure both `pubsub_audience` and `pubsub_service_account_email` (or their environment variables) to validate the OIDC audience and exact, verified service-account email. The endpoint detects Pub/Sub envelopes, verifies them with this separate verifier, and `parse_events` decodes them; a direct-webhook verifier alone does not authenticate Pub/Sub pushes.
 
 The adapter requires at least one direct-webhook verifier, a Pub/Sub audience, or `disable_signature_verification: true`. The explicit disable option (or `GOOGLE_CHAT_DISABLE_SIGNATURE_VERIFICATION=true`) accepts requests without a verifier for that transport and logs a warning once. Use it only when verification is intentionally handled elsewhere.
 
@@ -142,3 +142,20 @@ thread.mention_user("12345")  # => "<users/12345>"
 gchat_adapter = bot.adapter(:gchat)
 client = gchat_adapter.client  # Google::Apps::Chat::V1::ChatService::Client
 ```
+
+## Pub/Sub Events
+
+For apps using [Google Workspace Events](https://developers.google.com/workspace/events) with a Cloud Pub/Sub subscription, configure pushes to the normal Google Chat webhook endpoint shown above. That endpoint verifies the Pub/Sub token and `parse_events` decodes the envelope's base64-encoded `message.data`.
+
+If a custom route calls `parse_pubsub_event` directly, verify the request first. The parser does not authenticate requests:
+
+```ruby
+post "/custom/pubsub/gchat" do
+  gchat_adapter.verify_request!(request)
+  events = gchat_adapter.parse_pubsub_event(request)
+  events.each { |event| handle(event) }
+  status 200
+end
+```
+
+The adapter delegates decoded payloads to the same `EventParser` used for direct webhooks.

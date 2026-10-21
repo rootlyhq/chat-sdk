@@ -283,6 +283,16 @@ RSpec.describe ChatSDK::GChat::Adapter do
       end
     end
 
+    context "when the subscription is missing" do
+      it "returns an empty array" do
+        envelope = pubsub_envelope({"type" => "MESSAGE"})
+        envelope.delete("subscription")
+        request = build_request(JSON.generate(envelope))
+
+        expect(subject.parse_pubsub_event(request)).to be_empty
+      end
+    end
+
     context "when message.data contains invalid base64" do
       it "returns an empty array" do
         envelope = {"message" => {"data" => "!!not-base64!!"}, "subscription" => "projects/p/subscriptions/s"}
