@@ -173,13 +173,41 @@ RSpec.describe ChatSDK::Config do
         state: state,
         dedupe_ttl: 300,
         streaming_update_interval: 1.0,
-        handler_executor: :threaded,
+        handler_executor: :thread,
         log_level: :debug
       )
       expect(config.dedupe_ttl).to eq(300)
       expect(config.streaming_update_interval).to eq(1.0)
-      expect(config.handler_executor).to eq(:threaded)
+      expect(config.handler_executor).to eq(:thread)
       expect(config.log_level).to eq(:debug)
+    end
+  end
+
+  describe "handler_executor validation" do
+    it "accepts a callable" do
+      executor = ->(_payload) {}
+      config = described_class.new(
+        user_name: "bot",
+        adapters: {test: adapter},
+        state: state,
+        handler_executor: executor
+      )
+
+      expect(config.handler_executor).to eq(executor)
+    end
+
+    it "rejects unknown values" do
+      expect {
+        described_class.new(
+          user_name: "bot",
+          adapters: {test: adapter},
+          state: state,
+          handler_executor: :threaded
+        )
+      }.to raise_error(
+        ChatSDK::ConfigurationError,
+        "handler_executor must be :inline, :thread, or a callable"
+      )
     end
   end
 

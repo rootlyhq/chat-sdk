@@ -15,6 +15,7 @@ module ChatSDK
 
   class LockConflictError < Error; end
   class SignatureVerificationError < Error; end
+  class HandlerExecutorError < Error; end
 
   class PlatformError < Error
     attr_reader :status, :body, :adapter_name
