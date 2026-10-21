@@ -56,37 +56,37 @@ jobs:
       matrix:
         include:
           - gem: chat_sdk
-            oidc_role: rg_oidc_akr_h5zt1b2vxjpbh39dv1r1
+            oidc_role: ${{ vars.RUBYGEMS_CHAT_SDK_OIDC_ROLE }}
           - gem: chat_sdk-slack
-            oidc_role: rg_oidc_akr_fof4nb7wscj4bah6gmnm
+            oidc_role: ${{ vars.RUBYGEMS_SLACK_OIDC_ROLE }}
           - gem: chat_sdk-teams
-            oidc_role: rg_oidc_akr_vxtk14tyjnkf8sr86p93
+            oidc_role: ${{ vars.RUBYGEMS_TEAMS_OIDC_ROLE }}
           - gem: chat_sdk-gchat
-            oidc_role: rg_oidc_akr_tqje224vokp6nmhyc5xk
+            oidc_role: ${{ vars.RUBYGEMS_GCHAT_OIDC_ROLE }}
           - gem: chat_sdk-mattermost
-            oidc_role: rg_oidc_akr_rggsmpj2soty2ssvpwvp
+            oidc_role: ${{ vars.RUBYGEMS_MATTERMOST_OIDC_ROLE }}
           - gem: chat_sdk-discord
-            oidc_role: rg_oidc_akr_1snzvyj4dc59dmw5he9g
+            oidc_role: ${{ vars.RUBYGEMS_DISCORD_OIDC_ROLE }}
           - gem: chat_sdk-telegram
-            oidc_role: rg_oidc_akr_xqh9csbd15and36ywggh
+            oidc_role: ${{ vars.RUBYGEMS_TELEGRAM_OIDC_ROLE }}
           - gem: chat_sdk-twilio
-            oidc_role: rg_oidc_akr_81n5kemct5cmdwrx21e1
+            oidc_role: ${{ vars.RUBYGEMS_TWILIO_OIDC_ROLE }}
           - gem: chat_sdk-messenger
-            oidc_role: rg_oidc_akr_348j7rrrtrz6knkt2bzm
+            oidc_role: ${{ vars.RUBYGEMS_MESSENGER_OIDC_ROLE }}
           - gem: chat_sdk-whatsapp
-            oidc_role: rg_oidc_akr_ecaoy89thaytxj1wfsva
+            oidc_role: ${{ vars.RUBYGEMS_WHATSAPP_OIDC_ROLE }}
           - gem: chat_sdk-x
-            oidc_role: rg_oidc_akr_z8m6kkm4sq3x796erfm7
+            oidc_role: ${{ vars.RUBYGEMS_X_OIDC_ROLE }}
           - gem: chat_sdk-linear
-            oidc_role: rg_oidc_akr_3ayj5cmnm5b6e7frhyak
+            oidc_role: ${{ vars.RUBYGEMS_LINEAR_OIDC_ROLE }}
           - gem: chat_sdk-gitlab
             oidc_role: ${{ vars.RUBYGEMS_GITLAB_OIDC_ROLE }}
           - gem: chat_sdk-state-redis
-            oidc_role: rg_oidc_akr_61jy7b6zrf86kjana7p4
+            oidc_role: ${{ vars.RUBYGEMS_STATE_REDIS_OIDC_ROLE }}
           - gem: chat_sdk-state-pg
-            oidc_role: rg_oidc_akr_99vhvwzcqrdwq9bsxhya
+            oidc_role: ${{ vars.RUBYGEMS_STATE_PG_OIDC_ROLE }}
           - gem: chat_sdk-state-mysql
-            oidc_role: rg_oidc_akr_2t4724ngfqoyzgc5z1nv
+            oidc_role: ${{ vars.RUBYGEMS_STATE_MYSQL_OIDC_ROLE }}
 
     name: "Publish ${{ matrix.gem }}"
 
