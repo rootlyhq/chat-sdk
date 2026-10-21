@@ -99,25 +99,25 @@ Raised by adapters when a webhook request has an invalid or expired signature. C
 
 ## Handler Errors
 
-Exceptions raised inside event handlers are caught by the dispatcher. They are logged but do not crash the process or return an error response to the platform.
+Exceptions raised inside event handlers are caught by the dispatcher. ChatSDK logs the full exception and backtrace, then continues to the next handler. The webhook returns 200 because platforms retry non-2xx responses, which could repeat handler side effects.
 
 ```ruby
 bot.on_new_mention do |thread, message|
   raise "Something broke"
-  # Logged as: Handler error (mention): Something broke
-  # The webhook still returns 200 to the platform
 end
 ```
 
-If you need custom error handling, wrap your handler logic in a begin/rescue:
+Configure `on_error:` to report handler and webhook failures. The callback receives `(exception, context)`. The context includes `source` (`:handler` or `:webhook`), `adapter`, and `event_type`, `thread_id`, and `channel_id` when available. For errors raised before an event is parsed, the event-specific values are absent.
 
 ```ruby
-bot.on_new_mention do |thread, message|
-  begin
-    risky_operation(message.text)
-  rescue => e
-    thread.post("Sorry, something went wrong: #{e.message}")
-    ErrorTracker.notify(e)
-  end
-end
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: {slack: slack},
+  state: state,
+  on_error: ->(error, context) { ErrorTracker.notify(error, context) }
+)
 ```
+
+When `on_error:` is omitted and Rails is loaded, ChatSDK calls `Rails.error.report(exception, handled: true, severity: :error, context: context)`. Without Rails, failures are logged only. The callback runs after the full exception and backtrace are logged. If the callback raises, ChatSDK logs that failure and does not let it interrupt webhook acknowledgement.
+
+The webhook returns 200 after dispatch errors because platforms retry non-2xx responses. A retry can run handlers whose side effects already completed, so failures are surfaced through logging and `on_error:` instead of a retry response. Signature verification failures remain separate and return 401.

@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../../../spec/spec_helper"
+require "logger"
+require "stringio"
 
 RSpec.describe ChatSDK::Chat do
   let(:adapter) { ChatSDK::Testing::FakeAdapter.new }
@@ -22,6 +24,19 @@ RSpec.describe ChatSDK::Chat do
       expect {
         described_class.new(user_name: "bot", adapters: {}, state: state)
       }.to raise_error(ChatSDK::ConfigurationError)
+    end
+
+    it "uses the injected logger without changing its level when log_level is omitted" do
+      original_logger = ChatSDK::Log.logger
+      logger = Logger.new(StringIO.new)
+      logger.level = Logger::WARN
+
+      described_class.new(user_name: "bot", adapters: {test: adapter}, state: state, logger: logger)
+
+      expect(ChatSDK::Log.logger).to eq(logger)
+      expect(logger.level).to eq(Logger::WARN)
+    ensure
+      ChatSDK::Log.logger = original_logger
     end
   end
 

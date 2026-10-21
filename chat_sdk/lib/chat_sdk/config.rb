@@ -15,7 +15,7 @@ module ChatSDK
 
     attr_reader :user_name, :adapters, :state, :on_lock_conflict,
       :dedupe_ttl, :streaming_update_interval, :handler_executor, :log_level,
-      :history_user, :concurrency
+      :history_user, :concurrency, :logger, :on_error
 
     def initialize(user_name:, adapters:, state:, **options)
       raise ConfigurationError, "user_name is required" if user_name.nil? || user_name.empty?
@@ -26,6 +26,8 @@ module ChatSDK
       @adapters = adapters
       @state = state
       merged = DEFAULTS.merge(options)
+      @logger = merged[:logger]
+      @on_error = merged[:on_error]
       @on_lock_conflict = merged[:on_lock_conflict]
       @concurrency = normalize_concurrency(merged[:concurrency], lock_scope: merged[:lock_scope])
       @dedupe_ttl = merged[:dedupe_ttl]
@@ -38,12 +40,31 @@ module ChatSDK
         retention: user_history.fetch(:retention, user_history.fetch("retention", 30 * 24 * 3600)),
         max_per_user: user_history.fetch(:max_per_user, user_history.fetch("max_per_user", 200))
       }
-      @log_level = merged[:log_level]
+      @log_level = if !@logger.nil? && !options.key?(:log_level)
+        nil
+      else
+        merged[:log_level]
+      end
 
+      validate_logger!
+      validate_on_error!
       validate_lock_conflict!
     end
 
     private
+
+    def validate_logger!
+      return if @logger.nil?
+      return if %i[debug info warn error].all? { |level| @logger.respond_to?(level) }
+
+      raise ConfigurationError, "logger must respond to debug, info, warn, and error"
+    end
+
+    def validate_on_error!
+      return if @on_error.nil? || @on_error.respond_to?(:call)
+
+      raise ConfigurationError, "on_error must be a callable"
+    end
 
     def validate_lock_conflict!
       return if %i[drop force].include?(@on_lock_conflict) || @on_lock_conflict.respond_to?(:call)

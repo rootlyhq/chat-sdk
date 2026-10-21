@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Configurable error reporting through `on_error:` and injectable logging with `logger:`.
+
 ## [1.2.0] - 2026-10-21
 
 ### Added

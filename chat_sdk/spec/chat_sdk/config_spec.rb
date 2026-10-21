@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../../../spec/spec_helper"
+require "logger"
+require "stringio"
 
 RSpec.describe ChatSDK::Config do
   let(:adapter) { ChatSDK::Testing::FakeAdapter.new }
@@ -68,6 +70,51 @@ RSpec.describe ChatSDK::Config do
 
     it "applies default log_level" do
       expect(subject.log_level).to eq(:info)
+    end
+  end
+
+  describe "logger" do
+    it "accepts and exposes a logger-like object" do
+      logger = Logger.new(StringIO.new)
+
+      config = described_class.new(user_name: "bot", adapters: {test: adapter}, state: state, logger: logger)
+
+      expect(config.logger).to eq(logger)
+      expect(config.log_level).to be_nil
+    end
+
+    it "raises ConfigurationError for an invalid logger" do
+      expect {
+        described_class.new(user_name: "bot", adapters: {test: adapter}, state: state, logger: Object.new)
+      }.to raise_error(ChatSDK::ConfigurationError, "logger must respond to debug, info, warn, and error")
+    end
+
+    it "keeps the explicit log level when a logger is given" do
+      config = described_class.new(
+        user_name: "bot",
+        adapters: {test: adapter},
+        state: state,
+        logger: Logger.new(StringIO.new),
+        log_level: :debug
+      )
+
+      expect(config.log_level).to eq(:debug)
+    end
+  end
+
+  describe "on_error" do
+    it "accepts a callable" do
+      callback = ->(_error, _context) {}
+
+      config = described_class.new(user_name: "bot", adapters: {test: adapter}, state: state, on_error: callback)
+
+      expect(config.on_error).to eq(callback)
+    end
+
+    it "raises ConfigurationError for a non-callable value" do
+      expect {
+        described_class.new(user_name: "bot", adapters: {test: adapter}, state: state, on_error: :invalid)
+      }.to raise_error(ChatSDK::ConfigurationError, "on_error must be a callable")
     end
   end
 
