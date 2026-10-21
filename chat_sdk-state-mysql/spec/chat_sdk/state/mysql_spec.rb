@@ -6,19 +6,41 @@ def mysql_url
   ENV["MYSQL_URL"] || "mysql2://root@localhost/chat_sdk_dev"
 end
 
+def mysql_options
+  ChatSDK::State::Mysql.parse_url(mysql_url)
+end
+
 def mysql_available?
-  conn = Mysql2::Client.new(mysql_url)
+  conn = Mysql2::Client.new(mysql_options)
   conn.query("SELECT 1")
-  conn.close
   true
 rescue Mysql2::Error
   false
+ensure
+  conn&.close
 end
 
 RSpec.describe ChatSDK::State::Mysql, if: mysql_available? do
   subject { described_class.new(url: mysql_url) }
 
   before { subject.clear }
+
+  describe ".parse_url" do
+    it "coerces numeric and boolean query values while preserving strings" do
+      options = described_class.parse_url(
+        "mysql2://root@localhost/chat_sdk_test?connect_timeout=5&read_timeout=6&write_timeout=7&reconnect=true&local_infile=false&encoding=utf8mb4"
+      )
+
+      expect(options).to include(
+        connect_timeout: 5,
+        read_timeout: 6,
+        write_timeout: 7,
+        reconnect: true,
+        local_infile: false,
+        encoding: "utf8mb4"
+      )
+    end
+  end
 
   it_behaves_like "a chat_sdk state adapter"
 
@@ -60,7 +82,7 @@ RSpec.describe ChatSDK::State::Mysql, if: mysql_available? do
 
   describe "auto_migrate" do
     it "creates tables automatically" do
-      conn = Mysql2::Client.new(mysql_url)
+      conn = Mysql2::Client.new(mysql_options)
       described_class.new(connection: conn, auto_migrate: true)
       result = conn.query("SHOW TABLES LIKE 'chat_sdk_%'")
       table_names = result.map { |row| row.values.first }
