@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Google Chat endpoint-URL audience and Pub/Sub webhook verification options
+
+### Fixed
+
+- Google Chat project-number tokens are now verified against the Chat issuer certificates
+
 ## [1.3.0] - 2026-10-21
 
 ### Added

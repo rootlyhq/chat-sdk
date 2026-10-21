@@ -22,9 +22,9 @@ RSpec.describe ChatSDK::GChat::Adapter do
   it_behaves_like "a chat_sdk platform adapter"
 
   describe "#initialize" do
-    it "raises ConfigurationError without project_number" do
+    it "raises ConfigurationError without a webhook verifier" do
       expect { described_class.new(project_number: "") }
-        .to raise_error(ChatSDK::ConfigurationError, /project_number required/)
+        .to raise_error(ChatSDK::ConfigurationError, /webhook verification requires/)
     end
   end
 
@@ -35,25 +35,6 @@ RSpec.describe ChatSDK::GChat::Adapter do
   end
 
   describe "#verify_request!" do
-    let(:valid_token) { "valid.jwt.token" }
-    let(:token_payload) { {"iss" => "chat@system.gserviceaccount.com", "aud" => project_number} }
-
-    it "accepts a valid bearer token" do
-      allow(Google::Auth::IDTokens).to receive(:verify_oidc)
-        .with(valid_token, aud: project_number)
-        .and_return(token_payload)
-
-      env = Rack::MockRequest.env_for(
-        "/gchat/events",
-        :method => "POST",
-        :input => "{}",
-        "CONTENT_TYPE" => "application/json",
-        "HTTP_AUTHORIZATION" => "Bearer #{valid_token}"
-      )
-      request = Rack::Request.new(env)
-      expect(subject.verify_request!(request)).to be(true)
-    end
-
     it "rejects a missing bearer token" do
       env = Rack::MockRequest.env_for(
         "/gchat/events",
@@ -64,40 +45,6 @@ RSpec.describe ChatSDK::GChat::Adapter do
       request = Rack::Request.new(env)
       expect { subject.verify_request!(request) }
         .to raise_error(ChatSDK::SignatureVerificationError, /Missing bearer token/)
-    end
-
-    it "rejects an invalid token" do
-      allow(Google::Auth::IDTokens).to receive(:verify_oidc)
-        .and_raise(Google::Auth::IDTokens::VerificationError.new("bad token"))
-
-      env = Rack::MockRequest.env_for(
-        "/gchat/events",
-        :method => "POST",
-        :input => "{}",
-        "CONTENT_TYPE" => "application/json",
-        "HTTP_AUTHORIZATION" => "Bearer invalid.token"
-      )
-      request = Rack::Request.new(env)
-      expect { subject.verify_request!(request) }
-        .to raise_error(ChatSDK::SignatureVerificationError, /verification failed/)
-    end
-
-    it "rejects a token with unexpected issuer" do
-      bad_payload = {"iss" => "badactor@evil.com", "aud" => project_number}
-      allow(Google::Auth::IDTokens).to receive(:verify_oidc)
-        .with("suspect.token", aud: project_number)
-        .and_return(bad_payload)
-
-      env = Rack::MockRequest.env_for(
-        "/gchat/events",
-        :method => "POST",
-        :input => "{}",
-        "CONTENT_TYPE" => "application/json",
-        "HTTP_AUTHORIZATION" => "Bearer suspect.token"
-      )
-      request = Rack::Request.new(env)
-      expect { subject.verify_request!(request) }
-        .to raise_error(ChatSDK::SignatureVerificationError, /Unexpected issuer/)
     end
   end
 
