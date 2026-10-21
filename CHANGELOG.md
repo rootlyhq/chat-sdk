@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Configurable error reporting through `on_error:` and injectable logging with `logger:`.
 - Card and modal DSL parity for styled text, links, inputs, selections, and fields across supported adapters
+
 ### Fixed
 
 - Teams resolves conversation and DM service URLs from the shared state store so replies from other processes use the right regional endpoint; state reads are no longer cached per process
