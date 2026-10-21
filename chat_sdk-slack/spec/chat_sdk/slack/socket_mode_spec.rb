@@ -90,14 +90,15 @@ RSpec.describe ChatSDK::Slack::SocketMode do
       socket.instance_variable_set(:@ws, double("ws", send: nil))
 
       collected_events = []
-      socket.send(:handle_message, ws_event) { |event| collected_events << event }
+      socket.send(:handle_message, ws_event) { |event, payload| collected_events << [event, payload] }
 
       expect(collected_events.size).to eq(1)
-      event = collected_events.first
+      event, payload = collected_events.first
       expect(event).to be_a(ChatSDK::Events::Mention)
       expect(event.message.text).to eq("<@B456> hello from socket mode")
       expect(event.message.author.id).to eq("U123")
       expect(event.channel_id).to eq("C789")
+      expect(payload).to eq(envelope["payload"])
     end
 
     it "parses interactive envelopes (block_actions) and yields Action events" do

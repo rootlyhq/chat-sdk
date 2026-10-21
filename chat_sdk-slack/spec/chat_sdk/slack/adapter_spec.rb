@@ -15,12 +15,12 @@ RSpec.describe ChatSDK::Slack::Adapter do
   describe "#initialize" do
     it "raises ConfigurationError without bot_token or client_id" do
       expect { described_class.new(bot_token: nil, signing_secret: signing_secret) }
-        .to raise_error(ChatSDK::ConfigurationError, /bot_token or client_id required/)
+        .to raise_error(ChatSDK::ConfigurationError, /Slack bot_token, client_id or installation_provider required/)
     end
 
     it "raises ConfigurationError without signing_secret" do
       expect { described_class.new(bot_token: bot_token, signing_secret: nil) }
-        .to raise_error(ChatSDK::ConfigurationError, /signing_secret required/)
+        .to raise_error(ChatSDK::ConfigurationError, /signing_secret or webhook_verifier required/)
     end
   end
 
@@ -35,13 +35,12 @@ RSpec.describe ChatSDK::Slack::Adapter do
       expect(subject.client).to be_a(::Slack::Web::Client)
     end
 
-    it "ignores the thread-local client in single-workspace mode" do
-      previous_client = Thread.current[:chat_sdk_slack_client]
-      Thread.current[:chat_sdk_slack_client] = ::Slack::Web::Client.new(token: "xoxb-stale")
+    it "isolates request contexts between adapter instances" do
+      other_adapter = described_class.new(bot_token: "xoxb-other", signing_secret: signing_secret)
 
-      expect(subject.client.token).to eq(bot_token)
-    ensure
-      Thread.current[:chat_sdk_slack_client] = previous_client
+      other_adapter.with_bot_token("xoxb-temporary") do
+        expect(subject.client.token).to eq(bot_token)
+      end
     end
 
     it "configures an egress proxy" do
@@ -52,6 +51,68 @@ RSpec.describe ChatSDK::Slack::Adapter do
       )
 
       expect(adapter.client.proxy).to eq("http://proxy.internal:8080")
+    end
+
+    it "resolves callable bot tokens for every client access and caches by token" do
+      tokens = %w[xoxb-first xoxb-second xoxb-third]
+      resolver = double("token resolver")
+      allow(resolver).to receive(:call) { tokens.shift }
+      adapter = described_class.new(bot_token: resolver, signing_secret: signing_secret)
+
+      clients = 3.times.map { adapter.client }
+
+      expect(clients.map(&:token)).to eq(%w[xoxb-first xoxb-second xoxb-third])
+      expect(clients.uniq.size).to eq(3)
+      expect(resolver).to have_received(:call).exactly(3).times
+    end
+
+    it "raises when a callable bot token resolver returns nil or an empty token" do
+      [nil, ""].each do |token|
+        adapter = described_class.new(bot_token: -> { token }, signing_secret: signing_secret)
+
+        expect { adapter.client }
+          .to raise_error(ChatSDK::ConfigurationError, "Slack bot_token resolver returned no token")
+      end
+    end
+
+    it "propagates callable bot token resolver errors" do
+      adapter = described_class.new(
+        bot_token: -> { raise "resolver error" },
+        signing_secret: signing_secret
+      )
+
+      expect { adapter.client }.to raise_error("resolver error")
+    end
+
+    it "uses callable bot tokens for single-workspace auth.test and caches the result" do
+      resolver = double("token resolver")
+      allow(resolver).to receive(:call).and_return("xoxb-callable")
+      adapter = described_class.new(bot_token: resolver, signing_secret: signing_secret)
+      auth_client = adapter.client
+      allow(auth_client).to receive(:auth_test).and_return({"user_id" => "B_CALLABLE"})
+      payload = {
+        "type" => "event_callback",
+        "event" => {
+          "type" => "message",
+          "user" => "U123",
+          "text" => "hello",
+          "ts" => "1234567890.123456",
+          "channel" => "C789",
+          "channel_type" => "channel"
+        }
+      }
+      request_env = Rack::MockRequest.env_for(
+        "/slack/events",
+        method: "POST",
+        input: JSON.generate(payload)
+      )
+      request_env["CONTENT_TYPE"] = "application/json"
+      request = Rack::Request.new(request_env)
+
+      2.times { adapter.parse_events(request) }
+
+      expect(auth_client).to have_received(:auth_test).once
+      expect(resolver).to have_received(:call).at_least(:once)
     end
   end
 
@@ -103,6 +164,68 @@ RSpec.describe ChatSDK::Slack::Adapter do
       request = build_signed_request(body, timestamp: old_timestamp)
       expect { subject.verify_request!(request) }
         .to raise_error(ChatSDK::SignatureVerificationError, /too old/)
+    end
+
+    it "accepts a request through webhook_verifier without Slack signature headers" do
+      body = '{"type":"event_callback"}'
+      verifier = proc do |request, verified_body|
+        expect(request).to be_a(Rack::Request)
+        expect(verified_body).to eq(body)
+        true
+      end
+      adapter = described_class.new(bot_token: bot_token, webhook_verifier: verifier)
+      request = Rack::Request.new(Rack::MockRequest.env_for("/slack/events", method: "POST", input: body))
+
+      expect(adapter.verify_request!(request)).to be(true)
+    end
+
+    it "gives webhook_verifier precedence over the signing secret environment variable" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("SLACK_SIGNING_SECRET").and_return("ignored-secret")
+      verifier = proc { |_request, _body| true }
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, webhook_verifier: verifier)
+      request = Rack::Request.new(Rack::MockRequest.env_for("/slack/events", method: "POST", input: "{}"))
+
+      expect(adapter.verify_request!(request)).to be(true)
+    end
+
+    it "rejects falsey verifier results" do
+      [false, nil].each do |result|
+        adapter = described_class.new(bot_token: bot_token, webhook_verifier: ->(_request, _body) { result })
+        request = Rack::Request.new(Rack::MockRequest.env_for("/slack/events", method: "POST", input: "{}"))
+
+        expect { adapter.verify_request!(request) }
+          .to raise_error(ChatSDK::SignatureVerificationError, /verifier rejected/)
+      end
+    end
+
+    it "wraps exceptions raised by webhook_verifier" do
+      adapter = described_class.new(
+        bot_token: bot_token,
+        webhook_verifier: ->(_request, _body) { raise "verifier error" }
+      )
+      request = Rack::Request.new(Rack::MockRequest.env_for("/slack/events", method: "POST", input: "{}"))
+
+      expect { adapter.verify_request!(request) }
+        .to raise_error(ChatSDK::SignatureVerificationError, /verifier failed: verifier error/)
+    end
+
+    it "uses a String verifier result for subsequent challenge parsing" do
+      replacement = '{"type":"url_verification","challenge":"verified-challenge"}'
+      adapter = described_class.new(bot_token: bot_token, webhook_verifier: ->(_request, _body) { replacement })
+      request = Rack::Request.new(
+        Rack::MockRequest.env_for("/slack/events", method: "POST", input: '{"type":"invalid"}')
+      )
+
+      adapter.verify_request!(request)
+
+      expect(adapter.ack_response(request)).to eq([200, {"content-type" => "text/plain"}, ["verified-challenge"]])
+    end
+
+    it "rejects a non-callable verifier at initialization" do
+      expect {
+        described_class.new(bot_token: bot_token, webhook_verifier: "not-callable")
+      }.to raise_error(ChatSDK::ConfigurationError, /webhook_verifier must be callable/)
     end
   end
 
@@ -779,12 +902,6 @@ RSpec.describe ChatSDK::Slack::Adapter do
 
     before do
       multi_adapter.set_state(state)
-      # Clear any thread-local client from previous tests
-      Thread.current[:chat_sdk_slack_client] = nil
-    end
-
-    after do
-      Thread.current[:chat_sdk_slack_client] = nil
     end
 
     describe "#initialize" do
@@ -800,7 +917,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
       it "raises ConfigurationError without bot_token or client_id" do
         expect {
           described_class.new(signing_secret: signing_secret)
-        }.to raise_error(ChatSDK::ConfigurationError, /bot_token or client_id required/)
+        }.to raise_error(ChatSDK::ConfigurationError, /Slack bot_token, client_id or installation_provider required/)
       end
     end
 
@@ -939,6 +1056,67 @@ RSpec.describe ChatSDK::Slack::Adapter do
         )
         expect(result[:team_id]).to eq("T_REDIR")
       end
+
+      it "stores Enterprise Grid organization installs under the enterprise ID" do
+        temp_client = instance_double(::Slack::Web::Client)
+        allow(::Slack::Web::Client).to receive(:new).with(no_args).and_return(temp_client)
+        allow(temp_client).to receive(:oauth_v2_access).and_return({
+          "ok" => true,
+          "access_token" => "xoxb-enterprise",
+          "bot_user_id" => "B_ENTERPRISE",
+          "is_enterprise_install" => true,
+          "enterprise" => {"id" => "E_ORG", "name" => "Organization"},
+          "team" => nil
+        })
+
+        result = multi_adapter.handle_oauth_callback(code: "enterprise-code")
+
+        expect(result).to include(
+          team_id: "E_ORG",
+          enterprise_id: "E_ORG",
+          enterprise_install: true
+        )
+        expect(result[:installation]["team_name"]).to eq("Organization")
+        expect(multi_adapter.get_installation("E_ORG")).to include(
+          "enterprise_id" => "E_ORG",
+          "is_enterprise_install" => true
+        )
+      end
+
+      it "records enterprise metadata for a workspace install in Grid" do
+        temp_client = instance_double(::Slack::Web::Client)
+        allow(::Slack::Web::Client).to receive(:new).with(no_args).and_return(temp_client)
+        allow(temp_client).to receive(:oauth_v2_access).and_return({
+          "ok" => true,
+          "access_token" => "xoxb-grid-workspace",
+          "is_enterprise_install" => false,
+          "enterprise" => {"id" => "E_GRID", "name" => "Grid"},
+          "team" => {"id" => "T_GRID", "name" => "Grid Team"}
+        })
+
+        result = multi_adapter.handle_oauth_callback(code: "grid-code")
+
+        expect(result).to include(team_id: "T_GRID", enterprise_id: "E_GRID", enterprise_install: false)
+        expect(multi_adapter.get_installation("T_GRID")).to include(
+          "enterprise_id" => "E_GRID",
+          "is_enterprise_install" => false
+        )
+      end
+
+      it "raises when an enterprise install is missing its enterprise ID" do
+        temp_client = instance_double(::Slack::Web::Client)
+        allow(::Slack::Web::Client).to receive(:new).with(no_args).and_return(temp_client)
+        allow(temp_client).to receive(:oauth_v2_access).and_return({
+          "ok" => true,
+          "access_token" => "xoxb-enterprise",
+          "is_enterprise_install" => true,
+          "enterprise" => {},
+          "team" => nil
+        })
+
+        expect { multi_adapter.handle_oauth_callback(code: "missing-id") }
+          .to raise_error(ChatSDK::ConfigurationError, /enterprise\.id/)
+      end
     end
 
     describe "per-webhook token resolution" do
@@ -1013,24 +1191,470 @@ RSpec.describe ChatSDK::Slack::Adapter do
         request = build_request(JSON.generate(payload))
         subject.parse_events(request)
 
-        # Thread-local should not be set in single-workspace mode
-        expect(Thread.current[:chat_sdk_slack_client]).to be_nil
+        expect(subject.client.token).to eq(bot_token)
       end
     end
 
     describe "#client in multi-workspace mode" do
       it "returns nil when no team client is resolved and no bot_token" do
-        Thread.current[:chat_sdk_slack_client] = nil
         expect(multi_adapter.client).to be_nil
       end
 
-      it "returns thread-local client when set" do
-        team_client = ::Slack::Web::Client.new(token: "xoxb-thread-local")
-        Thread.current[:chat_sdk_slack_client] = team_client
+      it "uses the token supplied by with_bot_token" do
+        multi_adapter.with_bot_token("xoxb-thread-local", installation_id: "T001") do
+          expect(multi_adapter.client.token).to eq("xoxb-thread-local")
+        end
 
-        expect(multi_adapter.client).to eq(team_client)
-        expect(multi_adapter.client.token).to eq("xoxb-thread-local")
+        expect(multi_adapter.client).to be_nil
       end
+    end
+  end
+
+  describe "Slack installation providers" do
+    let(:signing_secret) { "test_signing_secret_abc123" }
+
+    def request_for(payload, content_type: "application/json")
+      body = if content_type == "application/x-www-form-urlencoded"
+        Rack::Utils.build_query(payload)
+      else
+        JSON.generate(payload)
+      end
+      env = Rack::MockRequest.env_for(
+        "/slack/events",
+        method: "POST",
+        input: body
+      )
+      env["CONTENT_TYPE"] = content_type
+      Rack::Request.new(env)
+    end
+
+    def installation_payload(team_id: "T_PROVIDER", text: "hello", event_type: "app_mention", extra: {})
+      {
+        "type" => "event_callback",
+        "team_id" => team_id,
+        **extra,
+        "event" => {
+          "type" => event_type,
+          "user" => "U123",
+          "text" => text,
+          "ts" => "1234567890.123456",
+          "channel" => "C789",
+          "channel_type" => "channel"
+        }
+      }
+    end
+
+    it "resolves workspace event installations using the provider token" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("T_PROVIDER", enterprise_install: false)
+        .and_return({"bot_token" => "xoxb-provider", "bot_user_id" => "B_PROVIDER"})
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      events = adapter.parse_events(request_for(installation_payload))
+
+      expect(events.size).to eq(1)
+      expect(adapter.client.token).to eq("xoxb-provider")
+      expect(provider).to have_received(:get_installation).with("T_PROVIDER", enterprise_install: false)
+    end
+
+    it "resolves Enterprise Grid events with their enterprise ID" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("E_PROVIDER", enterprise_install: true)
+        .and_return({"bot_token" => "xoxb-enterprise-provider"})
+      payload = installation_payload(
+        team_id: "T_ENTERPRISE",
+        extra: {
+          "enterprise_id" => "E_TOP_LEVEL",
+          "authorizations" => [{
+            "team_id" => "T_PROVIDER",
+            "enterprise_id" => "E_PROVIDER",
+            "is_enterprise_install" => true
+          }]
+        }
+      )
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      expect(adapter.parse_events(request_for(payload)).size).to eq(1)
+      expect(adapter.client.token).to eq("xoxb-enterprise-provider")
+      expect(provider).to have_received(:get_installation).with("E_PROVIDER", enterprise_install: true)
+    end
+
+    it "prefers the first authorization over top-level event identifiers" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("T_AUTHORIZATION", enterprise_install: false)
+        .and_return({"bot_token" => "xoxb-authorization"})
+      payload = installation_payload(
+        team_id: "T_TOP_LEVEL",
+        extra: {
+          "authorizations" => [{"team_id" => "T_AUTHORIZATION", "is_enterprise_install" => false}]
+        }
+      )
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      adapter.parse_events(request_for(payload))
+
+      expect(adapter.client.token).to eq("xoxb-authorization")
+    end
+
+    it "does not fall back to state when the configured provider returns nil" do
+      provider = double("installation provider", get_installation: nil)
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("T_PROVIDER", bot_token: "xoxb-state-token")
+
+      expect(adapter.parse_events(request_for(installation_payload))).to eq([])
+      expect(adapter.client).to be_nil
+    end
+
+    it "resolves slash command installations from form fields" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("T_SLASH", enterprise_install: false)
+        .and_return({"bot_token" => "xoxb-slash"})
+      payload = {
+        "command" => "/help",
+        "text" => "status",
+        "team_id" => "T_SLASH",
+        "user_id" => "U123",
+        "channel_id" => "C789",
+        "trigger_id" => "TRIGGER"
+      }
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      events = adapter.parse_events(request_for(payload, content_type: "application/x-www-form-urlencoded"))
+
+      expect(events.first).to be_a(ChatSDK::Events::SlashCommand)
+      expect(adapter.client.token).to eq("xoxb-slash")
+    end
+
+    it "resolves Enterprise Grid slash command installations from enterprise_id" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("E_SLASH", enterprise_install: true)
+        .and_return({"bot_token" => "xoxb-enterprise-slash"})
+      payload = {
+        "command" => "/help",
+        "text" => "status",
+        "team_id" => "T_SLASH",
+        "enterprise_id" => "E_SLASH",
+        "is_enterprise_install" => "true",
+        "user_id" => "U123",
+        "channel_id" => "C789",
+        "trigger_id" => "TRIGGER"
+      }
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      events = adapter.parse_events(request_for(payload, content_type: "application/x-www-form-urlencoded"))
+
+      expect(events.first).to be_a(ChatSDK::Events::SlashCommand)
+      expect(adapter.client.token).to eq("xoxb-enterprise-slash")
+    end
+
+    it "resolves interactive enterprise installations using enterprise.id" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("E_ACTION", enterprise_install: true)
+        .and_return({"bot_token" => "xoxb-action"})
+      payload = {
+        "type" => "block_actions",
+        "is_enterprise_install" => "true",
+        "enterprise" => {"id" => "E_ACTION"},
+        "enterprise_id" => "E_FALLBACK",
+        "team" => {"id" => "T_ACTION"},
+        "user" => {"id" => "U123", "name" => "user"},
+        "channel" => {"id" => "C789"},
+        "message" => {"ts" => "1234567890.123456"},
+        "trigger_id" => "TRIGGER",
+        "actions" => [{"action_id" => "action", "value" => "yes"}]
+      }
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      expect(adapter.parse_events(request_for(payload)).first).to be_a(ChatSDK::Events::Action)
+      expect(adapter.client.token).to eq("xoxb-action")
+    end
+
+    it "uses interactive enterprise_id and team_id when nested IDs are absent" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("E_ACTION_FALLBACK", enterprise_install: true)
+        .and_return({"bot_token" => "xoxb-action-fallback"})
+      payload = {
+        "type" => "block_actions",
+        "is_enterprise_install" => true,
+        "enterprise" => {},
+        "enterprise_id" => "E_ACTION_FALLBACK",
+        "team" => {},
+        "team_id" => "T_ACTION_FALLBACK",
+        "user" => {"id" => "U123", "name" => "user"},
+        "channel" => {"id" => "C789"},
+        "message" => {"ts" => "1234567890.123456"},
+        "trigger_id" => "TRIGGER",
+        "actions" => [{"action_id" => "action", "value" => "yes"}]
+      }
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      expect(adapter.parse_events(request_for(payload)).first).to be_a(ChatSDK::Events::Action)
+      expect(adapter.client.token).to eq("xoxb-action-fallback")
+    end
+
+    it "uses interactive team_id when the nested team ID is absent" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .with("T_ACTION_FALLBACK", enterprise_install: false)
+        .and_return({"bot_token" => "xoxb-team-action-fallback"})
+      payload = {
+        "type" => "block_actions",
+        "team" => {},
+        "team_id" => "T_ACTION_FALLBACK",
+        "user" => {"id" => "U123", "name" => "user"},
+        "channel" => {"id" => "C789"},
+        "message" => {"ts" => "1234567890.123456"},
+        "trigger_id" => "TRIGGER",
+        "actions" => [{"action_id" => "action", "value" => "yes"}]
+      }
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      expect(adapter.parse_events(request_for(payload)).first).to be_a(ChatSDK::Events::Action)
+      expect(adapter.client.token).to eq("xoxb-team-action-fallback")
+    end
+
+    it "accepts a callable installation provider" do
+      provider = double("callable provider")
+      allow(provider).to receive(:call)
+        .with("T_PROVIDER", enterprise_install: false)
+        .and_return({bot_token: "xoxb-callable-provider"})
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      adapter.parse_events(request_for(installation_payload))
+
+      expect(adapter.client.token).to eq("xoxb-callable-provider")
+      expect(provider).to have_received(:call).with("T_PROVIDER", enterprise_install: false)
+    end
+
+    it "logs provider errors and drops events when there is no fallback token" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation).and_raise("provider failure")
+      allow(ChatSDK::Log).to receive(:error)
+      allow(ChatSDK::Log).to receive(:warn)
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      expect(adapter.parse_events(request_for(installation_payload))).to eq([])
+      expect(ChatSDK::Log).to have_received(:error).with(/Could not resolve Slack installation T_PROVIDER/)
+      expect(ChatSDK::Log).to have_received(:warn).with(/Dropping Slack event without a resolved installation/)
+    end
+
+    it "uses a static bot token as a fallback when a multi-workspace provider misses" do
+      provider = double("installation provider", get_installation: nil)
+      adapter = described_class.new(
+        bot_token: "xoxb-static-fallback",
+        client_id: "client",
+        installation_provider: provider,
+        signing_secret: signing_secret
+      )
+      allow(adapter.client).to receive(:auth_test).and_return({})
+
+      expect(adapter.parse_events(request_for(installation_payload)).size).to eq(1)
+      expect(adapter.client.token).to eq("xoxb-static-fallback")
+    end
+
+    it "uses the provider bot_user_id for mention classification" do
+      provider = double("installation provider")
+      allow(provider).to receive(:get_installation)
+        .and_return({"bot_token" => "xoxb-provider", "bot_user_id" => "B_PROVIDER"})
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      event = adapter.parse_events(
+        request_for(installation_payload(text: "hello <@B_PROVIDER>", event_type: "message"))
+      ).first
+
+      expect(event.message.is_mention).to be(true)
+    end
+
+    it "does not reuse a previous workspace client after a failed resolution" do
+      provider = double("installation provider")
+      provider_calls = 0
+      allow(provider).to receive(:get_installation) do |installation_id, **_options|
+        provider_calls += 1
+        if installation_id == "T_FIRST" && provider_calls == 1
+          {"bot_token" => "xoxb-first"}
+        elsif installation_id == "T_SECOND"
+          {"bot_token" => "xoxb-second"}
+        elsif installation_id == "T_FIRST" && provider_calls == 4
+          {"bot_token" => "xoxb-rotated"}
+        end
+      end
+      adapter = described_class.new(installation_provider: provider, signing_secret: signing_secret)
+
+      adapter.parse_events(request_for(installation_payload(team_id: "T_FIRST")))
+      first_client = adapter.client
+      expect(first_client.token).to eq("xoxb-first")
+
+      adapter.parse_events(request_for(installation_payload(team_id: "T_SECOND")))
+      second_client = adapter.client
+      expect(second_client.token).to eq("xoxb-second")
+      expect(second_client).not_to equal(first_client)
+
+      expect(adapter.parse_events(request_for(installation_payload(team_id: "T_FIRST")))).to eq([])
+      expect(adapter.client).to be_nil
+
+      adapter.parse_events(request_for(installation_payload(team_id: "T_FIRST")))
+      expect(adapter.client.token).to eq("xoxb-rotated")
+      expect(adapter.client).not_to equal(first_client)
+    end
+
+    it "isolates request context between adapter instances" do
+      provider_a = double("provider A", get_installation: {"bot_token" => "xoxb-adapter-a"})
+      provider_b = double("provider B", get_installation: nil)
+      adapter_a = described_class.new(installation_provider: provider_a, signing_secret: signing_secret)
+      adapter_b = described_class.new(installation_provider: provider_b, signing_secret: signing_secret)
+
+      adapter_a.parse_events(request_for(installation_payload))
+      adapter_b.parse_events(request_for(installation_payload))
+
+      expect(adapter_a.client.token).to eq("xoxb-adapter-a")
+      expect(adapter_b.client).to be_nil
+    end
+
+    it "rejects an invalid installation provider" do
+      expect {
+        described_class.new(installation_provider: "not-a-provider", signing_secret: signing_secret)
+      }.to raise_error(ChatSDK::ConfigurationError, /installation_provider must respond/)
+    end
+  end
+
+  describe "#with_bot_token" do
+    it "restores the previous context after the block" do
+      adapter = described_class.new(client_id: "client", signing_secret: signing_secret)
+
+      result = adapter.with_bot_token("xoxb-temporary", installation_id: "T_TEMP") do
+        expect(adapter.client.token).to eq("xoxb-temporary")
+        :block_result
+      end
+
+      expect(result).to eq(:block_result)
+      expect(adapter.client).to be_nil
+    end
+
+    it "supports nested contexts and restores the outer token" do
+      adapter = described_class.new(client_id: "client", signing_secret: signing_secret)
+
+      adapter.with_bot_token("xoxb-outer", installation_id: "T_OUTER") do
+        expect(adapter.client.token).to eq("xoxb-outer")
+        adapter.with_bot_token("xoxb-inner", installation_id: "T_INNER") do
+          expect(adapter.client.token).to eq("xoxb-inner")
+        end
+        expect(adapter.client.token).to eq("xoxb-outer")
+      end
+    end
+
+    it "restores context when the block raises" do
+      adapter = described_class.new(client_id: "client", signing_secret: signing_secret)
+
+      expect {
+        adapter.with_bot_token("xoxb-temporary") { raise "block error" }
+      }.to raise_error("block error")
+      expect(adapter.client).to be_nil
+    end
+
+    it "uses the contextual installation ID for concurrency scope" do
+      adapter = described_class.new(client_id: "client", signing_secret: signing_secret)
+      event = ChatSDK::Events::Mention.new(
+        message: ChatSDK::Message.new(
+          id: "M1",
+          text: "",
+          author: ChatSDK::Author.new(id: "U1", name: "user", platform: :slack),
+          thread_id: "T1",
+          channel_id: "C1",
+          platform: :slack
+        ),
+        thread_id: "T1",
+        channel_id: "C1",
+        platform: :slack,
+        adapter_name: :slack,
+        raw: {"team_id" => "T_RAW"}
+      )
+
+      adapter.with_bot_token("xoxb-context", installation_id: "E_CONTEXT") do
+        expect(adapter.concurrency_scope(event)).to eq("E_CONTEXT")
+      end
+      expect(adapter.concurrency_scope(event)).to eq("T_RAW")
+    end
+  end
+
+  describe "installation token encryption" do
+    let(:state) { ChatSDK::State::Memory.new }
+    let(:key) { "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef" }
+
+    it "encrypts stored tokens and decrypts installations while preserving metadata" do
+      adapter = described_class.new(
+        client_id: "client",
+        client_secret: "secret",
+        signing_secret: signing_secret,
+        encryption_key: key
+      )
+      adapter.set_state(state)
+      adapter.set_installation("T_ENCRYPTED",
+        bot_token: "xoxb-secret-token",
+        bot_user_id: "B_ENCRYPTED",
+        team_name: "Encrypted Team")
+
+      stored = state.get("slack:installation:T_ENCRYPTED")
+      expect(stored["bot_token"]).to include("iv", "data", "tag")
+      expect(JSON.generate(stored["bot_token"])).not_to include("xoxb-secret-token")
+      expect(adapter.get_installation("T_ENCRYPTED")).to include(
+        "bot_token" => "xoxb-secret-token",
+        "bot_user_id" => "B_ENCRYPTED",
+        "team_name" => "Encrypted Team"
+      )
+    end
+
+    it "keeps reading plaintext installation tokens when encryption is enabled" do
+      adapter = described_class.new(
+        client_id: "client",
+        signing_secret: signing_secret,
+        encryption_key: key
+      )
+      adapter.set_state(state)
+      state.set("slack:installation:T_PLAIN", {
+        "bot_token" => "xoxb-legacy-token",
+        "bot_user_id" => "B_LEGACY",
+        "team_name" => "Legacy Team"
+      })
+
+      expect(adapter.get_installation("T_PLAIN")["bot_token"]).to eq("xoxb-legacy-token")
+    end
+
+    it "raises when encrypted installation data is read without a key" do
+      encrypted_token = ChatSDK::Slack::TokenEncryption.encrypt(
+        "xoxb-secret-token",
+        ChatSDK::Slack::TokenEncryption.decode_key(key)
+      )
+      adapter = described_class.new(client_id: "client", signing_secret: signing_secret)
+      adapter.set_state(state)
+      state.set("slack:installation:T_ENCRYPTED", {"bot_token" => encrypted_token})
+
+      expect { adapter.get_installation("T_ENCRYPTED") }
+        .to raise_error(ChatSDK::ConfigurationError, /encrypted; configure encryption_key/)
+    end
+
+    it "rejects invalid encryption keys during initialization" do
+      expect {
+        described_class.new(bot_token: bot_token, signing_secret: signing_secret, encryption_key: "short")
+      }.to raise_error(ChatSDK::ConfigurationError, /must decode to exactly 32 bytes/)
+    end
+
+    it "reads the encryption key from SLACK_ENCRYPTION_KEY" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("SLACK_ENCRYPTION_KEY").and_return(key)
+      adapter = described_class.new(client_id: "client", signing_secret: signing_secret)
+      adapter.set_state(state)
+      adapter.set_installation("T_ENV", bot_token: "xoxb-env-token")
+
+      expect(state.get("slack:installation:T_ENV")["bot_token"]).to be_a(Hash)
+      expect(adapter.get_installation("T_ENV")["bot_token"]).to eq("xoxb-env-token")
     end
   end
 
@@ -1235,34 +1859,28 @@ RSpec.describe ChatSDK::Slack::Adapter do
       socket_callback = nil
       allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
 
-      previous_client = Thread.current[:chat_sdk_slack_client]
-      begin
-        Thread.current[:chat_sdk_slack_client] = nil
-        adapter.start_socket_mode(app_token: "xapp-test-token") do |event|
-          adapter.post_message(channel_id: event.channel_id, message: "reply")
-        end
-
-        %w[TEAM_A TEAM_B].each do |team_id|
-          payload = {
-            "type" => "event_callback",
-            "team_id" => team_id,
-            "event" => {
-              "type" => "app_mention",
-              "user" => "U123",
-              "text" => "<@B456> hello",
-              "ts" => "1234567890.123456",
-              "channel" => "C789",
-              "channel_type" => "channel"
-            }
-          }
-          socket_callback.call(ChatSDK::Slack::EventParser.parse(payload).first)
-        end
-
-        expect(client_a).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
-        expect(client_b).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
-      ensure
-        Thread.current[:chat_sdk_slack_client] = previous_client
+      adapter.start_socket_mode(app_token: "xapp-test-token") do |event|
+        adapter.post_message(channel_id: event.channel_id, message: "reply")
       end
+
+      %w[TEAM_A TEAM_B].each do |team_id|
+        payload = {
+          "type" => "event_callback",
+          "team_id" => team_id,
+          "event" => {
+            "type" => "app_mention",
+            "user" => "U123",
+            "text" => "<@B456> hello",
+            "ts" => "1234567890.123456",
+            "channel" => "C789",
+            "channel_type" => "channel"
+          }
+        }
+        socket_callback.call(ChatSDK::Slack::EventParser.parse(payload).first, payload)
+      end
+
+      expect(client_a).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
+      expect(client_b).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
     end
 
     it "uses the event workspace client for Socket Mode mention classification" do
@@ -1287,32 +1905,26 @@ RSpec.describe ChatSDK::Slack::Adapter do
       socket_callback = nil
       allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
 
-      previous_client = Thread.current[:chat_sdk_slack_client]
-      begin
-        Thread.current[:chat_sdk_slack_client] = client_a
-        adapter.start_socket_mode(app_token: "xapp-test-token") { |_| }
+      adapter.start_socket_mode(app_token: "xapp-test-token") { |_| }
 
-        payload = {
-          "type" => "event_callback",
-          "team_id" => "TEAM_B",
-          "event" => {
-            "type" => "message",
-            "user" => "U123",
-            "text" => "<@B_TEAM_B>",
-            "ts" => "1234567890.123456",
-            "channel" => "C789",
-            "channel_type" => "channel"
-          }
+      payload = {
+        "type" => "event_callback",
+        "team_id" => "TEAM_B",
+        "event" => {
+          "type" => "message",
+          "user" => "U123",
+          "text" => "<@B_TEAM_B>",
+          "ts" => "1234567890.123456",
+          "channel" => "C789",
+          "channel_type" => "channel"
         }
-        event = ChatSDK::Slack::EventParser.parse(payload).first
-        socket_callback.call(event)
+      }
+      event = ChatSDK::Slack::EventParser.parse(payload).first
+      socket_callback.call(event, payload)
 
-        expect(event.message.is_mention).to be(true)
-        expect(client_a).not_to have_received(:auth_test)
-        expect(client_b).to have_received(:auth_test).once
-      ensure
-        Thread.current[:chat_sdk_slack_client] = previous_client
-      end
+      expect(event.message.is_mention).to be(true)
+      expect(client_a).not_to have_received(:auth_test)
+      expect(client_b).to have_received(:auth_test).once
     end
   end
 
