@@ -207,6 +207,56 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
     end
   end
 
+  describe "handler executor error" do
+    it "returns 500 and reports the enqueue failure with its cause" do
+      reported = []
+      event = ChatSDK::Events::Mention.new(
+        message: ChatSDK::Message.new(
+          id: "evt_1",
+          text: "hello",
+          author: ChatSDK::Author.new(id: "U1", name: "user", platform: :test),
+          thread_id: "T1",
+          channel_id: "C1",
+          platform: :test
+        ),
+        thread_id: "T1",
+        channel_id: "C1",
+        platform: :test,
+        adapter_name: :webhook_test
+      )
+      allow(test_adapter).to receive(:parse_events).and_return([event])
+      executor_chat = ChatSDK::Chat.new(
+        user_name: "test-bot",
+        adapters: {webhook_test: test_adapter},
+        state: state,
+        handler_executor: ->(_payload) { raise "queue down" },
+        on_error: ->(error, context) { reported << [error, context] }
+      )
+      executor_endpoint = described_class.new(
+        chat: executor_chat,
+        adapter: test_adapter,
+        adapter_name: :webhook_test
+      )
+
+      status, headers, body = executor_endpoint.call(env)
+
+      expect(status).to eq(500)
+      expect(headers["content-type"]).to eq("text/plain")
+      expect(body).to eq([""])
+      error, context = reported.fetch(0)
+      expect(error).to be_a(ChatSDK::HandlerExecutorError)
+      expect(error.cause).to be_a(RuntimeError)
+      expect(error.cause.message).to eq("queue down")
+      expect(context).to include(
+        source: :executor,
+        adapter: :webhook_test,
+        event_type: :mention,
+        thread_id: "T1",
+        channel_id: "C1"
+      )
+    end
+  end
+
   describe "general error handling" do
     it "catches non-signature errors and returns 200" do
       allow(test_adapter).to receive(:parse_events).and_raise(RuntimeError, "something broke")

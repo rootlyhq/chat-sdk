@@ -46,12 +46,19 @@ module ChatSDK
         merged[:log_level]
       end
 
+      validate_handler_executor!
       validate_logger!
       validate_on_error!
       validate_lock_conflict!
     end
 
     private
+
+    def validate_handler_executor!
+      return if %i[inline thread].include?(@handler_executor) || @handler_executor.respond_to?(:call)
+
+      raise ConfigurationError, "handler_executor must be :inline, :thread, or a callable"
+    end
 
     def validate_logger!
       return if @logger.nil?
