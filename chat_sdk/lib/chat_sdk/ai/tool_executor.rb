@@ -5,11 +5,8 @@ module ChatSDK
     class ToolExecutor
       def initialize(chat:, scope: nil, strict_scope: false)
         @chat = chat
-        @scope = if scope == false
-          false
-        else
-          ConversationScope.scope_for(scope)
-        end
+        @scope = (scope == false) ? false : (ConversationScope.scope_for(scope) || ConversationScope.current&.dup)
+        @created_in_handler = ConversationScope.active?
         validate_scope!(@scope) if @scope
         @strict_scope = strict_scope
         @warned_unscoped = {}
@@ -111,7 +108,9 @@ module ChatSDK
 
         scope = @scope || ConversationScope.current
         unless scope
-          raise ChatSDK::Error, "AI tool call requires an explicit scope when run inside a handler without a conversation" if ConversationScope.active?
+          if ConversationScope.active? || @created_in_handler
+            raise ChatSDK::Error, "AI tool call requires an explicit scope when run inside a handler without a conversation"
+          end
 
           unless @warned_unscoped[tool_name]
             ChatSDK::Log.warn("AI tool ran without a conversation scope; pass scope: to create_executor to confine access")

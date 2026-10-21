@@ -452,6 +452,43 @@ RSpec.describe ChatSDK::Slack::Adapter do
       expect(adapter.client).to have_received(:auth_test).once
     end
 
+    it "resolves and caches bot user IDs separately for workspaces without configured IDs" do
+      adapter = described_class.new(
+        client_id: "client",
+        client_secret: "secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("T1", bot_token: "xoxb-team-1")
+      adapter.set_installation("T2", bot_token: "xoxb-team-2")
+      auth_client = ::Slack::Web::Client.new
+      allow(adapter).to receive(:client).and_return(auth_client)
+      allow(auth_client).to receive(:auth_test)
+        .and_return({"user_id" => "B_TEAM_1"}, {"user_id" => "B_TEAM_2"})
+      event_for = lambda do |team_id|
+        ChatSDK::Events::Mention.new(
+          message: ChatSDK::Message.new(
+            id: "M1",
+            text: "",
+            author: ChatSDK::Author.new(id: "U1", name: "user", platform: :slack),
+            thread_id: "T1",
+            channel_id: "C1",
+            platform: :slack
+          ),
+          thread_id: "T1",
+          channel_id: "C1",
+          platform: :slack,
+          adapter_name: :slack,
+          raw: {"team_id" => team_id}
+        )
+      end
+
+      expect(adapter.send(:resolve_bot_user_id, event_for.call("T1"))).to eq("B_TEAM_1")
+      expect(adapter.send(:resolve_bot_user_id, event_for.call("T1"))).to eq("B_TEAM_1")
+      expect(adapter.send(:resolve_bot_user_id, event_for.call("T2"))).to eq("B_TEAM_2")
+      expect(auth_client).to have_received(:auth_test).twice
+    end
+
     it "normalizes Slack mentions while preserving code spans" do
       adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
       text = "<!here> <!channel> <!everyone> <!subteam^S1|@team> <mailto:a@b|email> <tel:123|call> `<!here>`"

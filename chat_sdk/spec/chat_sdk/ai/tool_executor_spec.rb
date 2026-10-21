@@ -96,7 +96,7 @@ RSpec.describe ChatSDK::AI::ToolExecutor do
       expect(adapter.dm_channels.size).to eq(1)
     end
 
-    it "resolves an implicit scope when the tool executes" do
+    it "captures the handler's conversation scope for execution in another thread" do
       thread = ChatSDK::Thread.new(id: "T1", channel_id: "C1", adapter: adapter, chat: chat)
       scoped_executor = nil
 
@@ -104,11 +104,25 @@ RSpec.describe ChatSDK::AI::ToolExecutor do
         scoped_executor = described_class.new(chat: chat)
       end
 
-      allow(ChatSDK::Log).to receive(:warn)
       expect do
-        scoped_executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C2"})
-      end.not_to raise_error
-      expect(ChatSDK::Log).to have_received(:warn).once
+        ::Thread.new do
+          scoped_executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C2"})
+        end.value
+      end.to raise_error(ChatSDK::Error, /tool call blocked/)
+    end
+
+    it "requires explicit scope across threads when created in a handler without a conversation" do
+      unscoped_executor = nil
+
+      ChatSDK::AI::ConversationScope.with(nil) do
+        unscoped_executor = described_class.new(chat: chat)
+      end
+
+      expect do
+        ::Thread.new do
+          unscoped_executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C1"})
+        end.value
+      end.to raise_error(ChatSDK::Error, /requires an explicit scope/)
     end
 
     it "warns once per tool when used outside a handler without a scope" do

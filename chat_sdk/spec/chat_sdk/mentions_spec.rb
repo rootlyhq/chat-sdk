@@ -12,8 +12,12 @@ RSpec.describe ChatSDK::Format::Mentions do
       expect(described_class.mask_code_spans("before ```\n@bot\n``` after")).to eq("before    \n    \n    after")
     end
 
-    it "masks an unclosed code span" do
-      expect(described_class.mask_code_spans("before `@bot")).to eq("before      ")
+    it "leaves an unclosed single backtick run literal" do
+      expect(described_class.mask_code_spans("it`s @bot help")).to eq("it`s @bot help")
+    end
+
+    it "leaves an unclosed fence literal" do
+      expect(described_class.mask_code_spans("before ```\n@bot help")).to eq("before ```\n@bot help")
     end
 
     it "masks inline code spans across line breaks" do

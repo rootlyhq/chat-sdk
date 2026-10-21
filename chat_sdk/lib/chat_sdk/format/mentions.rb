@@ -44,6 +44,7 @@ module ChatSDK
             end
           end
 
+          masked[opening..] = characters[opening..] if opening
           masked.join
         end
 

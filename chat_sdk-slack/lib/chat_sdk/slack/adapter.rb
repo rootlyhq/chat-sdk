@@ -406,9 +406,10 @@ module ChatSDK
         return unless current_client
 
         @bot_user_id_mutex.synchronize do
-          return @bot_user_ids[current_client.object_id] if @bot_user_ids.key?(current_client.object_id)
+          cache_key = @client_id ? (concurrency_scope(event) || :default) : :default
+          return @bot_user_ids[cache_key] if @bot_user_ids.key?(cache_key)
 
-          @bot_user_ids[current_client.object_id] = begin
+          @bot_user_ids[cache_key] = begin
             current_client.auth_test["user_id"]
           rescue ::Slack::Web::Api::Errors::SlackError, Faraday::Error, SocketError, Timeout::Error
             nil
