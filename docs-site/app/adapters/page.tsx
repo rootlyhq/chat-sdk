@@ -100,6 +100,14 @@ function LinearIcon({ size = 22 }: { size?: number }) {
   );
 }
 
+function GitLabIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
+      <path d="m22.65 14.39-1.23-3.79-2.44-7.5a.63.63 0 0 0-1.2 0l-1.65 5.08H7.87L6.22 3.1a.63.63 0 0 0-1.2 0l-2.44 7.5-1.23 3.79a1.25 1.25 0 0 0 .45 1.4L12 22.5l10.2-6.7a1.25 1.25 0 0 0 .45-1.4Z" />
+    </svg>
+  );
+}
+
 function TwilioIcon({ size = 22 }: { size?: number }) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="#fff">
@@ -291,6 +299,21 @@ const adapters: Adapter[] = [
       post: 'yes', edit: 'no', delete: 'yes', ephemeral: 'no',
       reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
       dms: 'yes', history: 'yes', typing: 'no',
+    },
+  },
+  {
+    name: 'GitLab',
+    slug: 'gitlab',
+    gem: 'chat_sdk-gitlab',
+    type: 'platform',
+    tagline: 'Handle GitLab issue and merge request notes with webhook verification, reactions, history, and Markdown cards.',
+    color: '#FC6D26',
+    icon: <GitLabIcon />,
+    official: true,
+    features: {
+      post: 'yes', edit: 'yes', delete: 'yes', ephemeral: 'no',
+      reactions: 'yes', files: 'no', modals: 'no', streaming: 'no',
+      dms: 'no', history: 'yes', typing: 'no',
     },
   },
   {

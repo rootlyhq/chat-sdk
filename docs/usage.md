@@ -28,7 +28,7 @@ Optional keyword arguments are documented in [Getting Started](getting-started.m
 
 An adapter translates between ChatSDK's normalized API and a specific platform. Each adapter is a subclass of `ChatSDK::Adapter::Base` that implements methods like `post_message`, `edit_message`, and `parse_events`.
 
-ChatSDK ships eleven official adapters:
+ChatSDK ships twelve official adapters:
 
 - `ChatSDK::Slack::Adapter` -- [Slack](adapters/slack.md)
 - `ChatSDK::Teams::Adapter` -- [Microsoft Teams](adapters/teams.md)
@@ -41,6 +41,7 @@ ChatSDK ships eleven official adapters:
 - `ChatSDK::WhatsApp::Adapter` -- [WhatsApp](adapters/whatsapp.md)
 - `ChatSDK::X::Adapter` -- [X](adapters/x.md)
 - `ChatSDK::Linear::Adapter` -- [Linear](adapters/linear.md)
+- `ChatSDK::GitLab::Adapter` -- [GitLab](adapters/gitlab.md)
 
 See [Platform Adapters](platform-adapters.md) for the full capability matrix.
 

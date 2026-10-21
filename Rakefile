@@ -2,7 +2,7 @@
 
 require "rspec/core/rake_task"
 
-GEMS = %w[chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-state-redis].freeze
+GEMS = %w[chat_sdk chat_sdk-slack chat_sdk-teams chat_sdk-gchat chat_sdk-mattermost chat_sdk-gitlab chat_sdk-state-redis].freeze
 
 GEMS.each do |gem_dir|
   namespace gem_dir.tr("-", "_") do
