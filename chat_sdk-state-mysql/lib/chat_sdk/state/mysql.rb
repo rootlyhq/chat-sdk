@@ -3,10 +3,37 @@
 require "chat_sdk"
 require "mysql2"
 require "json"
+require "uri"
 
 module ChatSDK
   module State
     class Mysql < Base
+      def self.parse_url(url)
+        uri = URI.parse(url)
+        options = {}
+        options[:host] = uri.host if uri.host
+        options[:port] = uri.port if uri.port
+        options[:username] = URI::DEFAULT_PARSER.unescape(uri.user) if uri.user
+        options[:password] = URI::DEFAULT_PARSER.unescape(uri.password) if uri.password
+        database = uri.path.delete_prefix("/")
+        options[:database] = URI::DEFAULT_PARSER.unescape(database) unless database.empty?
+        query_options = URI.decode_www_form(uri.query.to_s).to_h
+        query_options.transform_values! do |value|
+          case value
+          when /\A\d+\z/
+            value.to_i
+          when "true"
+            true
+          when "false"
+            false
+          else
+            value
+          end
+        end
+        options.merge!(query_options.transform_keys(&:to_sym))
+        options
+      end
+
       def initialize(url: nil, connection: nil, key_prefix: "chat_sdk", auto_migrate: true)
         @conn = connection || connect(url || ENV["MYSQL_URL"] || ENV["DATABASE_URL"] || "mysql2://root@localhost/chat_sdk_dev")
         @key_prefix = key_prefix
@@ -44,15 +71,15 @@ module ChatSDK
       def acquire_lock(key, owner:, ttl:)
         ttl_seconds = ttl.to_f
         del_stmt = @conn.prepare(
-          "DELETE FROM chat_sdk_locks WHERE key_prefix = ? AND lock_key = ? AND expires_at < NOW()"
+          "DELETE FROM chat_sdk_locks WHERE key_prefix = ? AND lock_key = ? AND expires_at < NOW(6)"
         )
         del_stmt.execute(@key_prefix, key)
         ins_stmt = @conn.prepare(
           "INSERT IGNORE INTO chat_sdk_locks (key_prefix, lock_key, owner, expires_at) " \
-          "VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL #{ttl_seconds} SECOND))"
+          "VALUES (?, ?, ?, DATE_ADD(NOW(6), INTERVAL #{ttl_seconds} SECOND))"
         )
         ins_stmt.execute(@key_prefix, key, owner)
-        @conn.affected_rows > 0
+        ins_stmt.affected_rows > 0
       end
 
       def release_lock(key, owner:)
@@ -60,14 +87,14 @@ module ChatSDK
           "DELETE FROM chat_sdk_locks WHERE key_prefix = ? AND lock_key = ? AND owner = ?"
         )
         stmt.execute(@key_prefix, key, owner)
-        @conn.affected_rows > 0
+        stmt.affected_rows > 0
       end
 
       def force_lock(key, owner:, ttl:)
         ttl_seconds = ttl.to_f
         stmt = @conn.prepare(
           "INSERT INTO chat_sdk_locks (key_prefix, lock_key, owner, expires_at) " \
-          "VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL #{ttl_seconds} SECOND)) " \
+          "VALUES (?, ?, ?, DATE_ADD(NOW(6), INTERVAL #{ttl_seconds} SECOND)) " \
           "ON DUPLICATE KEY UPDATE owner = VALUES(owner), expires_at = VALUES(expires_at)"
         )
         stmt.execute(@key_prefix, key, owner)
@@ -76,18 +103,18 @@ module ChatSDK
 
       def extend_lock(key, owner:, ttl:)
         stmt = @conn.prepare(
-          "UPDATE chat_sdk_locks SET expires_at = DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND) " \
-          "WHERE key_prefix = ? AND lock_key = ? AND owner = ? AND expires_at > NOW()"
+          "UPDATE chat_sdk_locks SET expires_at = DATE_ADD(NOW(6), INTERVAL #{ttl.to_f} SECOND) " \
+          "WHERE key_prefix = ? AND lock_key = ? AND owner = ? AND expires_at > NOW(6)"
         )
         stmt.execute(@key_prefix, key, owner)
-        @conn.affected_rows > 0
+        stmt.affected_rows > 0
       end
 
       # Key-value store
 
       def get(key)
         stmt = @conn.prepare(
-          "SELECT value FROM chat_sdk_cache WHERE key_prefix = ? AND cache_key = ? AND (expires_at IS NULL OR expires_at > NOW())"
+          "SELECT value FROM chat_sdk_cache WHERE key_prefix = ? AND cache_key = ? AND (expires_at IS NULL OR expires_at > NOW(6))"
         )
         result = stmt.execute(@key_prefix, key)
         row = result.first
@@ -101,7 +128,7 @@ module ChatSDK
         stmt = if ttl
           @conn.prepare(
             "INSERT INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-            "VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND)) " \
+            "VALUES (?, ?, ?, DATE_ADD(NOW(6), INTERVAL #{ttl.to_f} SECOND)) " \
             "ON DUPLICATE KEY UPDATE value = VALUES(value), expires_at = VALUES(expires_at)"
           )
         else
@@ -129,13 +156,13 @@ module ChatSDK
       def set_if_absent(key, value, ttl: nil)
         serialized = JSON.generate(value)
         del_stmt = @conn.prepare(
-          "DELETE FROM chat_sdk_cache WHERE key_prefix = ? AND cache_key = ? AND expires_at IS NOT NULL AND expires_at < NOW()"
+          "DELETE FROM chat_sdk_cache WHERE key_prefix = ? AND cache_key = ? AND expires_at IS NOT NULL AND expires_at < NOW(6)"
         )
         del_stmt.execute(@key_prefix, key)
         stmt = if ttl
           @conn.prepare(
             "INSERT IGNORE INTO chat_sdk_cache (key_prefix, cache_key, value, expires_at) " \
-            "VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL #{ttl.to_f} SECOND))"
+            "VALUES (?, ?, ?, DATE_ADD(NOW(6), INTERVAL #{ttl.to_f} SECOND))"
           )
         else
           @conn.prepare(
@@ -144,7 +171,7 @@ module ChatSDK
           )
         end
         stmt.execute(@key_prefix, key, serialized)
-        @conn.affected_rows > 0
+        stmt.affected_rows > 0
       end
 
       def enqueue(key, value, max_size:, drop: :drop_oldest)
@@ -208,11 +235,11 @@ module ChatSDK
 
       def cleanup_expired
         s1 = @conn.prepare(
-          "DELETE FROM chat_sdk_cache WHERE key_prefix = ? AND expires_at IS NOT NULL AND expires_at < NOW()"
+          "DELETE FROM chat_sdk_cache WHERE key_prefix = ? AND expires_at IS NOT NULL AND expires_at < NOW(6)"
         )
         s1.execute(@key_prefix)
         s2 = @conn.prepare(
-          "DELETE FROM chat_sdk_locks WHERE key_prefix = ? AND expires_at < NOW()"
+          "DELETE FROM chat_sdk_locks WHERE key_prefix = ? AND expires_at < NOW(6)"
         )
         s2.execute(@key_prefix)
       end
@@ -220,7 +247,7 @@ module ChatSDK
       private
 
       def connect(url)
-        Mysql2::Client.new(url)
+        Mysql2::Client.new(self.class.parse_url(url))
       end
 
       def ensure_tables
@@ -237,7 +264,7 @@ module ChatSDK
             key_prefix VARCHAR(255) NOT NULL,
             lock_key VARCHAR(512) NOT NULL,
             owner VARCHAR(255) NOT NULL,
-            expires_at TIMESTAMP NOT NULL,
+            expires_at TIMESTAMP(6) NOT NULL,
             PRIMARY KEY (key_prefix, lock_key)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         SQL
@@ -246,7 +273,7 @@ module ChatSDK
             key_prefix VARCHAR(255) NOT NULL,
             cache_key VARCHAR(512) NOT NULL,
             value JSON NOT NULL,
-            expires_at TIMESTAMP NULL DEFAULT NULL,
+            expires_at TIMESTAMP(6) NULL DEFAULT NULL,
             PRIMARY KEY (key_prefix, cache_key)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         SQL
@@ -258,9 +285,32 @@ module ChatSDK
             value JSON NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (id),
-            INDEX chat_sdk_queues_lookup (key_prefix, queue_key, id)
+            INDEX chat_sdk_queues_lookup (key_prefix, queue_key)
           ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         SQL
+        ensure_expiration_precision
+      end
+
+      def ensure_expiration_precision
+        columns = @conn.query(<<~SQL).each_with_object({}) do |row, result|
+          SELECT TABLE_NAME, DATETIME_PRECISION
+          FROM information_schema.columns
+          WHERE table_schema = DATABASE()
+            AND table_name IN ('chat_sdk_locks', 'chat_sdk_cache')
+            AND column_name = 'expires_at'
+        SQL
+          result[row["TABLE_NAME"]] = row["DATETIME_PRECISION"].to_i
+        end
+
+        definitions = {
+          "chat_sdk_locks" => "TIMESTAMP(6) NOT NULL",
+          "chat_sdk_cache" => "TIMESTAMP(6) NULL DEFAULT NULL"
+        }
+        definitions.each do |table_name, definition|
+          next if columns[table_name] == 6
+
+          @conn.query("ALTER TABLE #{table_name} MODIFY expires_at #{definition}")
+        end
       end
     end
   end
