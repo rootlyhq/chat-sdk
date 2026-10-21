@@ -358,9 +358,15 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(subject.supports?(:typing_indicator)).to be true
     end
 
-    it "raises PlatformError when no service URL is registered" do
-      expect { subject.start_typing(channel_id: "unknown-conv") }
-        .to raise_error(ChatSDK::PlatformError, /No service URL/)
+    it "uses the default service URL when no conversation URL is registered" do
+      allow(subject.client).to receive(:send_typing)
+
+      subject.start_typing(channel_id: "unknown-conv")
+
+      expect(subject.client).to have_received(:send_typing).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        conversation_id: "unknown-conv"
+      )
     end
   end
 
@@ -507,7 +513,7 @@ RSpec.describe ChatSDK::Teams::Adapter do
         approve = action_set["actions"][0]
         expect(approve["type"]).to eq("Action.Submit")
         expect(approve["title"]).to eq("Approve")
-        expect(approve["data"]).to eq({"action" => "btn:approve", "value" => "yes"})
+        expect(approve["data"]).to eq({"actionId" => "btn:approve", "value" => "yes"})
         expect(approve["style"]).to eq("positive")
 
         reject = action_set["actions"][1]
@@ -611,9 +617,16 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(result.id).to eq("msg-card-1")
     end
 
-    it "raises PlatformError when no service URL is registered" do
-      expect { subject.post_message(channel_id: "unknown-conv", message: "Hello") }
-        .to raise_error(ChatSDK::PlatformError, /No service URL/)
+    it "uses the default service URL when no conversation URL is registered" do
+      allow(subject.client).to receive(:send_activity).and_return({"id" => "message-1"})
+
+      subject.post_message(channel_id: "unknown-conv", message: "Hello")
+
+      expect(subject.client).to have_received(:send_activity).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        conversation_id: "unknown-conv",
+        activity: hash_including("text" => "Hello")
+      )
     end
   end
 

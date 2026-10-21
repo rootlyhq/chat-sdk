@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require "base64"
+require "uri"
+
 module ChatSDK
   module Teams
     class GraphClient
@@ -15,9 +18,10 @@ module ChatSDK
         @token_expires_at = nil
       end
 
-      def fetch_messages(chat_id:, limit: 50)
+      def fetch_messages(chat_id:, limit: 50, cursor: nil)
+        url = cursor || "#{GRAPH_BASE_URL}/chats/#{chat_id}/messages?$top=#{limit}&$orderby=createdDateTime desc"
+        validate_graph_url!(url) if cursor
         token = fetch_token
-        url = "#{GRAPH_BASE_URL}/chats/#{chat_id}/messages?$top=#{limit}&$orderby=createdDateTime desc"
 
         response = api_connection.get(url) do |req|
           req.headers["Authorization"] = "Bearer #{token}"
@@ -33,6 +37,27 @@ module ChatSDK
         end
 
         response.body
+      end
+
+      def resolve_reference_attachment(content_url:)
+        item = fetch_reference_item(content_url)
+        {
+          "url" => item["@microsoft.graph.downloadUrl"],
+          "mime_type" => item.dig("file", "mimeType") || "application/octet-stream",
+          "filename" => item["name"]
+        }
+      end
+
+      def resolve_reference_url(content_url:)
+        resolve_reference_attachment(content_url: content_url).fetch("url")
+      end
+
+      def download_reference_attachment(content_url:)
+        download_url = resolve_reference_url(content_url: content_url)
+        uri = URI.parse(download_url)
+        raise ArgumentError, "Teams download URL must use HTTPS" unless uri.is_a?(URI::HTTPS)
+
+        Faraday.get(download_url)
       end
 
       def fetch_token
@@ -77,6 +102,43 @@ module ChatSDK
           f.response :json
           f.adapter :net_http
         end
+      end
+
+      def fetch_reference_item(content_url)
+        uri = URI.parse(content_url)
+        raise ArgumentError, "Teams attachment URL must use HTTPS" unless uri.is_a?(URI::HTTPS)
+
+        token = fetch_token
+        share_id = "u!#{Base64.urlsafe_encode64(content_url, padding: false)}"
+        response = api_connection.get("#{GRAPH_BASE_URL}/shares/#{share_id}/driveItem") do |req|
+          req.headers["Authorization"] = "Bearer #{token}"
+        end
+        unless response.success?
+          raise ChatSDK::PlatformError.new(
+            "Graph API error: #{response.status}",
+            status: response.status,
+            body: response.body,
+            adapter_name: :teams
+          )
+        end
+
+        item = response.body
+        unless item["@microsoft.graph.downloadUrl"]
+          raise ChatSDK::PlatformError.new("Graph API did not return an attachment download URL", adapter_name: :teams)
+        end
+
+        item
+      rescue URI::InvalidURIError
+        raise ArgumentError, "Invalid Teams attachment URL"
+      end
+
+      def validate_graph_url!(url)
+        uri = URI.parse(url)
+        valid = uri.is_a?(URI::HTTPS) && uri.host == "graph.microsoft.com" &&
+          uri.port == 443 && !uri.userinfo && !uri.fragment
+        raise ArgumentError, "Graph pagination cursor must use https://graph.microsoft.com" unless valid
+      rescue URI::InvalidURIError
+        raise ArgumentError, "Invalid Graph pagination cursor"
       end
     end
   end

@@ -3,13 +3,16 @@
 module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
+      DEFAULT_SERVICE_URL = "https://smba.trafficmanager.net/teams/"
+
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
         :file_uploads, :streaming_edit, :typing_indicator, :message_history
 
       attr_reader :client
 
       def initialize(app_id: nil, app_password: nil, tenant_id: nil,
-        graph_client_id: nil, graph_client_secret: nil, graph_tenant_id: nil)
+        graph_client_id: nil, graph_client_secret: nil, graph_tenant_id: nil,
+        service_url: nil)
         @app_id = app_id || ENV["TEAMS_APP_ID"]
         @app_password = app_password || ENV["TEAMS_APP_PASSWORD"]
         @tenant_id = tenant_id || ENV["TEAMS_TENANT_ID"]
@@ -21,11 +24,16 @@ module ChatSDK
         @graph_client_secret = graph_client_secret || ENV["TEAMS_GRAPH_CLIENT_SECRET"]
         @graph_tenant_id = graph_tenant_id || ENV["TEAMS_GRAPH_TENANT_ID"]
         @graph_client = GraphClient.new(@graph_client_id, @graph_client_secret, @graph_tenant_id) if @graph_client_id
+        @default_service_url = service_url || ENV["TEAMS_SERVICE_URL"] || DEFAULT_SERVICE_URL
 
         @client = BotFrameworkClient.new(app_id: @app_id, app_password: @app_password)
         @jwt_verifier = JwtVerifier.new(app_id: @app_id)
         @renderer = AdaptiveCardRenderer.new
         @service_urls = {}
+      end
+
+      def set_state(state)
+        @state = state
       end
 
       def name
@@ -47,7 +55,7 @@ module ChatSDK
 
         # Cache the service URL for this conversation
         if activity["serviceUrl"] && activity.dig("conversation", "id")
-          @service_urls[activity.dig("conversation", "id")] = activity["serviceUrl"]
+          register_service_url(activity.dig("conversation", "id"), activity["serviceUrl"])
         end
 
         ActivityParser.parse(activity, bot_app_id: @app_id)
@@ -61,7 +69,7 @@ module ChatSDK
         service_url = service_url_for(channel_id)
 
         activity = build_activity(msg)
-        activity["replyToId"] = thread_id if thread_id
+        activity["replyToId"] = activity_reply_id(channel_id, thread_id) if thread_id
 
         result = @client.send_activity(
           service_url: service_url,
@@ -73,7 +81,7 @@ module ChatSDK
           id: result["id"],
           text: msg.text || "",
           author: ChatSDK::Author.new(id: @app_id, name: "bot", platform: :teams, bot: true),
-          thread_id: thread_id || result["id"],
+          thread_id: thread_id || channel_thread_id(channel_id, result["id"]),
           channel_id: channel_id,
           platform: :teams,
           raw: result
@@ -137,14 +145,7 @@ module ChatSDK
 
       def open_dm(user_id)
         require_capability!(:direct_messages)
-        # To open a DM, we need a service URL. Use the first cached one.
-        service_url = @service_urls.values.first
-        unless service_url
-          raise ChatSDK::PlatformError.new(
-            "No service URL available. A Teams activity must be received first.",
-            adapter_name: :teams
-          )
-        end
+        service_url = @service_urls.values.first || @default_service_url
 
         payload = {
           "bot" => {"id" => @app_id},
@@ -154,7 +155,7 @@ module ChatSDK
 
         result = @client.create_conversation(service_url: service_url, payload: payload)
         conversation_id = result["id"]
-        @service_urls[conversation_id] = service_url
+        register_service_url(conversation_id, service_url)
         conversation_id
       end
 
@@ -191,7 +192,7 @@ module ChatSDK
             "(TEAMS_GRAPH_CLIENT_ID, TEAMS_GRAPH_CLIENT_SECRET, TEAMS_GRAPH_TENANT_ID)"
         end
 
-        result = @graph_client.fetch_messages(chat_id: channel_id, limit: limit)
+        result = @graph_client.fetch_messages(chat_id: channel_id, limit: limit, cursor: cursor)
         messages = (result["value"] || []).map { |m| parse_graph_message(m, channel_id) }
         next_link = result["@odata.nextLink"]
         [messages, next_link]
@@ -200,6 +201,18 @@ module ChatSDK
       # Store a service URL for a conversation (useful when sending proactive messages)
       def register_service_url(conversation_id, service_url)
         @service_urls[conversation_id] = service_url
+        @state&.set(service_url_key(conversation_id), service_url)
+      end
+
+      def webhook_response(events)
+        return unless events.any? { |event| event.raw.is_a?(Hash) && event.raw["type"] == "invoke" }
+
+        body = {
+          "statusCode" => 200,
+          "type" => "application/vnd.microsoft.activity.message",
+          "value" => "OK"
+        }
+        [200, {"content-type" => "application/json"}, [JSON.generate(body)]]
       end
 
       private
@@ -218,11 +231,25 @@ module ChatSDK
           activity["text"] = postable_message.text
         end
 
+        if postable_message.ai_generated
+          activity["entities"] = [{
+            "type" => "https://schema.org/Message",
+            "@type" => "Message",
+            "@context" => "https://schema.org",
+            "additionalType" => ["AIGeneratedContent"]
+          }]
+        end
+
         activity
       end
 
       def service_url_for(channel_id)
         url = @service_urls[channel_id]
+        if !url && @state
+          url = @state.get(service_url_key(channel_id))
+          @service_urls[channel_id] = url if url
+        end
+        url ||= @default_service_url
         unless url
           raise ChatSDK::PlatformError.new(
             "No service URL for conversation #{channel_id}. Register it first or receive an activity.",
@@ -232,10 +259,31 @@ module ChatSDK
         url
       end
 
+      def service_url_key(conversation_id)
+        "chat_sdk:teams:service_url:#{conversation_id}"
+      end
+
+      def channel_thread_id(channel_id, activity_id)
+        return activity_id unless channel_id.to_s.include?("@thread.tacv2") && activity_id
+
+        "#{channel_id};messageid=#{activity_id}"
+      end
+
+      def activity_reply_id(channel_id, thread_id)
+        prefix = "#{channel_id};messageid="
+        thread_id.start_with?(prefix) ? thread_id.delete_prefix(prefix) : thread_id
+      end
+
       def parse_graph_message(data, channel_id)
         from = data["from"] || {}
         user = from["user"] || from["application"] || {}
         is_bot = !from["application"].nil?
+        attachments = Array(data["attachments"]).filter_map do |attachment|
+          next unless attachment["contentType"] == "reference" && attachment["contentUrl"]
+
+          resolved = @graph_client.resolve_reference_attachment(content_url: attachment["contentUrl"])
+          resolved.merge("filename" => resolved["filename"] || attachment["name"])
+        end
 
         ChatSDK::Message.new(
           id: data["id"],
@@ -244,11 +292,13 @@ module ChatSDK
             id: user["id"] || "unknown",
             name: user["displayName"] || "unknown",
             platform: :teams,
-            bot: is_bot
+            bot: is_bot,
+            me: is_bot && user["id"] == @app_id
           ),
           thread_id: data["replyToId"] || data["id"],
           channel_id: channel_id,
           platform: :teams,
+          attachments: attachments,
           timestamp: data["createdDateTime"],
           raw: data
         )
