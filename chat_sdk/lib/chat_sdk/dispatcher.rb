@@ -38,7 +38,7 @@ module ChatSDK
         if LIFECYCLE_EVENT_TYPES.include?(event.type)
           return unless dedupe(event, adapter_name, adapter.concurrency_scope(event))
 
-          return execute_event(event, build_thread(event, adapter))
+          return execute_event(event, build_thread(event, adapter), adapter_name: adapter_name)
         end
 
         concurrency_scope = adapter.concurrency_scope(event)

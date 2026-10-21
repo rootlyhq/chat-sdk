@@ -126,10 +126,35 @@ RSpec.describe "Slack lifecycle events" do
     second_called = false
     chat.on_assistant_thread_started { raise "handler failed" }
     chat.on_assistant_thread_started { second_called = true }
-    expect(ChatSDK::Log).to receive(:error).with(/Handler error \(assistant_thread_started\): handler failed/)
+    expect(ChatSDK::Log).to receive(:error).with(/Handler error \(assistant_thread_started\).*RuntimeError: handler failed/)
 
     expect { chat.dispatch(assistant_thread_started, adapter_name: :slack) }.not_to raise_error
     expect(second_called).to be(true)
+  end
+
+  it "reports lifecycle handler errors through on_error with event context" do
+    error = RuntimeError.new("handler failed")
+    reported = nil
+    reporting_chat = ChatSDK::Chat.new(
+      user_name: "bot",
+      adapters: {slack: adapter},
+      state: state,
+      on_error: ->(reported_error, context) { reported = [reported_error, context] }
+    )
+    reporting_chat.on_assistant_thread_started { raise error }
+
+    reporting_chat.dispatch(assistant_thread_started, adapter_name: :slack)
+
+    expect(reported).to eq([
+      error,
+      {
+        source: :handler,
+        adapter: :slack,
+        event_type: :assistant_thread_started,
+        thread_id: "1234.5678",
+        channel_id: "D123"
+      }
+    ])
   end
 
   it "dispatches even when the corresponding thread lock is held" do
