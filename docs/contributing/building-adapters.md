@@ -175,6 +175,8 @@ Most methods have default implementations that raise `NotSupportedError`. Overri
 
 The optional `stream(channel_id:, thread_id:, stream:, options: {})` hook is different: its base implementation returns `nil`, which delegates to ChatSDK's post-and-edit fallback. Implement it only when the platform has a native streaming API. Return a `ChatSDK::Message` after consuming the source when native streaming succeeds; return `nil` before consuming it when native streaming is unavailable. Existing adapters do not need to implement this hook.
 
+Adapters that need persistent state can implement `set_state(state)`. `ChatSDK::Chat` calls it during construction with its configured state adapter.
+
 ## Declaring Capabilities
 
 Use the `capabilities` class method to declare what your adapter supports. Only declare capabilities for methods you actually implement:
