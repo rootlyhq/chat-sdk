@@ -13,13 +13,18 @@ module ChatSDK
     end
 
     def handlers_for(event)
-      @handlers.select { |h| matches?(h, event) }
+      handlers_for_type(event.type, event: event)
+    end
+
+    def handlers_for_type(type, event: nil)
+      @handlers.select do |handler|
+        handler.type == type && (!event || matches?(handler, event))
+      end
     end
 
     private
 
     def matches?(handler, event)
-      return false unless handler.type == event.type
       return true if handler.matcher.nil?
 
       case handler.matcher

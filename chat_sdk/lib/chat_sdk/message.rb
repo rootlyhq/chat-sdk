@@ -4,9 +4,11 @@ module ChatSDK
   class Message
     attr_reader :id, :text, :author, :thread_id, :channel_id,
       :platform, :attachments, :links, :reply_to, :subject, :raw, :timestamp
+    attr_accessor :is_mention
 
     def initialize(id:, text:, author:, thread_id:, channel_id:, platform:,
-      attachments: [], links: [], reply_to: nil, subject: nil, raw: nil, timestamp: nil)
+      attachments: [], links: [], reply_to: nil, subject: nil, raw: nil,
+      timestamp: nil, is_mention: nil)
       @id = id
       @text = text
       @author = author
@@ -19,6 +21,7 @@ module ChatSDK
       @subject = subject
       @raw = raw
       @timestamp = timestamp
+      @is_mention = is_mention
     end
 
     def ==(other)

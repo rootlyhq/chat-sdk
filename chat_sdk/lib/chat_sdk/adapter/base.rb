@@ -96,9 +96,13 @@ module ChatSDK
         raise NotImplementedError
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         require_capability!(:typing_indicator)
         raise NotImplementedError
+      end
+
+      def concurrency_scope(_event)
+        nil
       end
 
       def mention(user_id)

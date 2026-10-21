@@ -26,7 +26,12 @@ module ChatSDK
     end
 
     def on_new_message(pattern = nil, &block)
-      @registry.register(:mention, matcher: pattern, &block)
+      unless pattern.nil? || pattern.is_a?(Regexp)
+        raise ChatSDK::ConfigurationError, "on_new_message pattern must be a Regexp or nil"
+      end
+      raise ChatSDK::ConfigurationError, "on_new_message requires a block" unless block
+
+      @registry.register(:new_message, matcher: pattern, &block)
     end
 
     def on_direct_message(&block)

@@ -69,7 +69,7 @@ bot.on_action("approve_btn") { |event| ... }
 bot.on_slash_command("/deploy") { |event| ... }
 ```
 
-Handlers for mentions, subscribed messages, and direct messages receive `(thread, message)`. Handlers for reactions, actions, and slash commands receive a single `event` object that includes a `thread` method.
+Message handlers receive `(thread, message, context)`; the context is optional for handlers that do not need queueing metadata. Handlers for reactions, actions, and slash commands receive a single `event` object that includes a `thread` method.
 
 See [Handling Events](handling-events.md) for details on each handler.
 

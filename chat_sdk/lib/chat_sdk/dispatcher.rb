@@ -27,10 +27,11 @@ module ChatSDK
           return execute_event(event, build_thread(event, adapter))
         end
 
-        return unless dedupe(event, adapter_name)
+        concurrency_scope = adapter.concurrency_scope(event)
+        return unless dedupe(event, adapter_name, concurrency_scope)
 
         thread = build_thread(event, adapter)
-        thread_key = thread_key_for(event, adapter_name)
+        thread_key = thread_key_for(event, adapter_name, concurrency_scope)
         strategy = @config.concurrency[:strategy]
 
         if strategy == :concurrent
@@ -155,12 +156,12 @@ module ChatSDK
       end
     end
 
-    def dedupe(event, adapter_name)
+    def dedupe(event, adapter_name, concurrency_scope)
       event_id = extract_event_id(event)
       return true unless event_id
 
       is_new = @state.set_if_absent(
-        "chat_sdk:dedupe:#{adapter_name}:#{event_id}",
+        dedupe_key(adapter_name, concurrency_scope, event_id),
         true,
         ttl: @config.dedupe_ttl
       )
@@ -178,12 +179,18 @@ module ChatSDK
       end
     end
 
-    def thread_key_for(event, adapter_name)
+    def dedupe_key(adapter_name, concurrency_scope, event_id)
+      prefix = ["chat_sdk:dedupe", adapter_name]
+      prefix << concurrency_scope if concurrency_scope
+      "#{prefix.join(":")}:#{event_id}"
+    end
+
+    def thread_key_for(event, adapter_name, concurrency_scope)
       channel_id = event.respond_to?(:channel_id) ? event.channel_id : nil
       thread_id = event.respond_to?(:thread_id) ? event.thread_id : nil
       lock_scope = @config.concurrency[:lock_scope]
       scope_id = (lock_scope&.to_sym == :channel) ? channel_id : thread_id
-      "#{adapter_name}:#{channel_id}:#{scope_id}"
+      [adapter_name, concurrency_scope, channel_id, scope_id].compact.join(":")
     end
 
     def acquire_lock(thread_key, event, owner, force: false, apply_conflict_policy: true)
@@ -256,16 +263,63 @@ module ChatSDK
     end
 
     def execute_event(event, thread, context: nil)
+      if %i[mention subscribed_message direct_message].include?(event.type)
+        route_message_event(event, thread, context)
+        return
+      end
+
       @registry.handlers_for(event).each do |handler|
         execute_handler(handler, event, thread, context: context)
       end
+    end
+
+    def route_message_event(event, thread, context)
+      message = event.message
+      dm_handlers = @registry.handlers_for_type(:direct_message, event: event)
+      if event.type == :direct_message && dm_handlers.any?
+        run_handlers(dm_handlers, event, thread, context)
+        return
+      end
+
+      message.is_mention = true if event.type == :direct_message
+
+      if thread&.subscribed?
+        run_handlers(@registry.handlers_for_type(:subscribed_message, event: event), event, thread, context)
+        return
+      end
+
+      if message.is_mention.nil?
+        message.is_mention = if event.type == :mention
+          true
+        else
+          detect_mention(message.text)
+        end
+      end
+
+      if message.is_mention
+        run_handlers(@registry.handlers_for_type(:mention, event: event), event, thread, context)
+        return
+      end
+
+      @registry.handlers_for_type(:new_message, event: event).each do |handler|
+        execute_handler(handler, event, thread, context: context)
+      end
+    end
+
+    def run_handlers(handlers, event, thread, context)
+      handlers.each { |handler| execute_handler(handler, event, thread, context: context) }
+    end
+
+    def detect_mention(text)
+      masked_text = ChatSDK::Format::Mentions.mask_code_spans(text)
+      /(?<![[:word:]])@#{Regexp.escape(@config.user_name)}\b/i.match?(masked_text)
     end
 
     def execute_handler(handler, event, thread, context: nil)
       ChatSDK::Instrumentation.instrument("handler.chat_sdk", handler_type: event.type) do
         ChatSDK::AI::ConversationScope.with(thread) do
           case event.type
-          when :mention, :subscribed_message, :direct_message
+          when :mention, :subscribed_message, :direct_message, :new_message
             handler.block.call(thread, event.message, context)
           when :message_updated
             handler.block.call(thread, event.message, event.previous_message)

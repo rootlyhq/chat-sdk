@@ -268,6 +268,18 @@ RSpec.describe ChatSDK::Dispatcher do
   end
 
   describe "concurrency: queue" do
+    it "routes queued messages through ordinary message handlers" do
+      bot = build_bot(concurrency: :queue)
+      received = []
+      bot.on_new_message(/ordinary/) { |_thread, message| received << message.text }
+      event = make_mention(text: "ordinary message", message_id: "queue-ordinary")
+      event.message.is_mention = false
+
+      bot.dispatch(event, adapter_name: :test)
+
+      expect(received).to eq(["ordinary message"])
+    end
+
     it "collapses queued messages into the latest message with skipped context" do
       bot = build_bot(concurrency: :queue)
       entered = Queue.new
