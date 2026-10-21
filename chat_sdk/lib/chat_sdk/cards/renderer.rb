@@ -18,6 +18,7 @@ module ChatSDK
         when :link_button then "[#{node.attributes[:text]}](#{node.attributes[:url]})"
         when :text_input then node.attributes[:label]
         when :select then "_#{node.attributes[:placeholder] || "Select"}_"
+        when :radio_select then "_#{node.attributes[:label] || "Select"}_"
         when :table then render_table(node)
         when :chart then render_chart(node)
         else ""

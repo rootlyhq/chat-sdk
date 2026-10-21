@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "cgi"
+
 module ChatSDK
   module GChat
     class CardV2Renderer
@@ -92,7 +94,9 @@ module ChatSDK
       end
 
       def render_link(node)
-        {textParagraph: {text: %(<a href="#{node.attributes[:url]}">#{node.attributes[:label]}</a>)}}
+        url = CGI.escapeHTML(node.attributes[:url].to_s)
+        label = CGI.escapeHTML(node.attributes[:label].to_s)
+        {textParagraph: {text: %(<a href="#{url}">#{label}</a>)}}
       end
 
       def render_fields(node)

@@ -138,6 +138,45 @@ RSpec.describe "Teams parity behavior" do
         expect(event.values).to eq("firstName" => "Ada")
       end
     end
+
+    it "fans out auto-submit inputs as individual actions with the full form values" do
+      events = parse(
+        "type" => "message",
+        "from" => {"id" => "user-1"},
+        "conversation" => {"id" => "conversation-1"},
+        "value" => {
+          "actionId" => "__auto_submit",
+          "value" => "red",
+          "priority" => 2,
+          "toggle" => true,
+          "msteams" => {"type" => "task/fetch"}
+        }
+      )
+
+      expect(events.map(&:action_id)).to eq(["value", "priority", "toggle"])
+      expect(events.map(&:value)).to eq(["red", "2", nil])
+      expect(events.map(&:values)).to all(
+        eq("value" => "red", "priority" => "2")
+      )
+    end
+
+    it "fans out invoke auto-submit inputs from the action payload" do
+      events = parse(
+        "type" => "invoke",
+        "from" => {"id" => "user-1"},
+        "conversation" => {"id" => "conversation-1"},
+        "value" => {
+          "action" => {"data" => {"actionId" => "__auto_submit"}},
+          "data" => {"color" => "red", "priority" => 2}
+        }
+      )
+
+      expect(events.map(&:action_id)).to eq(["color", "priority"])
+      expect(events.map(&:value)).to eq(["red", "2"])
+      expect(events.map(&:values)).to all(
+        eq("color" => "red", "priority" => "2")
+      )
+    end
   end
 
   describe "invoke acknowledgement" do

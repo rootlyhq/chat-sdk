@@ -728,6 +728,19 @@ RSpec.describe ChatSDK::GChat::Adapter do
         expect(selections[1][:items].find { |item| item[:selected] }[:value]).to eq("fast")
       end
 
+      it "escapes HTML in link labels and URLs" do
+        card = ChatSDK.card do
+          link url: 'https://example.com/<path>"quoted"', label: 'Docs <"guide">'
+        end
+
+        widgets = renderer.render(card)[:cards_v2][0][:card][:sections][0][:widgets]
+        expect(widgets[0]).to eq(
+          textParagraph: {
+            text: %(<a href="https://example.com/&lt;path&gt;&quot;quoted&quot;">Docs &lt;&quot;guide&quot;&gt;</a>)
+          }
+        )
+      end
+
       it "renders a divider" do
         card = ChatSDK.card do
           text "Before"

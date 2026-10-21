@@ -22,4 +22,17 @@ RSpec.describe ChatSDK::Cards::Renderer do
     expect(output).to include("[Ack]")
     expect(output).to include("[Runbook](https://example.com)")
   end
+
+  it "renders radio selects as fallback text using their label" do
+    card = ChatSDK.card do
+      actions do
+        radio_select id: "priority", label: "Priority" do
+          option "High", value: "high"
+          option "Low", value: "low"
+        end
+      end
+    end
+
+    expect(renderer.render(card)).to eq("_Priority_")
+  end
 end

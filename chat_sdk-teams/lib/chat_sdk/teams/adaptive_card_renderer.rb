@@ -32,16 +32,15 @@ module ChatSDK
           element = render_node(child)
           next unless element
 
+          elements = element.is_a?(Array) ? element.compact : [element]
+          next if elements.empty?
+
           if pending_separator
-            element["separator"] = true
+            elements.first["separator"] = true
             pending_separator = false
           end
 
-          if element.is_a?(Array)
-            body.concat(element)
-          else
-            body << element
-          end
+          body.concat(elements)
         end
 
         wrap_card(body, width: node.attributes[:width])
@@ -144,20 +143,37 @@ module ChatSDK
       end
 
       def render_actions(node)
-        actions = node.children.filter_map { |child| render_action_element(child) }
-        {
-          "type" => "ActionSet",
-          "actions" => actions
-        }
-      end
+        elements = []
+        actions = []
+        has_inputs = false
+        has_buttons = false
 
-      def render_action_element(node)
-        case node.type
-        when :button then render_action_submit(node)
-        when :link_button then render_action_open_url(node)
-        when :select then render_select(node)
-        when :radio_select then render_radio_select(node)
+        node.children.each do |child|
+          case child.type
+          when :button
+            has_buttons = true
+            actions << render_action_submit(child)
+          when :link_button
+            actions << render_action_open_url(child)
+          when :select
+            has_inputs = true
+            elements << render_select(child)
+          when :radio_select
+            has_inputs = true
+            elements << render_radio_select(child)
+          end
         end
+
+        if has_inputs && !has_buttons
+          actions << {
+            "type" => "Action.Submit",
+            "title" => "Submit",
+            "data" => {"actionId" => AUTO_SUBMIT_ACTION_ID}
+          }
+        end
+
+        elements << {"type" => "ActionSet", "actions" => actions} unless actions.empty?
+        elements
       end
 
       def render_action_submit(node)

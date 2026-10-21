@@ -83,9 +83,14 @@ module ChatSDK
 
       def render_section(node)
         block = {type: "section"}
-        text_children = node.children.select { |c| c.type == :text }
-        if text_children.any?
-          block[:text] = {type: "mrkdwn", text: truncate_mrkdwn(text_children.map { |t| t.attributes[:content] }.join("\n"), 3000)}
+        lines = node.children.filter_map do |child|
+          case child.type
+          when :text then child.attributes[:content]
+          when :link then render_link(child).dig(:text, :text)
+          end
+        end
+        if lines.any?
+          block[:text] = {type: "mrkdwn", text: truncate_mrkdwn(lines.join("\n"), 3000)}
         end
         block
       end

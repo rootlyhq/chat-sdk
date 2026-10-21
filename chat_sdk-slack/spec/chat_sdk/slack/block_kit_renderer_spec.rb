@@ -151,4 +151,19 @@ RSpec.describe ChatSDK::Slack::BlockKitRenderer do
     expect(elements[3][:options].size).to eq(10)
     expect(elements[3][:initial_option][:value]).to eq("9")
   end
+
+  it "renders section links alongside text in child order" do
+    card = ChatSDK.card do
+      section do
+        text "Before"
+        link url: "https://example.com/docs", label: "Docs"
+        text "After"
+      end
+    end
+
+    expect(renderer.render(card).first).to eq(
+      type: "section",
+      text: {type: "mrkdwn", text: "Before\n<https://example.com/docs|Docs>\nAfter"}
+    )
+  end
 end

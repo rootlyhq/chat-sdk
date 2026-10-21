@@ -637,13 +637,44 @@ RSpec.describe ChatSDK::Teams::Adapter do
         end
         result = renderer.render(card)
 
-        action_set = result["body"][0]
-        choice_set = action_set["actions"][0]
+        choice_set = result["body"][0]
         expect(choice_set["type"]).to eq("Input.ChoiceSet")
         expect(choice_set["id"]).to eq("severity_select")
         expect(choice_set["placeholder"]).to eq("Choose severity")
         expect(choice_set["choices"].size).to eq(2)
         expect(choice_set["choices"][0]).to eq({"title" => "SEV1", "value" => "sev1"})
+        expect(result["body"][1]).to eq(
+          "type" => "ActionSet",
+          "actions" => [
+            {
+              "type" => "Action.Submit",
+              "title" => "Submit",
+              "data" => {"actionId" => "__auto_submit"}
+            }
+          ]
+        )
+      end
+
+      it "renders a radio select in the body with an automatic submit action" do
+        card = ChatSDK.card do
+          actions do
+            radio_select id: "mode", label: "Mode" do
+              option "Fast", value: "fast"
+              option "Careful", value: "careful"
+            end
+          end
+        end
+        body = renderer.render(card)["body"]
+
+        expect(body[0]).to include(
+          "type" => "Input.ChoiceSet",
+          "id" => "mode",
+          "style" => "expanded"
+        )
+        expect(body[1]["actions"].first).to include(
+          "type" => "Action.Submit",
+          "data" => {"actionId" => "__auto_submit"}
+        )
       end
 
       it "renders card styles, links, input options, and radio selections" do
@@ -672,11 +703,26 @@ RSpec.describe ChatSDK::Teams::Adapter do
         expect(body[2]).to include("isSubtle" => true)
         expect(body[3]["text"]).to eq("[Docs](https://example.com/docs)")
         expect(body[4]["maxLength"]).to eq(80)
-        actions = body[5]["actions"]
+        select_input = body.find { |element| element["id"] == "scope" }
+        radio_input = body.find { |element| element["id"] == "mode" }
+        action_set = body.find { |element| element["type"] == "ActionSet" }
+        expect(select_input).to include("type" => "Input.ChoiceSet", "style" => "compact")
+        expect(radio_input).to include("type" => "Input.ChoiceSet", "style" => "expanded")
+        expect(body.index(select_input)).to be < body.index(action_set)
+        expect(body.index(radio_input)).to be < body.index(action_set)
+        actions = action_set["actions"]
         expect(actions[0]["style"]).to eq("positive")
         expect(actions[1]).not_to have_key("disabled")
-        expect(actions[2]).to include("style" => "compact", "isRequired" => false, "value" => "team")
-        expect(actions[3]).to include("style" => "expanded", "value" => "fast")
+        expect(actions.map { |action| action["type"] }).to eq(["Action.OpenUrl", "Action.Submit"])
+        expect(actions.map { |action| action.dig("data", "actionId") }).not_to include("__auto_submit")
+      end
+
+      it "omits an empty ActionSet" do
+        card = ChatSDK.card do
+          actions {}
+        end
+
+        expect(renderer.render(card)["body"]).to be_empty
       end
 
       it "renders a section as Container" do
