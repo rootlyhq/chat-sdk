@@ -255,6 +255,15 @@ RSpec.describe ChatSDK::Telegram::FormatConverter do
       expect(converter.truncate_markdown_v2(markdown, 20)).to eq("prefix \\.\\.\\.")
     end
 
+    it "drops an unmatched spoiler delimiter" do
+      markdown = "prefix ||spoiler#{"x" * 30}||"
+
+      truncated = converter.truncate_markdown_v2(markdown, 24)
+
+      expect(truncated).to eq("prefix \\.\\.\\.")
+      expect(truncated).not_to include("||")
+    end
+
     it "drops an incomplete entity" do
       markdown = "prefix **#{"bold" * 10}**"
 

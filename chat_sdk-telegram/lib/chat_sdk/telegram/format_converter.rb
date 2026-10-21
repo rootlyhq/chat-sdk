@@ -62,7 +62,7 @@ module ChatSDK
             index += 2
             next
           end
-          if %w[* _ ~].include?(chars[index])
+          if %w[* _ ~ |].include?(chars[index])
             run_length = 1
             run_length += 1 while chars[index + run_length] == chars[index]
             marker_positions[[chars[index], run_length]] << index
