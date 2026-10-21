@@ -355,6 +355,11 @@ module ChatSDK
 
         @socket_mode = SocketMode.new(app_token: app_token, bot_client: client)
         @socket_mode.start do |event|
+          if @client_id
+            ::Thread.current[:chat_sdk_slack_client] = nil
+            team_id = concurrency_scope(event)
+            resolve_team_client(team_id) if team_id
+          end
           classify_message_events([event], event.raw)
           block.call(event)
         end

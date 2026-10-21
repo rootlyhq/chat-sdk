@@ -1213,6 +1213,58 @@ RSpec.describe ChatSDK::Slack::Adapter do
       expect(yielded_events).to eq([event])
     end
 
+    it "selects each workspace client before Socket Mode handlers run" do
+      adapter = described_class.new(
+        client_id: "client-id",
+        client_secret: "client-secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("TEAM_A", bot_token: "xoxb-team-a")
+      adapter.set_installation("TEAM_B", bot_token: "xoxb-team-b")
+
+      client_a = instance_double(::Slack::Web::Client)
+      client_b = instance_double(::Slack::Web::Client)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-a").and_return(client_a)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-b").and_return(client_b)
+      allow(client_a).to receive(:chat_postMessage).and_return({"ts" => "reply-a"})
+      allow(client_b).to receive(:chat_postMessage).and_return({"ts" => "reply-b"})
+
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new).and_return(socket_double)
+      socket_callback = nil
+      allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
+
+      previous_client = Thread.current[:chat_sdk_slack_client]
+      begin
+        Thread.current[:chat_sdk_slack_client] = nil
+        adapter.start_socket_mode(app_token: "xapp-test-token") do |event|
+          adapter.post_message(channel_id: event.channel_id, message: "reply")
+        end
+
+        %w[TEAM_A TEAM_B].each do |team_id|
+          payload = {
+            "type" => "event_callback",
+            "team_id" => team_id,
+            "event" => {
+              "type" => "app_mention",
+              "user" => "U123",
+              "text" => "<@B456> hello",
+              "ts" => "1234567890.123456",
+              "channel" => "C789",
+              "channel_type" => "channel"
+            }
+          }
+          socket_callback.call(ChatSDK::Slack::EventParser.parse(payload).first)
+        end
+
+        expect(client_a).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
+        expect(client_b).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
+      ensure
+        Thread.current[:chat_sdk_slack_client] = previous_client
+      end
+    end
+
     it "uses the event workspace client for Socket Mode mention classification" do
       adapter = described_class.new(
         client_id: "client-id",
