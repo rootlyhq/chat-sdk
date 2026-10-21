@@ -41,6 +41,18 @@ RSpec.describe ChatSDK::Streaming::Stream do
     end
   end
 
+  it "returns the posted message" do
+    message = build_stream.run(["Hello"])
+
+    expect(message).to be_a(ChatSDK::Message)
+    expect(message.id).to eq("msg_1")
+    expect(message.text).to eq("Hello")
+  end
+
+  it "returns nil when it posts no message" do
+    expect(build_stream.run).to be_nil
+  end
+
   describe "legacy edit method signatures" do
     let(:legacy_adapter) do
       Class.new(ChatSDK::Adapter::Base) do

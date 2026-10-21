@@ -9,12 +9,23 @@ module ChatSDK
         :scheduled_messages
 
       def initialize(bot_token: nil, signing_secret: nil,
-        client_id: nil, client_secret: nil, proxy: nil, bot_user_id: nil)
+        client_id: nil, client_secret: nil, proxy: nil, bot_user_id: nil,
+        native_streaming: true, stream_segment_max_age: 240)
         @bot_token = bot_token || ENV["SLACK_BOT_TOKEN"]
         @signing_secret = signing_secret || ENV["SLACK_SIGNING_SECRET"]
         @client_id = client_id || ENV["SLACK_CLIENT_ID"]
         @client_secret = client_secret || ENV["SLACK_CLIENT_SECRET"]
         @bot_user_id = bot_user_id || ENV["SLACK_BOT_USER_ID"]
+        valid_segment_max_age = stream_segment_max_age.is_a?(Numeric) &&
+          !stream_segment_max_age.is_a?(Complex) &&
+          !(stream_segment_max_age.respond_to?(:nan?) && stream_segment_max_age.nan?) &&
+          (stream_segment_max_age.positive? || stream_segment_max_age == Float::INFINITY)
+        unless valid_segment_max_age
+          raise ChatSDK::ConfigurationError, "stream_segment_max_age must be a positive number"
+        end
+        @native_streaming = native_streaming
+        @native_streaming_broken = false
+        @stream_segment_max_age = stream_segment_max_age
         @bot_user_ids = {}
         @bot_user_id_mutex = Mutex.new
         @proxy = proxy || ENV["HTTPS_PROXY"] || ENV["https_proxy"]
@@ -183,6 +194,24 @@ module ChatSDK
           platform: :slack,
           raw: result
         )
+      end
+
+      def stream(channel_id:, thread_id:, stream:, options: {})
+        return unless thread_id && !thread_id.to_s.empty?
+        direct_message = channel_id.to_s.start_with?("D")
+        recipient_ids = [options[:recipient_user_id], options[:recipient_team_id]]
+        has_recipient_context = recipient_ids.all? { |id| id && !id.to_s.empty? }
+        return unless direct_message || has_recipient_context
+        return unless @native_streaming && !@native_streaming_broken
+
+        NativeStream.new(
+          adapter: self,
+          channel_id: channel_id,
+          thread_id: thread_id,
+          stream: stream,
+          options: options,
+          max_age: @stream_segment_max_age
+        ).run
       end
 
       def edit_message(channel_id:, message_id:, message:, **_options)
@@ -382,6 +411,10 @@ module ChatSDK
       end
 
       private
+
+      def monotonic_now
+        Process.clock_gettime(Process::CLOCK_MONOTONIC)
+      end
 
       def build_client(token: nil)
         options = {}

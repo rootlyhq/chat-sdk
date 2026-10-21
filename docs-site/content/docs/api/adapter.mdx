@@ -59,6 +59,16 @@ events = adapter.parse_events(rack_request)
 
 ### Outbound Methods
 
+#### stream(channel\_id:, thread\_id:, stream:, options: {})
+
+Optional native streaming hook. Return a `ChatSDK::Message` after consuming the stream when native streaming is handled. Return `nil` before consuming it to let ChatSDK use the post-and-edit fallback. The base implementation returns `nil`.
+
+```ruby
+def stream(channel_id:, thread_id:, stream:, options: {})
+  nil
+end
+```
+
 #### post\_message(channel\_id:, message:, thread\_id: nil)
 
 Posts a message to a channel, optionally in a thread.

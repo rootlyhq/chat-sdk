@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Slack native streaming via `chat.startStream`, `chat.appendStream`, and `chat.stopStream`
+- `ChatSDK::StreamingPlan`, structured streaming chunks, and the optional `Adapter::Base#stream` hook
+
+### Changed
+
+- `Thread#post_stream` returns the posted `ChatSDK::Message`
+
 ## [1.2.0] - 2026-10-21
 
 ### Added

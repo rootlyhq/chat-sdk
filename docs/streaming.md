@@ -17,13 +17,44 @@ bot.on_new_mention do |thread, message|
 end
 ```
 
+`post_stream` returns the posted `ChatSDK::Message`. It also accepts an enumerable of chunks:
+
+```ruby
+message = thread.post_stream(ai_client.stream(prompt))
+```
+
 ## How It Works
 
-1. `post_stream` posts the `placeholder` text as a new message.
-2. The block receives a `Streaming::Stream` object.
-3. Use `stream << chunk` to append text to an internal buffer.
-4. The stream flushes (edits the message) at a throttled interval to avoid hitting API rate limits.
-5. When the block returns, a final flush sends any remaining buffered content.
+The block receives a writer that accepts chunks with `<<`. The SDK normalizes text and structured chunks, then uses an adapter's optional native streaming hook when available. If the hook returns `nil`, the core posts and edits a message at the configured `streaming_update_interval` (default: 0.5 seconds).
+
+Structured chunks are represented by `ChatSDK::Streaming::MarkdownTextChunk`, `TaskUpdateChunk`, and `PlanUpdateChunk`. The core edit-based fallback includes markdown text and ignores task and plan chunks.
+
+```ruby
+chunks = [
+  ChatSDK::Streaming::MarkdownTextChunk.new(text: "Working..."),
+  ChatSDK::Streaming::TaskUpdateChunk.new(
+    id: "lookup",
+    title: "Look up records",
+    status: "in_progress"
+  ),
+  ChatSDK::Streaming::PlanUpdateChunk.new(title: "Review results")
+]
+thread.post_stream(chunks)
+```
+
+`ChatSDK::StreamingPlan` carries task grouping, end blocks, update interval, and AI-generated metadata:
+
+```ruby
+plan = ChatSDK::StreamingPlan.new(
+  chunks,
+  group_tasks: :plan,
+  end_with: [{type: "context", elements: []}],
+  ai_generated: true
+)
+thread.post(plan)
+```
+
+`group_tasks` accepts `:plan` or `:timeline`. Task statuses are `pending`, `in_progress`, `complete`, and `error`.
 
 ## Configuration
 
@@ -52,14 +83,31 @@ end
 
 ## Adapter Compatibility
 
-Streaming works on any adapter that supports message editing (`edit_messages` capability). If the adapter does not support editing, the stream falls back to posting the final accumulated text as a single message.
+Adapters may implement the optional `Adapter::Base#stream` hook for native streaming. When the hook returns `nil` without consuming the source, ChatSDK uses its post-and-edit fallback. If the adapter cannot edit messages, it posts the final accumulated text once.
 
 | Adapter | Streaming Support |
 |---------|------------------|
-| Slack | Full (edit-based) |
+| Slack | Native streaming when eligible; post-and-edit fallback |
 | Teams | Full (edit-based) |
 | Google Chat | Full (edit-based) |
 | FakeAdapter | Full (for testing) |
+
+## Slack Native Streaming
+
+Slack native streaming requires a thread ID and either a direct-message channel or both recipient user and team IDs. The adapter derives recipient IDs from the current inbound message when available. Otherwise, the post-and-edit fallback is used.
+
+```ruby
+slack = ChatSDK::Slack::Adapter.new(
+  bot_token: ENV["SLACK_BOT_TOKEN"],
+  signing_secret: ENV["SLACK_SIGNING_SECRET"],
+  native_streaming: true,
+  stream_segment_max_age: 240
+)
+```
+
+`native_streaming: false` disables the native API. `stream_segment_max_age` controls when long streams rotate into a new Slack message; it must be positive, and `Float::INFINITY` disables rotation. If Slack rejects the native API before any message is rendered, ChatSDK falls back to post-and-edit. Errors after native output has rendered are raised.
+
+Task and plan chunks use Slack's Assistants streaming APIs and require the `assistant:write` scope. Plain markdown streaming does not require this scope.
 
 ## Integrating with AI APIs
 

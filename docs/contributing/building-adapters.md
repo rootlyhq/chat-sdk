@@ -159,7 +159,7 @@ Every adapter must implement these methods:
 
 ## Optional Methods
 
-These methods have default implementations that raise `NotSupportedError`. Override them and declare the matching capability:
+Most methods have default implementations that raise `NotSupportedError`. Override them and declare the matching capability:
 
 | Method | Capability |
 |--------|-----------|
@@ -172,6 +172,8 @@ These methods have default implementations that raise `NotSupportedError`. Overr
 | `fetch_messages` | `:message_history` |
 | `open_modal` | `:modals` |
 | `start_typing` | `:typing_indicator` |
+
+The optional `stream(channel_id:, thread_id:, stream:, options: {})` hook is different: its base implementation returns `nil`, which delegates to ChatSDK's post-and-edit fallback. Implement it only when the platform has a native streaming API. Return a `ChatSDK::Message` after consuming the source when native streaming succeeds; return `nil` before consuming it when native streaming is unavailable. Existing adapters do not need to implement this hook.
 
 ## Declaring Capabilities
 

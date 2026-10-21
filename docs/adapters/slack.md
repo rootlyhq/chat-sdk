@@ -20,11 +20,23 @@ slack = ChatSDK::Slack::Adapter.new(
   bot_token: ENV["SLACK_BOT_TOKEN"],       # or set SLACK_BOT_TOKEN env var
   signing_secret: ENV["SLACK_SIGNING_SECRET"], # or set SLACK_SIGNING_SECRET env var
   proxy: ENV["HTTPS_PROXY"],               # optional Web API egress proxy
-  bot_user_id: ENV["SLACK_BOT_USER_ID"]     # optional bot user ID
+  bot_user_id: ENV["SLACK_BOT_USER_ID"],    # optional bot user ID
+  native_streaming: true,                   # use Slack's native streaming API
+  stream_segment_max_age: 240              # rotate long streams after 240 seconds
 )
 ```
 
 Both parameters fall back to environment variables if not provided.
+
+## Native Streaming
+
+The Slack adapter uses `chat.startStream`, `chat.appendStream`, and `chat.stopStream` for eligible `Thread#post_stream` calls. Native streaming requires a thread ID and either a direct-message channel or both recipient user and team IDs. Recipient IDs are derived from the current inbound message when available. If those requirements are not met, or native streaming is disabled, ChatSDK uses its post-and-edit fallback.
+
+`native_streaming:` defaults to `true`. Set it to `false` to always use the fallback. `stream_segment_max_age:` defaults to `240` seconds and controls when long streams rotate into a new Slack message; it must be positive. Set it to `Float::INFINITY` to disable segment rotation.
+
+If Slack rejects the native API before any output has rendered, the adapter falls back to post-and-edit. Unsupported-method errors are remembered by the adapter so later streams use the fallback immediately. Errors after native output has rendered are raised.
+
+Structured task and plan chunks require the Slack app's `assistant:write` scope. Plain markdown text does not need this scope.
 
 ## Environment Variables
 
@@ -41,6 +53,7 @@ Both parameters fall back to environment variables if not provided.
 2. Under **OAuth & Permissions**, add the bot token scopes your app needs:
    - `chat:write` -- Post messages
    - `chat:write.customize` -- Post with custom username/icon
+   - `assistant:write` -- Send structured task and plan streaming chunks
    - `reactions:write` -- Add/remove reactions
    - `reactions:read` -- Read reactions
    - `files:write` -- Upload files
@@ -88,6 +101,8 @@ The Slack adapter supports all capabilities:
 | `threads` | Yes |
 | `direct_messages` | Yes |
 | `message_history` | Yes |
+
+Slack native streaming is available through `Thread#post_stream` when its thread and recipient requirements are met; otherwise it falls back to post-and-edit.
 
 ## Direct Client Access
 

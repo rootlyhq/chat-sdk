@@ -35,6 +35,163 @@ RSpec.describe ChatSDK::Thread do
       expect(adapter.posted_messages.size).to eq(1)
       expect(adapter.posted_messages.first[:message].card?).to be true
     end
+
+    it "posts a StreamingPlan through the adapter hook and returns its message" do
+      message = ChatSDK::Message.new(
+        id: "native-1", text: "hello", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+      allow(adapter).to receive(:stream) do |channel_id:, thread_id:, stream:, options:|
+        expect(channel_id).to eq("C123")
+        expect(thread_id).to eq("T123")
+        expect(stream.to_a).to eq(["hello"])
+        expect(options[:task_display_mode]).to eq("plan")
+        message
+      end
+
+      result = thread.post(ChatSDK::StreamingPlan.new(["hello"], group_tasks: :plan))
+
+      expect(result).to be(message)
+    end
+  end
+
+  describe "#post_stream" do
+    it "runs the block once when the adapter handles the stream" do
+      message = ChatSDK::Message.new(
+        id: "native-1", text: "hello", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+      block_calls = 0
+      allow(adapter).to receive(:stream) do |stream:, **|
+        stream.each { |_chunk| }
+        message
+      end
+
+      result = thread.post_stream do |writer|
+        block_calls += 1
+        writer << "hello"
+      end
+
+      expect(result).to be(message)
+      expect(block_calls).to eq(1)
+    end
+
+    it "preserves the legacy push-block and placeholder call shape" do
+      result = thread.post_stream(placeholder: "Thinking...") do |stream|
+        stream << "done"
+      end
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(adapter.posted_messages.first[:message].text).to eq("Thinking...")
+      expect(adapter.edited_messages.last[:message].text).to eq("done")
+    end
+
+    it "runs the block once and uses the core fallback when the adapter returns nil" do
+      block_calls = 0
+      allow(adapter).to receive(:stream).and_return(nil)
+
+      result = thread.post_stream do |writer|
+        block_calls += 1
+        writer << "hello "
+        writer << ChatSDK::Streaming::TaskUpdateChunk.new(id: "task-1", title: "Hidden", status: "pending")
+        writer << ChatSDK::Streaming::MarkdownTextChunk.new(text: "world")
+      end
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.text).to eq("hello world")
+      expect(block_calls).to eq(1)
+      expect(adapter.posted_messages.last[:message].text).to eq("hello world")
+    end
+
+    it "supports adapters that do not implement the stream hook" do
+      allow(adapter).to receive(:respond_to?).and_call_original
+      allow(adapter).to receive(:respond_to?).with(:stream).and_return(false)
+
+      result = thread.post_stream(["hello"])
+
+      expect(result).to be_a(ChatSDK::Message)
+      expect(result.text).to eq("hello")
+    end
+
+    it "merges post_stream options with a StreamingPlan" do
+      message = ChatSDK::Message.new(
+        id: "native-1", text: "hello", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+      allow(adapter).to receive(:stream) do |options:, **|
+        expect(options).to include(task_display_mode: "plan", stop_blocks: [{type: "context"}])
+        message
+      end
+
+      result = thread.post_stream(
+        ChatSDK::StreamingPlan.new(["hello"], group_tasks: :plan),
+        end_with: [{type: "context"}]
+      )
+
+      expect(result).to be(message)
+    end
+
+    it "passes AI stream options through post_ai_stream" do
+      message = ChatSDK::Message.new(
+        id: "native-1", text: "hello", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+      allow(adapter).to receive(:stream) do |options:, **|
+        expect(options[:ai_generated]).to be(true)
+        message
+      end
+
+      expect(thread.post_ai_stream(["hello"], ai_generated: true)).to be(message)
+    end
+
+    it "passes ai_generated through to the fallback postable message" do
+      allow(adapter).to receive(:stream).and_return(nil)
+
+      thread.post_stream(["hello"], ai_generated: true)
+
+      expect(adapter.posted_messages.last[:message].ai_generated).to be(true)
+    end
+
+    it "derives recipient team IDs from Slack event payload shapes" do
+      raw_payloads = [
+        {"team_id" => "T1"},
+        {"team" => "T2"},
+        {"team" => {"id" => "T3"}},
+        {"user" => {"team_id" => "T4"}}
+      ]
+
+      raw_payloads.each_with_index do |raw, index|
+        inbound_message = ChatSDK::Message.new(
+          id: "M#{index}",
+          text: "hello",
+          author: ChatSDK::Author.new(id: "U1", name: "User", platform: :slack),
+          thread_id: "T123",
+          channel_id: "C123",
+          platform: :slack,
+          raw: raw
+        )
+        current_thread = described_class.new(
+          id: "T123",
+          channel_id: "C123",
+          adapter: adapter,
+          chat: bot,
+          current_message: inbound_message
+        )
+        allow(adapter).to receive(:stream) do |options:, **|
+          expect(options).to include(recipient_user_id: "U1", recipient_team_id: "T#{index + 1}")
+          ChatSDK::Message.new(
+            id: "native-#{index}",
+            text: "reply",
+            author: nil,
+            thread_id: "T123",
+            channel_id: "C123",
+            platform: :slack
+          )
+        end
+
+        current_thread.post_stream(["reply"])
+      end
+    end
   end
 
   describe "#reply" do
