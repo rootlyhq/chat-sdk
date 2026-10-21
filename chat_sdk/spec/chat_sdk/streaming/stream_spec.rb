@@ -41,6 +41,50 @@ RSpec.describe ChatSDK::Streaming::Stream do
     end
   end
 
+  describe "legacy edit method signatures" do
+    let(:legacy_adapter) do
+      Class.new(ChatSDK::Adapter::Base) do
+        capabilities :edit_messages
+
+        attr_reader :edited_messages
+
+        def initialize
+          @edited_messages = []
+        end
+
+        def name = :legacy
+
+        def post_message(channel_id:, message:, thread_id: nil)
+          ChatSDK::Message.new(
+            id: "M1",
+            text: message.text,
+            author: nil,
+            thread_id: thread_id,
+            channel_id: channel_id,
+            platform: :test
+          )
+        end
+
+        def edit_message(channel_id:, message_id:, message:)
+          edited_messages << {channel_id: channel_id, message_id: message_id, message: message}
+        end
+      end.new
+    end
+
+    it "omits thread_id when editing through a legacy adapter" do
+      stream = described_class.new(
+        adapter: legacy_adapter,
+        channel_id: channel_id,
+        thread_id: thread_id,
+        placeholder: "Thinking..."
+      )
+
+      stream.run { |current_stream| current_stream << "done" }
+
+      expect(legacy_adapter.edited_messages.last[:message].text).to eq("done")
+    end
+  end
+
   describe "#<<" do
     it "accumulates chunks in buffer" do
       stream = build_stream(placeholder: "...")
