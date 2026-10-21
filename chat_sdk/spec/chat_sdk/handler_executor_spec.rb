@@ -75,6 +75,20 @@ RSpec.describe "handler execution" do
     expect(JSON.parse(JSON.generate(payload))).to eq(payload)
   end
 
+  it "raises HandlerExecutorError with the original enqueue failure as its cause" do
+    bot = build_bot(handler_executor: ->(_payload) { raise "queue down" })
+
+    expect {
+      bot.dispatch(make_mention, adapter_name: :test)
+    }.to raise_error(
+      ChatSDK::HandlerExecutorError,
+      "handler_executor failed for mention: RuntimeError: queue down"
+    ) { |error|
+      expect(error.cause).to be_a(RuntimeError)
+      expect(error.cause.message).to eq("queue down")
+    }
+  end
+
   it "round-trips mention events through JSON and dispatches their original message" do
     payloads = []
     received = []

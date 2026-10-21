@@ -173,6 +173,8 @@ end
 handler_executor: ->(payload) { ChatSdkDispatchJob.perform_later(payload) }
 ```
 
+If the callable raises, ChatSDK raises `ChatSDK::HandlerExecutorError` and the webhook returns 500 so the platform redelivers; worker deduplication makes that safe.
+
 Deduplication, locks, and concurrency strategies run in the worker. Use a persistent state backend shared by the web and worker processes, such as Redis, PostgreSQL, or MySQL. `State::Memory` cannot share deduplication or lock state across processes. Webhook retries can enqueue duplicate jobs; the worker deduplicates them before handlers run.
 
 The `:thread` executor runs in the current process and can lose work if that process exits. In Rails, raw threads do not run inside the Rails executor. If handlers access Active Record, wrap `dispatch_serialized` in `Rails.application.executor.wrap` in your own worker, or use the Active Job approach above.

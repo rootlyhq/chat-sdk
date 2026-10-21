@@ -112,7 +112,12 @@ module ChatSDK
       if executor == :thread
         ::Thread.new { run_background_dispatch(event, adp, adapter_name) }
       else
-        executor.call({"adapter_name" => adapter_name.to_s, "event" => EventSerializer.dump(event)})
+        payload = {"adapter_name" => adapter_name.to_s, "event" => EventSerializer.dump(event)}
+        begin
+          executor.call(payload)
+        rescue => e
+          raise HandlerExecutorError, "handler_executor failed for #{event.type}: #{e.class}: #{e.message}"
+        end
       end
       nil
     end

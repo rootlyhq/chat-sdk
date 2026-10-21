@@ -99,7 +99,7 @@ Raised by adapters when a webhook request has an invalid or expired signature. C
 
 ## Handler Errors
 
-Exceptions raised inside event handlers are caught by the dispatcher. ChatSDK logs the full exception and backtrace, then continues to the next handler. The webhook returns 200 because platforms retry non-2xx responses, which could repeat handler side effects.
+Exceptions raised inside event handlers are caught by the dispatcher. ChatSDK logs the full exception and backtrace, then continues to the next handler. The webhook returns 200 for handler failures to avoid platform retries, which could repeat side effects that already ran.
 
 ```ruby
 bot.on_new_mention do |thread, message|
@@ -107,7 +107,7 @@ bot.on_new_mention do |thread, message|
 end
 ```
 
-Configure `on_error:` to report handler and webhook failures. The callback receives `(exception, context)`. The context includes `source` (`:handler`, `:webhook`, or `:dispatch` for failures in a `handler_executor: :thread` background dispatch outside a handler), `adapter`, and `event_type`, `thread_id`, and `channel_id` when available. For errors raised before an event is parsed, the event-specific values are absent.
+Configure `on_error:` to report handler, webhook, and handler executor failures. The callback receives `(exception, context)`. The context includes `source` (`:handler`, `:webhook`, `:executor` for a callable enqueue failure that returns 500, or `:dispatch` for failures in a `handler_executor: :thread` background dispatch outside a handler), `adapter`, and `event_type`, `thread_id`, and `channel_id` when available. For errors raised before an event is parsed, the event-specific values are absent.
 
 ```ruby
 bot = ChatSDK::Chat.new(
@@ -120,4 +120,4 @@ bot = ChatSDK::Chat.new(
 
 When `on_error:` is omitted and Rails is loaded, ChatSDK calls `Rails.error.report(exception, handled: true, severity: :error, context: context)`. Without Rails, failures are logged only. The callback runs after the full exception and backtrace are logged. If the callback raises, ChatSDK logs that failure and does not let it interrupt webhook acknowledgement.
 
-The webhook returns 200 after dispatch errors because platforms retry non-2xx responses. A retry can run handlers whose side effects already completed, so failures are surfaced through logging and `on_error:` instead of a retry response. Signature verification failures remain separate and return 401.
+Webhook, handler, and background dispatch errors generally return 200. Platforms retry non-2xx responses, which could repeat side effects that already ran. A callable executor failure is the exception: the webhook returns 500 so the platform redelivers, and the worker deduplicates repeated events. Signature verification failures remain separate and return 401.

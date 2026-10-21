@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Unknown `handler_executor` values now raise `ConfigurationError` instead of being ignored.
+- A callable `handler_executor` that raises now raises `ChatSDK::HandlerExecutorError`, and the webhook returns 500 so the platform redelivers the event.
 
 ### Fixed
 
