@@ -98,6 +98,7 @@ PATH
     chat_sdk-x (1.1.0)
       chat_sdk (>= 0.1)
       faraday (~> 2.0)
+      faraday-multipart (~> 1.0)
 
 PATH
   remote: chat_sdk
