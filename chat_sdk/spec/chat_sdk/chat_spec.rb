@@ -62,6 +62,18 @@ RSpec.describe ChatSDK::Chat do
     end
   end
 
+  describe "#on_new_message" do
+    it "rejects a non-regexp pattern" do
+      expect { bot.on_new_message("deploy") {} }
+        .to raise_error(ChatSDK::ConfigurationError, /pattern must be a Regexp or nil/)
+    end
+
+    it "requires a block" do
+      expect { bot.on_new_message(/deploy/) }
+        .to raise_error(ChatSDK::ConfigurationError, /requires a block/)
+    end
+  end
+
   describe "#on_action" do
     it "fires handler for matching action_id" do
       received_value = nil

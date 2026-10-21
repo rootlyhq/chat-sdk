@@ -146,7 +146,7 @@ module ChatSDK
         [messages, next_cursor]
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         @client.trigger_typing(channel_id)
       end
 

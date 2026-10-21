@@ -122,8 +122,8 @@ module ChatSDK
         record
       end
 
-      def start_typing(channel_id:, thread_id: nil)
-        record = RecordedCall.new(:start_typing, channel_id: channel_id, thread_id: thread_id)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
+        record = RecordedCall.new(:start_typing, channel_id: channel_id, thread_id: thread_id, message_id: message_id)
         @typing_started << record
         record
       end

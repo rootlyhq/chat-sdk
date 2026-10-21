@@ -31,6 +31,13 @@ module ChatSDK
         @children << Node.new(:image, attributes: {url: url, alt: alt})
       end
 
+      def text_input(id:, label:, placeholder: nil, multiline: false, optional: false, value: nil)
+        attrs = {id: id, label: label, multiline: multiline, optional: optional}
+        attrs[:placeholder] = placeholder if placeholder
+        attrs[:value] = value if value
+        @children << Node.new(:text_input, attributes: attrs)
+      end
+
       def fields(&block)
         ctx = FieldsContext.new
         ctx.instance_eval(&block)

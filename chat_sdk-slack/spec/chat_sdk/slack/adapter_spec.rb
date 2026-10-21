@@ -5,7 +5,7 @@ require "openssl"
 require "rack"
 
 RSpec.describe ChatSDK::Slack::Adapter do
-  subject { described_class.new(bot_token: bot_token, signing_secret: signing_secret) }
+  subject { described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456") }
 
   let(:bot_token) { "xoxb-test-token-12345" }
   let(:signing_secret) { "test_signing_secret_abc123" }
@@ -33,6 +33,15 @@ RSpec.describe ChatSDK::Slack::Adapter do
   describe "#client" do
     it "returns a Slack::Web::Client" do
       expect(subject.client).to be_a(::Slack::Web::Client)
+    end
+
+    it "ignores the thread-local client in single-workspace mode" do
+      previous_client = Thread.current[:chat_sdk_slack_client]
+      Thread.current[:chat_sdk_slack_client] = ::Slack::Web::Client.new(token: "xoxb-stale")
+
+      expect(subject.client.token).to eq(bot_token)
+    ensure
+      Thread.current[:chat_sdk_slack_client] = previous_client
     end
 
     it "configures an egress proxy" do
@@ -351,6 +360,277 @@ RSpec.describe ChatSDK::Slack::Adapter do
         expect(event.user_id).to eq("U123")
         expect(event.channel_id).to eq("C789")
       end
+    end
+  end
+
+  describe "Slack message enhancements" do
+    def build_event_request(payload)
+      env = Rack::MockRequest.env_for(
+        "/slack/events",
+        :method => "POST",
+        :input => JSON.generate(payload),
+        "CONTENT_TYPE" => "application/json"
+      )
+      Rack::Request.new(env)
+    end
+
+    def slack_message_payload(type:, text:, blocks: nil, team_id: nil)
+      event = {
+        "type" => type,
+        "user" => "U123",
+        "text" => text,
+        "ts" => "1234567890.123456",
+        "channel" => "C789",
+        "channel_type" => "channel"
+      }
+      event["blocks"] = blocks if blocks
+      payload = {"type" => "event_callback", "event" => event}
+      payload["team_id"] = team_id if team_id
+      payload
+    end
+
+    it "classifies a bot mention from mrkdwn for app_mention and message events" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      %w[app_mention message].each do |type|
+        event = adapter.parse_events(build_event_request(slack_message_payload(type: type, text: "hello <@B456>"))).first
+        expect(event.message.is_mention).to be(true)
+      end
+    end
+
+    it "classifies labeled mentions of the bot" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      event = adapter.parse_events(
+        build_event_request(slack_message_payload(type: "message", text: "hello <@B456|helper>"))
+      ).first
+
+      expect(event.message.is_mention).to be(true)
+    end
+
+    it "uses the configured bot user ID environment variable" do
+      allow(ENV).to receive(:[]).and_call_original
+      allow(ENV).to receive(:[]).with("SLACK_BOT_USER_ID").and_return("B_ENV")
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret)
+      event = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: "<@B_ENV>"))).first
+
+      expect(event.message.is_mention).to be(true)
+    end
+
+    it "ignores bot tokens that appear only inside code" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      event = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: "`<@B456>`"))).first
+
+      expect(event.message.is_mention).to be(false)
+    end
+
+    it "marks inspected messages without the bot mention as false" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      event = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: "hello"))).first
+
+      expect(event.message.is_mention).to be(false)
+    end
+
+    it "classifies app_mention without resolving an unknown bot user ID" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret)
+      allow(adapter.client).to receive(:auth_test).and_return({})
+      app_mention = adapter.parse_events(build_event_request(slack_message_payload(type: "app_mention", text: "hello"))).first
+
+      expect(app_mention.message.is_mention).to be(true)
+      expect(adapter.client).not_to have_received(:auth_test)
+
+      message = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: "hello"))).first
+
+      expect(message.message.is_mention).to be_nil
+      expect(adapter.client).to have_received(:auth_test).once
+    end
+
+    it "retries auth.test after a lookup error" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret)
+      auth_test_calls = 0
+      allow(adapter.client).to receive(:auth_test) do
+        auth_test_calls += 1
+        raise ::Slack::Web::Api::Errors::SlackError, "temporary error" if auth_test_calls == 1
+
+        {"user_id" => "B456"}
+      end
+      request = build_event_request(slack_message_payload(type: "message", text: "hello"))
+
+      first = adapter.parse_events(request).first
+      second = adapter.parse_events(request).first
+
+      expect(first.message.is_mention).to be_nil
+      expect(second.message.is_mention).to be(false)
+      expect(auth_test_calls).to eq(2)
+    end
+
+    it "classifies rich-text user elements outside preformatted blocks" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      blocks = [{"type" => "rich_text", "elements" => [
+        {"type" => "rich_text_section", "elements" => [{"type" => "user", "user_id" => "B456"}]}
+      ]}]
+      event = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: "", blocks: blocks))).first
+
+      expect(event.message.is_mention).to be(true)
+    end
+
+    it "does not classify rich-text users inside preformatted blocks as mentions" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      blocks = [{"type" => "rich_text", "elements" => [
+        {"type" => "rich_text_preformatted", "elements" => [{"type" => "user", "user_id" => "B456"}]}
+      ]}]
+      event = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: "", blocks: blocks))).first
+
+      expect(event.message.is_mention).to be(false)
+    end
+
+    it "resolves auth.test once per client when the bot user ID is not configured" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret)
+      allow(adapter.client).to receive(:auth_test).and_return({"user_id" => "B456"})
+      request = build_event_request(slack_message_payload(type: "message", text: "<@B456>"))
+
+      2.times { adapter.parse_events(request) }
+
+      expect(adapter.client).to have_received(:auth_test).once
+    end
+
+    it "resolves and caches bot user IDs separately for workspaces without configured IDs" do
+      adapter = described_class.new(
+        client_id: "client",
+        client_secret: "secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("T1", bot_token: "xoxb-team-1")
+      adapter.set_installation("T2", bot_token: "xoxb-team-2")
+      auth_client_1 = instance_double(::Slack::Web::Client)
+      auth_client_2 = instance_double(::Slack::Web::Client)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-1").and_return(auth_client_1)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-2").and_return(auth_client_2)
+      allow(auth_client_1).to receive(:auth_test).and_return({"user_id" => "B_TEAM_1"})
+      allow(auth_client_2).to receive(:auth_test).and_return({"user_id" => "B_TEAM_2"})
+      event_for = lambda do |team_id|
+        ChatSDK::Events::Mention.new(
+          message: ChatSDK::Message.new(
+            id: "M1",
+            text: "",
+            author: ChatSDK::Author.new(id: "U1", name: "user", platform: :slack),
+            thread_id: "T1",
+            channel_id: "C1",
+            platform: :slack
+          ),
+          thread_id: "T1",
+          channel_id: "C1",
+          platform: :slack,
+          adapter_name: :slack,
+          raw: {"team_id" => team_id}
+        )
+      end
+
+      expect(adapter.send(:resolve_bot_user_id, event_for.call("T1"))).to eq("B_TEAM_1")
+      expect(adapter.send(:resolve_bot_user_id, event_for.call("T1"))).to eq("B_TEAM_1")
+      expect(adapter.send(:resolve_bot_user_id, event_for.call("T2"))).to eq("B_TEAM_2")
+      expect(auth_client_1).to have_received(:auth_test).once
+      expect(auth_client_2).to have_received(:auth_test).once
+    end
+
+    it "evicts cached bot user IDs when installations change or are deleted" do
+      adapter = described_class.new(
+        client_id: "client",
+        client_secret: "secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("T1", bot_token: "xoxb-team-1")
+      auth_client_1 = instance_double(::Slack::Web::Client)
+      auth_client_2 = instance_double(::Slack::Web::Client)
+      auth_client_3 = instance_double(::Slack::Web::Client)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-1").and_return(auth_client_1)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-1-reinstalled").and_return(auth_client_2)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-1-after-delete").and_return(auth_client_3)
+      allow(auth_client_1).to receive(:auth_test).and_return({"user_id" => "B_TEAM_1"})
+      allow(auth_client_2).to receive(:auth_test).and_return({"user_id" => "B_TEAM_2"})
+      allow(auth_client_3).to receive(:auth_test).and_return({"user_id" => "B_TEAM_3"})
+      event = ChatSDK::Events::Mention.new(
+        message: ChatSDK::Message.new(
+          id: "M1",
+          text: "",
+          author: ChatSDK::Author.new(id: "U1", name: "user", platform: :slack),
+          thread_id: "T1",
+          channel_id: "C1",
+          platform: :slack
+        ),
+        thread_id: "T1",
+        channel_id: "C1",
+        platform: :slack,
+        adapter_name: :slack,
+        raw: {"team_id" => "T1"}
+      )
+
+      expect(adapter.send(:resolve_bot_user_id, event)).to eq("B_TEAM_1")
+      adapter.set_installation("T1", bot_token: "xoxb-team-1-reinstalled")
+      expect(adapter.send(:resolve_bot_user_id, event)).to eq("B_TEAM_2")
+      adapter.delete_installation("T1")
+      expect(adapter.send(:resolve_bot_user_id, event)).to be_nil
+      adapter.set_installation("T1", bot_token: "xoxb-team-1-after-delete")
+      expect(adapter.send(:resolve_bot_user_id, event)).to eq("B_TEAM_3")
+    end
+
+    it "normalizes Slack mentions while preserving code spans" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      text = "<!here> <!channel> <!everyone> <!subteam^S1|@team> <mailto:a@b|email> <tel:123|call> `<!here>`"
+      event = adapter.parse_events(build_event_request(slack_message_payload(type: "message", text: text))).first
+
+      expect(event.message.text).to eq("@here @channel @everyone @team email call `<!here>`")
+    end
+
+    it "scopes multi-workspace events by team ID" do
+      adapter = described_class.new(client_id: "client", client_secret: "secret", signing_secret: signing_secret)
+      [
+        [{"team_id" => "T1"}, "T1"],
+        [{"team" => {"id" => "T2"}}, "T2"],
+        [{"event" => {"team" => "T3"}}, "T3"]
+      ].each do |raw, team_id|
+        event = ChatSDK::Events::Mention.new(
+          message: ChatSDK::Message.new(id: "M1", text: "", author: ChatSDK::Author.new(id: "U1", name: "user", platform: :slack),
+            thread_id: "T1", channel_id: "C1", platform: :slack),
+          thread_id: "T1", channel_id: "C1", platform: :slack, adapter_name: :slack,
+          raw: raw
+        )
+
+        expect(adapter.concurrency_scope(event)).to eq(team_id)
+      end
+      single_workspace_event = ChatSDK::Events::Mention.new(
+        message: ChatSDK::Message.new(id: "M1", text: "", author: ChatSDK::Author.new(id: "U1", name: "user", platform: :slack),
+          thread_id: "T1", channel_id: "C1", platform: :slack),
+        thread_id: "T1", channel_id: "C1", platform: :slack, adapter_name: :slack,
+        raw: {"team_id" => "T1"}
+      )
+      expect(subject.concurrency_scope(single_workspace_event)).to be_nil
+    end
+
+    it "uses the workspace installation bot user ID" do
+      adapter = described_class.new(
+        client_id: "client",
+        client_secret: "secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("T1", bot_token: "xoxb-workspace", bot_user_id: "B_WORKSPACE")
+      event = adapter.parse_events(build_event_request(
+        slack_message_payload(type: "message", text: "<@B_WORKSPACE>", team_id: "T1")
+      )).first
+
+      expect(event.message.is_mention).to be(true)
+    end
+
+    it "uploads files through files_upload_v2" do
+      io = StringIO.new("contents")
+      allow(subject.client).to receive(:files_upload_v2).and_return({"ok" => true})
+
+      subject.upload_file(channel_id: "C1", io: io, filename: "report.txt", thread_id: "T1", comment: "Here")
+
+      expect(subject.client).to have_received(:files_upload_v2).with(
+        channel_id: "C1", filename: "report.txt", content: "contents", thread_ts: "T1", initial_comment: "Here"
+      )
     end
   end
 
@@ -885,6 +1165,11 @@ RSpec.describe ChatSDK::Slack::Adapter do
         .to raise_error(ChatSDK::ConfigurationError, /app_token required/)
     end
 
+    it "raises ArgumentError without a block" do
+      expect { subject.start_socket_mode(app_token: "xapp-test-token") }
+        .to raise_error(ArgumentError, /requires a block/)
+    end
+
     it "delegates to SocketMode with the given app_token" do
       socket_double = instance_double(ChatSDK::Slack::SocketMode)
       allow(ChatSDK::Slack::SocketMode).to receive(:new)
@@ -897,6 +1182,137 @@ RSpec.describe ChatSDK::Slack::Adapter do
       subject.start_socket_mode(app_token: "xapp-test-token", &block)
 
       expect(socket_double).to have_received(:start)
+    end
+
+    it "classifies message events received through Socket Mode" do
+      adapter = described_class.new(bot_token: bot_token, signing_secret: signing_secret, bot_user_id: "B456")
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new).and_return(socket_double)
+      socket_callback = nil
+      allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
+      yielded_events = []
+
+      adapter.start_socket_mode(app_token: "xapp-test-token") { |event| yielded_events << event }
+
+      event = ChatSDK::Slack::EventParser.parse(
+        {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "message",
+            "user" => "U123",
+            "text" => "<@B456>",
+            "ts" => "1234567890.123456",
+            "channel" => "C789",
+            "channel_type" => "channel"
+          }
+        }
+      ).first
+      socket_callback.call(event)
+
+      expect(event.message.is_mention).to be(true)
+      expect(yielded_events).to eq([event])
+    end
+
+    it "selects each workspace client before Socket Mode handlers run" do
+      adapter = described_class.new(
+        client_id: "client-id",
+        client_secret: "client-secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("TEAM_A", bot_token: "xoxb-team-a")
+      adapter.set_installation("TEAM_B", bot_token: "xoxb-team-b")
+
+      client_a = instance_double(::Slack::Web::Client)
+      client_b = instance_double(::Slack::Web::Client)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-a").and_return(client_a)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-b").and_return(client_b)
+      allow(client_a).to receive(:chat_postMessage).and_return({"ts" => "reply-a"})
+      allow(client_b).to receive(:chat_postMessage).and_return({"ts" => "reply-b"})
+
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new).and_return(socket_double)
+      socket_callback = nil
+      allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
+
+      previous_client = Thread.current[:chat_sdk_slack_client]
+      begin
+        Thread.current[:chat_sdk_slack_client] = nil
+        adapter.start_socket_mode(app_token: "xapp-test-token") do |event|
+          adapter.post_message(channel_id: event.channel_id, message: "reply")
+        end
+
+        %w[TEAM_A TEAM_B].each do |team_id|
+          payload = {
+            "type" => "event_callback",
+            "team_id" => team_id,
+            "event" => {
+              "type" => "app_mention",
+              "user" => "U123",
+              "text" => "<@B456> hello",
+              "ts" => "1234567890.123456",
+              "channel" => "C789",
+              "channel_type" => "channel"
+            }
+          }
+          socket_callback.call(ChatSDK::Slack::EventParser.parse(payload).first)
+        end
+
+        expect(client_a).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
+        expect(client_b).to have_received(:chat_postMessage).with(channel: "C789", text: "reply").once
+      ensure
+        Thread.current[:chat_sdk_slack_client] = previous_client
+      end
+    end
+
+    it "uses the event workspace client for Socket Mode mention classification" do
+      adapter = described_class.new(
+        client_id: "client-id",
+        client_secret: "client-secret",
+        signing_secret: signing_secret
+      )
+      adapter.set_state(ChatSDK::State::Memory.new)
+      adapter.set_installation("TEAM_A", bot_token: "xoxb-team-a")
+      adapter.set_installation("TEAM_B", bot_token: "xoxb-team-b")
+
+      client_a = instance_double(::Slack::Web::Client)
+      client_b = instance_double(::Slack::Web::Client)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-a").and_return(client_a)
+      allow(adapter).to receive(:build_client).with(token: "xoxb-team-b").and_return(client_b)
+      allow(client_a).to receive(:auth_test).and_return({"user_id" => "B_TEAM_A"})
+      allow(client_b).to receive(:auth_test).and_return({"user_id" => "B_TEAM_B"})
+
+      socket_double = instance_double(ChatSDK::Slack::SocketMode)
+      allow(ChatSDK::Slack::SocketMode).to receive(:new).and_return(socket_double)
+      socket_callback = nil
+      allow(socket_double).to receive(:start) { |&callback| socket_callback = callback }
+
+      previous_client = Thread.current[:chat_sdk_slack_client]
+      begin
+        Thread.current[:chat_sdk_slack_client] = client_a
+        adapter.start_socket_mode(app_token: "xapp-test-token") { |_| }
+
+        payload = {
+          "type" => "event_callback",
+          "team_id" => "TEAM_B",
+          "event" => {
+            "type" => "message",
+            "user" => "U123",
+            "text" => "<@B_TEAM_B>",
+            "ts" => "1234567890.123456",
+            "channel" => "C789",
+            "channel_type" => "channel"
+          }
+        }
+        event = ChatSDK::Slack::EventParser.parse(payload).first
+        socket_callback.call(event)
+
+        expect(event.message.is_mention).to be(true)
+        expect(client_a).not_to have_received(:auth_test)
+        expect(client_b).to have_received(:auth_test).once
+      ensure
+        Thread.current[:chat_sdk_slack_client] = previous_client
+      end
     end
   end
 

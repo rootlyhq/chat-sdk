@@ -28,6 +28,7 @@ Block-based DSL for constructing card nodes.
 | `fields(&block)` | Block | Add key-value fields |
 | `section(title = nil, &block)` | `String?`, Block | Add a grouped section |
 | `actions(&block)` | Block | Add interactive elements |
+| `text_input(id:, label:, placeholder:, multiline:, optional:, value:)` | keyword args | Add a cross-platform text-input placeholder; generic renderers show its label |
 | `table(headers:, rows:, ...)` | keyword args | Add tabular data |
 | `chart(title:, type:, ...)` | keyword args | Add a pie, bar, line, or area chart |
 
@@ -66,9 +67,11 @@ end
 
 | Method | Parameters | Description |
 |--------|-----------|-------------|
-| `button(text, id:, style:, value:, tooltip:)` | `String`, keyword args | Add a button |
-| `link_button(text, url:, id:, tooltip:)` | `String`, keyword args | Add a link button |
+| `button(text, id:, style:, value:, tooltip:, visible_to:)` | `String`, keyword args | Add a button; `visible_to` is a Slack-only display hint |
+| `link_button(text, url:, id:, tooltip:, visible_to:)` | `String`, keyword args | Add a link button; `visible_to` is a Slack-only display hint |
 | `select(id:, placeholder:, &block)` | keyword args, Block | Add a select menu |
+
+`visible_to` is a display hint rendered natively only by Slack. Other platforms still show the button, so action handlers must check `event.user` before acting.
 
 ## Cards::SelectContext
 
@@ -92,7 +95,7 @@ The immutable tree node that represents a card element.
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `type` | `Symbol` | Node type (`:card`, `:text`, `:fields`, etc.) |
+| `type` | `Symbol` | Node type (`:card`, `:text`, `:text_input`, `:fields`, etc.) |
 | `attributes` | `Hash` | Node-specific attributes |
 | `children` | `Array<Node>` | Child nodes (frozen) |
 

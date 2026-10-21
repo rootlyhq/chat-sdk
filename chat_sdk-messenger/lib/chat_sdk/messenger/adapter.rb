@@ -66,7 +66,7 @@ module ChatSDK
         user_id
       end
 
-      def start_typing(channel_id:, thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
+      def start_typing(channel_id:, thread_id: nil, message_id: nil) # rubocop:disable Lint/UnusedMethodArgument
         @client.send_action(recipient_id: channel_id, action: "typing_on")
       end
 

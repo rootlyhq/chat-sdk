@@ -5,13 +5,11 @@ module ChatSDK
     class ToolExecutor
       def initialize(chat:, scope: nil, strict_scope: false)
         @chat = chat
-        @scope = if scope == false
-          false
-        else
-          ConversationScope.scope_for(scope) || ConversationScope.current&.dup
-        end
+        @scope = (scope == false) ? false : (ConversationScope.scope_for(scope) || ConversationScope.current&.dup)
+        @created_in_handler = ConversationScope.active?
+        validate_scope!(@scope) if @scope
         @strict_scope = strict_scope
-        @warned_unscoped = false
+        @warned_unscoped = {}
       end
 
       def execute(tool_name, arguments)
@@ -20,7 +18,7 @@ module ChatSDK
 
         args = arguments.transform_keys(&:to_sym)
         adapter_name = args[:adapter_name].to_sym
-        guard_scope!(adapter_name, args) unless tool_name == :send_direct_message
+        guard_scope!(tool_name, adapter_name, args)
 
         send(:"execute_#{tool_name}", adapter_name, args)
       end
@@ -48,24 +46,25 @@ module ChatSDK
 
       def execute_post_message(adapter_name, args)
         channel = @chat.channel(args[:channel_id], adapter_name: adapter_name)
+        message = ChatSDK::PostableMessage.new(text: args[:text], ai_generated: true)
         if args[:thread_id]
           thread = channel.thread(args[:thread_id])
-          result = thread.post(args[:text])
+          result = thread.post(message)
         else
-          result = channel.post(args[:text])
+          result = channel.post(message)
         end
         {id: result.id, text: args[:text]}
       end
 
       def execute_send_direct_message(adapter_name, args)
         dm_channel = @chat.open_dm(args[:user_id], adapter_name: adapter_name)
-        result = dm_channel.post(args[:text])
+        result = dm_channel.post(ChatSDK::PostableMessage.new(text: args[:text], ai_generated: true))
         {id: result.id, channel_id: dm_channel.id}
       end
 
       def execute_edit_message(adapter_name, args)
         thread = target_thread(adapter_name, args)
-        thread.edit(args[:message_id], args[:text])
+        thread.edit(args[:message_id], ChatSDK::PostableMessage.new(text: args[:text], ai_generated: true))
         {success: true}
       end
 
@@ -89,7 +88,9 @@ module ChatSDK
 
       def execute_start_typing(adapter_name, args)
         adapter = @chat.adapter(adapter_name)
-        adapter.start_typing(channel_id: args[:channel_id], thread_id: args[:thread_id])
+        scoped_message_id = @scope.is_a?(Hash) ? @scope[:message_id] : nil
+        message_id = args[:message_id] || ConversationScope.current&.[](:message_id) || scoped_message_id
+        adapter.start_typing(channel_id: args[:channel_id], thread_id: args[:thread_id], message_id: message_id)
         {success: true}
       end
 
@@ -102,17 +103,24 @@ module ChatSDK
         channel.thread(args[:thread_id] || args[:channel_id])
       end
 
-      def guard_scope!(adapter_name, args)
+      def guard_scope!(tool_name, adapter_name, args)
         return if @scope == false
 
         scope = @scope || ConversationScope.current
         unless scope
-          unless @warned_unscoped
-            ChatSDK::Log.warn("AI tool ran without a conversation scope; pass scope: to create_executor to confine access")
-            @warned_unscoped = true
+          if ConversationScope.active? || @created_in_handler
+            raise ChatSDK::Error, "AI tool call requires an explicit scope when run inside a handler without a conversation"
           end
+
+          unless @warned_unscoped[tool_name]
+            ChatSDK::Log.warn("AI tool ran without a conversation scope; pass scope: to create_executor to confine access")
+            @warned_unscoped[tool_name] = true
+          end
+
           return
         end
+
+        return if tool_name == :send_direct_message
 
         target_channel = args[:channel_id].to_s
         target_thread = args[:thread_id]&.to_s
@@ -124,6 +132,15 @@ module ChatSDK
         target = [adapter_name, target_channel, target_thread].compact.join(":")
         active = [scope[:adapter_name], scope[:channel_id], scope[:thread_id]].compact.join(":")
         raise ChatSDK::Error, "AI tool call blocked: executor is scoped to #{active.inspect}, but targeted #{target.inspect}"
+      end
+
+      def validate_scope!(scope)
+        %i[channel_id thread_id].each do |key|
+          next if key == :thread_id && scope[key].nil?
+          next unless scope.key?(key) && scope[key].to_s.empty?
+
+          raise ChatSDK::ConfigurationError, "AI tool scope #{key} must not be empty"
+        end
       end
     end
   end

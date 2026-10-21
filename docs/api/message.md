@@ -15,6 +15,7 @@
 | `attachments` | `Array` | File attachments (default: `[]`) |
 | `raw` | `Object` | Raw platform payload (default: `nil`) |
 | `timestamp` | `String` | Platform-specific timestamp (default: `nil`) |
+| `is_mention` | `Boolean` or `nil` | Whether the message mentions the bot; `nil` means unknown |
 
 ## Constructor
 
@@ -28,9 +29,12 @@ message = ChatSDK::Message.new(
   platform: :slack,
   attachments: [],
   raw: nil,
-  timestamp: nil
+  timestamp: nil,
+  is_mention: nil
 )
 ```
+
+Adapters may set `is_mention` to `true` or `false`. When it is `nil`, ChatSDK determines mention status from the event type and message text outside code spans and fences.
 
 ## Equality
 

@@ -2,14 +2,15 @@
 
 module ChatSDK
   class PostableMessage
-    attr_reader :text, :card, :attachments, :metadata
+    attr_reader :text, :card, :attachments, :metadata, :ai_generated
 
-    def initialize(text: nil, card: nil, attachments: [], metadata: {})
+    def initialize(text: nil, card: nil, attachments: [], metadata: {}, ai_generated: false)
       raise ArgumentError, "text or card required" if text.nil? && card.nil?
       @text = text
       @card = card
       @attachments = attachments
       @metadata = metadata
+      @ai_generated = ai_generated
     end
 
     def card?

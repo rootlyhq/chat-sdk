@@ -106,5 +106,24 @@ RSpec.describe ChatSDK::Cards::Builder do
 
       expect(card.children.first.children.first.attributes[:tooltip]).to eq("Approve the request")
     end
+
+    it "builds text inputs as card children" do
+      card = ChatSDK.card do
+        text_input id: "name", label: "Your name", placeholder: "Enter a name", optional: true
+      end
+
+      expect(card.children.first.type).to eq(:text_input)
+      expect(card.children.first.attributes).to include(id: "name", label: "Your name", placeholder: "Enter a name", optional: true)
+      expect(card.fallback_text).to eq("Your name")
+      expect(ChatSDK::Cards::Renderer.new.render(card)).to include("Your name")
+    end
+
+    it "stores visible user IDs on buttons" do
+      card = ChatSDK.card do
+        actions { button "Approve", id: "approve", visible_to: %w[U1 U2] }
+      end
+
+      expect(card.children.first.children.first.attributes[:visible_to]).to eq(%w[U1 U2])
+    end
   end
 end

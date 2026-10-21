@@ -9,18 +9,20 @@ module ChatSDK
         @nodes = []
       end
 
-      def button(text, id:, style: nil, value: nil, tooltip: nil)
+      def button(text, id:, style: nil, value: nil, tooltip: nil, visible_to: nil)
         attrs = {text: text, id: id}
         attrs[:style] = style if style
         attrs[:value] = value if value
         attrs[:tooltip] = tooltip if tooltip
+        attrs[:visible_to] = visible_to if visible_to
         @nodes << Node.new(:button, attributes: attrs)
       end
 
-      def link_button(text, url:, id: nil, tooltip: nil)
+      def link_button(text, url:, id: nil, tooltip: nil, visible_to: nil)
         attrs = {text: text, url: url}
         attrs[:id] = id if id
         attrs[:tooltip] = tooltip if tooltip
+        attrs[:visible_to] = visible_to if visible_to
         @nodes << Node.new(:link_button, attributes: attrs)
       end
 

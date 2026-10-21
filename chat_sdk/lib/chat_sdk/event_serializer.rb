@@ -21,7 +21,7 @@ module ChatSDK
         when :reaction
           data.merge!("emoji" => event.emoji, "user_id" => event.user_id, "message_id" => event.message_id, "added" => event.added?)
         when :action
-          data.merge!("action_id" => event.action_id, "value" => event.value, "user" => dump_author(event.user), "trigger_id" => event.trigger_id)
+          data.merge!("action_id" => event.action_id, "value" => event.value, "values" => json_safe(event.values), "user" => dump_author(event.user), "trigger_id" => event.trigger_id)
         when :slash_command
           data.merge!("command" => event.command, "text" => event.text, "user_id" => event.user_id, "trigger_id" => event.trigger_id)
         end
@@ -55,7 +55,7 @@ module ChatSDK
         when :reaction
           Events::Reaction.new(emoji: data["emoji"], user_id: data["user_id"], message_id: data["message_id"], added: data["added"], **common)
         when :action
-          Events::Action.new(action_id: data["action_id"], value: data["value"], user: load_author(data["user"]), trigger_id: data["trigger_id"], **common)
+          Events::Action.new(action_id: data["action_id"], value: data["value"], values: data["values"], user: load_author(data["user"]), trigger_id: data["trigger_id"], **common)
         when :slash_command
           common.delete(:thread_id)
           Events::SlashCommand.new(command: data["command"], text: data["text"], user_id: data["user_id"], trigger_id: data["trigger_id"], **common)
@@ -93,7 +93,8 @@ module ChatSDK
           "reply_to" => dump_message(message.reply_to),
           "subject" => json_safe(message.subject),
           "raw" => json_safe(message.raw),
-          "timestamp" => message.timestamp&.iso8601
+          "timestamp" => message.timestamp&.iso8601,
+          "is_mention" => message.is_mention
         }
       end
 
@@ -113,7 +114,8 @@ module ChatSDK
           reply_to: load_message(data["reply_to"]),
           subject: data["subject"],
           raw: data["raw"],
-          timestamp: parse_time(data["timestamp"])
+          timestamp: parse_time(data["timestamp"]),
+          is_mention: data["is_mention"]
         )
       end
 

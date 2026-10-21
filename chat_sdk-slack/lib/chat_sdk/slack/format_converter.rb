@@ -19,6 +19,23 @@ module ChatSDK
         parts.map.with_index { |part, i| i.odd? ? part : convert_md_to_mrkdwn(part) }.join
       end
 
+      def normalize_inbound_text(text)
+        return "" if text.nil? || text.empty?
+
+        split_code_blocks(text).map.with_index do |part, index|
+          if index.odd?
+            part
+          else
+            part
+              .gsub("<!here>", "@here")
+              .gsub("<!channel>", "@channel")
+              .gsub("<!everyone>", "@everyone")
+              .gsub(/<!subteam\^[^|>]+\|(@[^>]+)>/, '\1')
+              .gsub(/<(?:mailto|tel):[^>|]+\|([^>]+)>/, '\1')
+          end
+        end.join
+      end
+
       private
 
       # ── Slack mrkdwn → Markdown ──────────────────────────────────────────

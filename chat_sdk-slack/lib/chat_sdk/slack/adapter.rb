@@ -9,11 +9,14 @@ module ChatSDK
         :scheduled_messages
 
       def initialize(bot_token: nil, signing_secret: nil,
-        client_id: nil, client_secret: nil, proxy: nil)
+        client_id: nil, client_secret: nil, proxy: nil, bot_user_id: nil)
         @bot_token = bot_token || ENV["SLACK_BOT_TOKEN"]
         @signing_secret = signing_secret || ENV["SLACK_SIGNING_SECRET"]
         @client_id = client_id || ENV["SLACK_CLIENT_ID"]
         @client_secret = client_secret || ENV["SLACK_CLIENT_SECRET"]
+        @bot_user_id = bot_user_id || ENV["SLACK_BOT_USER_ID"]
+        @bot_user_ids = {}
+        @bot_user_id_mutex = Mutex.new
         @proxy = proxy || ENV["HTTPS_PROXY"] || ENV["https_proxy"]
 
         unless @bot_token || @client_id
@@ -35,6 +38,8 @@ module ChatSDK
 
       # Returns the per-request client (multi-workspace) or the static client (single-workspace).
       def client
+        return @client unless @client_id
+
         ::Thread.current[:chat_sdk_slack_client] || @client
       end
 
@@ -54,6 +59,7 @@ module ChatSDK
           "bot_user_id" => bot_user_id,
           "team_name" => team_name
         })
+        invalidate_bot_user_id(team_id)
       end
 
       def get_installation(team_id)
@@ -64,6 +70,7 @@ module ChatSDK
 
       def delete_installation(team_id)
         @team_clients.delete(team_id)
+        invalidate_bot_user_id(team_id)
         return unless @state
 
         @state.delete(installation_key(team_id))
@@ -153,7 +160,8 @@ module ChatSDK
           resolve_team_client(team_id) if team_id
         end
 
-        EventParser.parse(parsed)
+        events = EventParser.parse(parsed)
+        classify_message_events(events, parsed)
       end
 
       # Outbound
@@ -201,10 +209,12 @@ module ChatSDK
       end
 
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
-        params = {channels: channel_id, file: Faraday::Multipart::FilePart.new(io, nil, filename)}
+        content = io.read
+        io.rewind if io.respond_to?(:rewind)
+        params = {channel_id: channel_id, filename: filename, content: content}
         params[:thread_ts] = thread_id if thread_id
         params[:initial_comment] = comment if comment
-        client.files_upload(**params)
+        client.files_upload_v2(**params)
       end
 
       def add_reaction(channel_id:, message_id:, emoji:)
@@ -315,9 +325,19 @@ module ChatSDK
         result["channel"]
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         # Slack doesn't have a native typing indicator API for bots
         # This is a no-op but the capability is declared for streaming support
+      end
+
+      def concurrency_scope(event)
+        return unless @client_id
+
+        raw = event.raw.is_a?(Hash) ? event.raw : {}
+        raw_event = raw.is_a?(Hash) ? raw["event"] || raw[:event] || raw : {}
+        raw_team = raw.is_a?(Hash) ? raw["team"] || raw[:team] : nil
+        raw_team_id = raw_team.is_a?(Hash) ? raw_team["id"] || raw_team[:id] : raw_team
+        raw_team_id || raw["team_id"] || raw[:team_id] || raw_event["team_id"] || raw_event[:team_id] || raw_event["team"] || raw_event[:team]
       end
 
       # Slack-specific: receive real-time events via Socket Mode WebSocket.
@@ -331,9 +351,18 @@ module ChatSDK
       def start_socket_mode(app_token: nil, &block)
         app_token ||= ENV["SLACK_APP_TOKEN"]
         raise ChatSDK::ConfigurationError, "Slack app_token required for socket mode" unless app_token
+        raise ArgumentError, "start requires a block" unless block
 
         @socket_mode = SocketMode.new(app_token: app_token, bot_client: client)
-        @socket_mode.start(&block)
+        @socket_mode.start do |event|
+          if @client_id
+            ::Thread.current[:chat_sdk_slack_client] = nil
+            team_id = concurrency_scope(event)
+            resolve_team_client(team_id) if team_id
+          end
+          classify_message_events([event], event.raw)
+          block.call(event)
+        end
       end
 
       def stop_socket_mode
@@ -361,13 +390,83 @@ module ChatSDK
         options.empty? ? ::Slack::Web::Client.new : ::Slack::Web::Client.new(options)
       end
 
+      def classify_message_events(events, payload)
+        events.each do |event|
+          next unless %i[mention subscribed_message direct_message].include?(event.type)
+
+          event.message.is_mention = classify_mention(event, payload)
+        end
+        events
+      end
+
+      def classify_mention(event, payload)
+        raw_event = payload["event"] || {}
+        return true if raw_event["type"] == "app_mention"
+
+        bot_user_id = resolve_bot_user_id(event)
+        return true if event.type == :mention && bot_user_id.nil?
+        return nil if bot_user_id.nil?
+
+        text = raw_event["text"].to_s
+        masked_text = ChatSDK::Format::Mentions.mask_code_spans(text)
+        text_mentions_bot = /<@#{Regexp.escape(bot_user_id)}(?:\|[^>]*)?>/.match?(masked_text)
+        text_mentions_bot || rich_text_mentions_bot?(raw_event["blocks"], bot_user_id)
+      end
+
+      def resolve_bot_user_id(event)
+        team_id = concurrency_scope(event) if @client_id
+        if @client_id
+          installation = get_installation(team_id) if team_id
+          return installation["bot_user_id"] if installation && installation["bot_user_id"]
+        end
+
+        return @bot_user_id if @bot_user_id
+
+        current_client = if @client_id
+          resolve_team_client(team_id) if team_id
+        else
+          @client
+        end
+        return unless current_client
+
+        @bot_user_id_mutex.synchronize do
+          cache_key = @client_id ? (team_id || :default) : :default
+          return @bot_user_ids[cache_key] if @bot_user_ids.key?(cache_key)
+
+          bot_user_id = begin
+            current_client.auth_test["user_id"]
+          rescue ::Slack::Web::Api::Errors::SlackError, Faraday::Error, SocketError, Timeout::Error
+            nil
+          end
+          @bot_user_ids[cache_key] = bot_user_id if bot_user_id
+          bot_user_id
+        end
+      end
+
+      def invalidate_bot_user_id(team_id)
+        @bot_user_id_mutex.synchronize { @bot_user_ids.delete(team_id) }
+      end
+
+      def rich_text_mentions_bot?(blocks, bot_user_id)
+        Array(blocks).any? { |block| rich_text_element_mentions_bot?(block, bot_user_id) }
+      end
+
+      def rich_text_element_mentions_bot?(element, bot_user_id)
+        return false unless element.is_a?(Hash)
+        return false if %w[rich_text_preformatted preformatted code].include?(element["type"])
+        return false if element.dig("style", "code")
+        return true if element["type"] == "user" && element["user_id"] == bot_user_id
+
+        Array(element["elements"]).any? { |child| rich_text_element_mentions_bot?(child, bot_user_id) }
+      end
+
       def resolve_team_client(team_id)
         return unless @client_id && @state
 
         cached = @team_clients[team_id]
         if cached
           ::Thread.current[:chat_sdk_slack_client] = cached
-          return
+          return cached
         end
 
         installation = get_installation(team_id)
@@ -376,6 +475,7 @@ module ChatSDK
         new_client = build_client(token: installation["bot_token"])
         @team_clients[team_id] = new_client
         ::Thread.current[:chat_sdk_slack_client] = new_client
+        new_client
       end
 
       def installation_key(team_id)

@@ -162,7 +162,7 @@ module ChatSDK
         super
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         service_url = service_url_for(channel_id)
         @client.send_typing(
           service_url: service_url,

@@ -34,10 +34,10 @@ chat.on_new_mention { |thread, message| ... }
 Register a handler for @-mentions.
 
 ```ruby
-chat.on_new_message(pattern) { |thread, message| ... }
+chat.on_new_message(pattern = nil) { |thread, message, context| ... }
 ```
 
-Register a handler for @-mentions matching a `Regexp` pattern.
+Register a handler for non-mention messages matching a `Regexp`, or all messages reaching ordinary-message routing when `pattern` is `nil`. Patterns must be `Regexp` or `nil`, and the block is required. Message handlers receive `(thread, message, context)` after direct-message, subscribed-thread, and mention handlers.
 
 ```ruby
 chat.on_subscribed_message { |thread, message| ... }

@@ -44,7 +44,7 @@ end
 
 ## on_new_message(pattern)
 
-Matches mentions whose text matches a `Regexp` pattern.
+Handles messages that are not routed to a direct-message, subscribed-thread, or mention handler. Pass a `Regexp` to filter by text, or omit it to handle every remaining message, including messages with empty text or attachments only.
 
 ```ruby
 bot.on_new_message(/deploy (\w+)/) do |thread, message|
@@ -53,7 +53,9 @@ bot.on_new_message(/deploy (\w+)/) do |thread, message|
 end
 ```
 
-Only mention events whose `message.text` matches the regex will trigger this handler. This is useful for building command-style bots.
+Patterns must be `Regexp` objects or `nil`, and a block is required. Bot mentions are routed to `on_new_mention`; ordinary messages may still be routed as mentions when their text includes the configured bot name outside code spans or fences. Adapters can provide a definitive `message.is_mention` value.
+
+For message handlers, `message.is_mention` is `true`, `false`, or `nil` when the adapter could not classify it.
 
 ## on_subscribed_message
 
@@ -148,7 +150,7 @@ end
 | Handler | Block signature | When it fires |
 |---------|----------------|---------------|
 | `on_new_mention` | `\|thread, message, context\|` | Bot is @-mentioned |
-| `on_new_message(pattern)` | `\|thread, message\|` | @-mention text matches pattern |
+| `on_new_message(pattern)` | `\|thread, message, context\|` | Non-mention message matches pattern (or no pattern is provided) |
 | `on_subscribed_message` | `\|thread, message, context\|` | Message in a subscribed thread |
 | `on_direct_message` | `\|thread, message, context\|` | Direct message to the bot |
 | `on_message_updated` | `\|thread, message, previous_message\|` | Existing message edited |

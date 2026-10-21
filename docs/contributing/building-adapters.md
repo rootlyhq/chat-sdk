@@ -189,9 +189,9 @@ Your `parse_events` method should return instances of:
 
 | Event Class | Type Symbol | Used By |
 |-------------|------------|---------|
-| `Events::Mention` | `:mention` | `on_new_mention`, `on_new_message` |
-| `Events::SubscribedMessage` | `:subscribed_message` | `on_subscribed_message` |
-| `Events::DirectMessage` | `:direct_message` | `on_direct_message` |
+| `Events::Mention` | `:mention` | `on_new_mention`; otherwise ordinary-message routing |
+| `Events::SubscribedMessage` | `:subscribed_message` | `on_subscribed_message` for subscribed threads; otherwise mention or ordinary-message routing |
+| `Events::DirectMessage` | `:direct_message` | `on_direct_message` when registered; otherwise mention routing |
 | `Events::Reaction` | `:reaction` | `on_reaction` |
 | `Events::Action` | `:action` | `on_action` |
 | `Events::SlashCommand` | `:slash_command` | `on_slash_command` |
