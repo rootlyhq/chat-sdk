@@ -82,6 +82,18 @@ RSpec.describe "Teams parity behavior" do
       expect(uninstalled.action).to eq("remove-upgrade")
     end
 
+    it "includes the user in personal installation ids" do
+      event = parse(
+        "type" => "installationUpdate",
+        "action" => "add",
+        "recipient" => {"id" => app_id},
+        "from" => {"id" => "user-1", "aadObjectId" => "aad-user-1"},
+        "conversation" => {"id" => "conversation-1", "tenantId" => "tenant-1"}
+      ).first
+
+      expect(event.installation_id).to eq("tenant-1:aad-user-1")
+    end
+
     it "parses submitted card input values from invoke and message activities" do
       ["invoke", "message"].each do |type|
         event = parse(
@@ -102,6 +114,28 @@ RSpec.describe "Teams parity behavior" do
         expect(event).to be_a(ChatSDK::Events::Action)
         expect(event.action_id).to eq("submit")
         expect(event.values).to eq("firstName" => "Alice")
+      end
+    end
+
+    it "uses the Adaptive Card action identifier while preserving submitted inputs" do
+      [
+        [{"actionId" => "action-id"}, "action-id"],
+        [{"action" => "action-name"}, "action-name"],
+        [{}, "action-verb"]
+      ].each do |action_data, expected_action_id|
+        event = parse(
+          "type" => "invoke",
+          "name" => "adaptiveCard/action",
+          "from" => {"id" => "user-1"},
+          "conversation" => {"id" => "conversation-1"},
+          "value" => {
+            "action" => {"verb" => "action-verb", "data" => action_data},
+            "data" => {"firstName" => "Ada"}
+          }
+        ).first
+
+        expect(event.action_id).to eq(expected_action_id)
+        expect(event.values).to eq("firstName" => "Ada")
       end
     end
   end
@@ -281,6 +315,64 @@ RSpec.describe "Teams parity behavior" do
       expect(a_request(:get, cursor)).to have_been_made.once
       expect { client.fetch_messages(channel_id: "chat-1", cursor: "https://example.com/evil") }
         .to raise_error(ArgumentError, /https:\/\/graph\.microsoft\.com/)
+    end
+
+    it "validates the cursor path against the escaped chat id" do
+      client = graph_adapter
+      chat_id = "19:abc@thread.v2"
+      cursor = "https://graph.microsoft.com/v1.0/chats/19%3Aabc%40thread.v2/messages?$skiptoken=next"
+      stub_graph_token
+      stub_request(:get, cursor)
+        .to_return(status: 200, body: JSON.generate("value" => []), headers: {"Content-Type" => "application/json"})
+
+      expect(client.fetch_messages(channel_id: chat_id, cursor: cursor)).to eq([[], nil])
+      expect {
+        client.fetch_messages(
+          channel_id: chat_id,
+          cursor: "https://graph.microsoft.com/v1.0/chats/other-chat/messages?$skiptoken=next"
+        )
+      }.to raise_error(ArgumentError, /requested chat path/)
+      expect {
+        client.fetch_messages(
+          channel_id: chat_id,
+          cursor: "https://graph.microsoft.com/v1.0/users/user-1/messages?$skiptoken=next"
+        )
+      }.to raise_error(ArgumentError, /requested chat path/)
+    end
+
+    it "skips reference attachments that fail to resolve" do
+      client = graph_adapter
+      graph_client = client.instance_variable_get(:@graph_client)
+      errors = {
+        "https://files.example/platform" => ChatSDK::PlatformError.new("not found"),
+        "https://files.example/argument" => ArgumentError.new("invalid attachment"),
+        "https://files.example/faraday" => Faraday::ConnectionFailed.new("connection failed")
+      }
+      attachments = errors.keys.map do |url|
+        {"contentType" => "reference", "contentUrl" => url, "name" => "failed"}
+      end
+      attachments << {
+        "contentType" => "reference",
+        "contentUrl" => "https://files.example/good",
+        "name" => "good.pdf"
+      }
+      allow(graph_client).to receive(:fetch_messages).and_return(
+        "value" => [{
+          "id" => "message-1",
+          "body" => {"content" => "report"},
+          "from" => {"user" => {"id" => "user-1", "displayName" => "Alice"}},
+          "attachments" => attachments
+        }]
+      )
+      allow(graph_client).to receive(:resolve_reference_attachment) do |content_url:|
+        raise errors.fetch(content_url) if errors.key?(content_url)
+
+        {"url" => "https://download.example/good.pdf", "filename" => "good.pdf"}
+      end
+
+      messages, = client.fetch_messages(channel_id: "chat-1")
+
+      expect(messages.first.attachments.size).to eq(1)
     end
 
     it "maps Graph reference files and downloads them without forwarding Graph credentials" do

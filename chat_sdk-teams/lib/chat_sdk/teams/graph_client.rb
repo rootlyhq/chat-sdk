@@ -19,8 +19,9 @@ module ChatSDK
       end
 
       def fetch_messages(chat_id:, limit: 50, cursor: nil)
-        url = cursor || "#{GRAPH_BASE_URL}/chats/#{chat_id}/messages?$top=#{limit}&$orderby=createdDateTime desc"
-        validate_graph_url!(url) if cursor
+        messages_url = chat_messages_url(chat_id)
+        url = cursor || "#{messages_url}?$top=#{limit}&$orderby=createdDateTime desc"
+        validate_graph_url!(url, chat_id) if cursor
         token = fetch_token
 
         response = api_connection.get(url) do |req|
@@ -132,11 +133,19 @@ module ChatSDK
         raise ArgumentError, "Invalid Teams attachment URL"
       end
 
-      def validate_graph_url!(url)
+      def chat_messages_url(chat_id)
+        "#{GRAPH_BASE_URL}/chats/#{URI::DEFAULT_PARSER.escape(chat_id.to_s, /[^A-Za-z0-9._~-]/)}/messages"
+      end
+
+      def validate_graph_url!(url, chat_id)
         uri = URI.parse(url)
+        expected_path = URI.parse(chat_messages_url(chat_id)).path
         valid = uri.is_a?(URI::HTTPS) && uri.host == "graph.microsoft.com" &&
-          uri.port == 443 && !uri.userinfo && !uri.fragment
-        raise ArgumentError, "Graph pagination cursor must use https://graph.microsoft.com" unless valid
+          uri.port == 443 && !uri.userinfo && !uri.fragment && uri.path == expected_path
+        unless valid
+          raise ArgumentError,
+            "Graph pagination cursor must use https://graph.microsoft.com and the requested chat path"
+        end
       rescue URI::InvalidURIError
         raise ArgumentError, "Invalid Graph pagination cursor"
       end

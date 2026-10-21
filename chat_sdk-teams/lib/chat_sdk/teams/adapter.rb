@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
+require "uri"
+
 module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
       DEFAULT_SERVICE_URL = "https://smba.trafficmanager.net/teams/"
+      VERIFIED_JWT_CLAIMS_ENV_KEY = "chat_sdk.teams.verified_jwt_claims"
 
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
         :file_uploads, :streaming_edit, :typing_indicator, :message_history
@@ -46,16 +49,17 @@ module ChatSDK
         raise ChatSDK::SignatureVerificationError, "Missing authorization header" unless auth_header
 
         token = auth_header.sub(/^Bearer\s+/i, "")
-        @jwt_verifier.verify!(token)
+        rack_request.env[VERIFIED_JWT_CLAIMS_ENV_KEY] = @jwt_verifier.verify!(token)
         true
       end
 
       def parse_events(rack_request)
         activity = read_json_body(rack_request)
 
-        # Cache the service URL for this conversation
-        if activity["serviceUrl"] && activity.dig("conversation", "id")
-          register_service_url(activity.dig("conversation", "id"), activity["serviceUrl"])
+        conversation_id = activity.dig("conversation", "id")
+        claims = rack_request.env[VERIFIED_JWT_CLAIMS_ENV_KEY]
+        if conversation_id && trusted_service_url?(activity["serviceUrl"], claims)
+          register_service_url(conversation_id, activity["serviceUrl"])
         end
 
         ActivityParser.parse(activity, bot_app_id: @app_id)
@@ -134,7 +138,7 @@ module ChatSDK
             "contentUrl" => "data:application/octet-stream;base64,#{content}"
           }]
         }
-        activity["replyToId"] = thread_id if thread_id
+        activity["replyToId"] = activity_reply_id(channel_id, thread_id) if thread_id
 
         @client.send_activity(
           service_url: service_url,
@@ -263,6 +267,18 @@ module ChatSDK
         "chat_sdk:teams:service_url:#{conversation_id}"
       end
 
+      def trusted_service_url?(service_url, claims)
+        return false unless service_url.is_a?(String)
+
+        uri = URI.parse(service_url)
+        return false unless uri.is_a?(URI::HTTPS) && uri.host
+
+        service_url_claim = claims.is_a?(Hash) ? claims["serviceurl"] : nil
+        service_url_claim.nil? || service_url == service_url_claim
+      rescue URI::InvalidURIError
+        false
+      end
+
       def channel_thread_id(channel_id, activity_id)
         return activity_id unless channel_id.to_s.include?("@thread.tacv2") && activity_id
 
@@ -281,8 +297,12 @@ module ChatSDK
         attachments = Array(data["attachments"]).filter_map do |attachment|
           next unless attachment["contentType"] == "reference" && attachment["contentUrl"]
 
-          resolved = @graph_client.resolve_reference_attachment(content_url: attachment["contentUrl"])
-          resolved.merge("filename" => resolved["filename"] || attachment["name"])
+          begin
+            resolved = @graph_client.resolve_reference_attachment(content_url: attachment["contentUrl"])
+            resolved.merge("filename" => resolved["filename"] || attachment["name"])
+          rescue ChatSDK::PlatformError, ArgumentError, Faraday::Error
+            nil
+          end
         end
 
         ChatSDK::Message.new(

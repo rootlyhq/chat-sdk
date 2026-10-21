@@ -115,19 +115,23 @@ module ChatSDK
           conversation_id = activity.dig("conversation", "id")
           user = build_author(activity, bot_app_id)
 
-          nested_data = activity.dig("value", "data")
-          action_data = activity.dig("value", "action")
-          nested_action_data = action_data.is_a?(Hash) ? action_data["data"] : nil
+          value_data = activity["value"]
+          nested_data = value_data["data"] if value_data.is_a?(Hash)
+          action = value_data["action"] if value_data.is_a?(Hash)
+          action_data = action.is_a?(Hash) ? action["data"] : nil
           data = if nested_data.is_a?(Hash)
             nested_data
-          elsif nested_action_data.is_a?(Hash)
-            nested_action_data
+          elsif action_data.is_a?(Hash)
+            action_data
           else
-            activity["value"]
+            value_data
           end
           data = {} unless data.is_a?(Hash)
-          action = activity.dig("value", "action")
-          action_id = data["actionId"] || data["action"] ||
+          action_id = if action_data.is_a?(Hash)
+            action_data["actionId"] || action_data["action"]
+          end
+          action_id ||= action["verb"] if action.is_a?(Hash)
+          action_id ||= data["actionId"] || data["action"] ||
             (action unless action.is_a?(Hash)) || activity["name"] || "invoke"
           value = data["value"] || (nested_data unless nested_data.is_a?(Hash)) || data
           value = value.is_a?(Hash) ? JSON.generate(value) : value.to_s
@@ -166,8 +170,16 @@ module ChatSDK
           team_id = activity.dig("channelData", "team", "id")
           tenant_id = activity.dig("conversation", "tenantId") ||
             activity.dig("channelData", "tenant", "id")
+          user_id = activity.dig("from", "aadObjectId") || activity.dig("from", "id")
+          installation_id = if team_id
+            team_id
+          elsif tenant_id && user_id
+            "#{tenant_id}:#{user_id}"
+          else
+            tenant_id || conversation_id
+          end
           [event_class.new(
-            installation_id: team_id || tenant_id || conversation_id,
+            installation_id: installation_id,
             team_id: team_id,
             tenant_id: tenant_id,
             conversation_id: conversation_id,
