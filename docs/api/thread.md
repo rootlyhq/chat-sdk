@@ -15,7 +15,7 @@
 
 ### post(content)
 
-Posts a message to the thread. Accepts a `String`, `Cards::Node`, or `PostableMessage`.
+Posts a message to the thread. Accepts a `String`, `Cards::Node`, `PostableMessage`, or `StreamingPlan`.
 
 ```ruby
 thread.post("Hello!")
@@ -60,15 +60,27 @@ thread.post_ephemeral("Only you see this", user_id: "U123")
 
 Raises `NotSupportedError` if the adapter does not support ephemeral messages.
 
-### post_stream(placeholder: nil, &block)
+### post_stream(source = nil, placeholder: nil, **plan_options, &block)
 
-Posts a streaming message that is updated incrementally.
+Posts a streaming message from an enumerable source or a block. The block receives a writer that accepts chunks with `<<`. Supports the `StreamingPlan` options `group_tasks`, `end_with`, `update_interval`, and `ai_generated`. Returns the posted `ChatSDK::Message`.
 
 ```ruby
 thread.post_stream(placeholder: "Loading...") do |stream|
   stream << "chunk1"
   stream << "chunk2"
 end
+
+thread.post_stream(chunks, group_tasks: :plan)
+```
+
+`thread.post(StreamingPlan.new(chunks, ...))` is also supported.
+
+### post_ai_stream(enumerable, placeholder: "Thinking...", **plan_options)
+
+Streams chunks from an AI response and returns the posted `ChatSDK::Message`. `plan_options` are the same options accepted by `post_stream`.
+
+```ruby
+thread.post_ai_stream(ai_client.stream(prompt), ai_generated: true)
 ```
 
 ### edit(message_id, content)

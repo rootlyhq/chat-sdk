@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Slack native streaming via `chat.startStream`, `chat.appendStream`, and `chat.stopStream`
+- `ChatSDK::StreamingPlan`, structured streaming chunks, and the optional `Adapter::Base#stream` hook
 - Configurable error reporting through `on_error:` and injectable logging with `logger:`.
 - Slack installation providers, Enterprise Grid OAuth, token encryption, token resolvers, and custom webhook verification
 - Background handler execution through `handler_executor`, including `:thread`, callable executors, and `dispatch_serialized`.
@@ -18,12 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unknown `handler_executor` values now raise `ConfigurationError` instead of being ignored.
 - A callable `handler_executor` that raises now raises `ChatSDK::HandlerExecutorError`, and the webhook returns 500 so the platform redelivers the event.
+- `Thread#post_stream` returns the posted `ChatSDK::Message`
 
 ### Fixed
 
 - Serialized event timestamps retain sub-second precision, preventing same-second reactions from sharing a dedupe key.
 - Teams resolves conversation and DM service URLs from the shared state store so replies from other processes use the right regional endpoint; state reads are no longer cached per process
-
 ## [1.2.0] - 2026-10-21
 
 ### Added
