@@ -73,7 +73,7 @@ end
 
 ## Service URL Registration
 
-Teams requires a `serviceUrl` to send messages. ChatSDK automatically caches the service URL from incoming activities. For proactive messaging, you may need to register it manually:
+Teams requires a `serviceUrl` to send messages. ChatSDK resolves a conversation URL in this order: the URL from a trusted incoming activity registered in the current adapter, the shared state key `chat_sdk:teams:service_url:<conversation_id>`, then the configured `service_url:` or `DEFAULT_SERVICE_URL`. For proactive messaging, you may register it manually:
 
 ```ruby
 teams_adapter = bot.adapter(:teams)
@@ -82,6 +82,10 @@ teams_adapter.register_service_url(
   "https://smba.trafficmanager.net/..."
 )
 ```
+
+`ChatSDK::Chat` injects its state adapter into adapters that support `set_state(state)`. When processes share a state backend, a background job or another process can reply using the service URL persisted from an incoming activity. Redis, PostgreSQL, and MySQL state adapters can be shared across processes; `ChatSDK::State::Memory` is per-process. A process-local URL registered with `register_service_url` takes precedence over the value in shared state.
+
+When opening a DM, the adapter reuses the user's last trusted activity service URL from state (with a 30-day TTL), then falls back to a process-local registered URL and the configured default. Set `service_url:` or `TEAMS_SERVICE_URL` to override the final default for a deployment whose Bot Framework service endpoint is not the standard Teams endpoint.
 
 ## Cards Rendering
 

@@ -12,6 +12,21 @@ RSpec.describe ChatSDK::Chat do
       expect(bot.config.user_name).to eq("test-bot")
     end
 
+    it "passes its state to adapters that support set_state" do
+      stateful_adapter = double("adapter")
+      expect(stateful_adapter).to receive(:set_state).with(state)
+
+      described_class.new(user_name: "test-bot", adapters: {test: stateful_adapter}, state: state)
+    end
+
+    it "creates with adapters that do not support set_state" do
+      stateless_adapter = Object.new
+
+      expect {
+        described_class.new(user_name: "test-bot", adapters: {test: stateless_adapter}, state: state)
+      }.not_to raise_error
+    end
+
     it "raises on missing user_name" do
       expect {
         described_class.new(user_name: "", adapters: {test: adapter}, state: state)
