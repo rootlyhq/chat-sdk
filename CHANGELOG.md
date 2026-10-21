@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- WhatsApp inbound sender identifiers now fall back from empty phone fields to contact IDs, and outbound thread IDs are validated before sending
 - Message routing now prioritizes direct messages, subscribed threads, and mentions before ordinary message handlers
 - Slack cards now render `title` as a header block and `subtitle` as a context block instead of dropping them
 
