@@ -229,4 +229,30 @@ RSpec.describe ChatSDK::Telegram::FormatConverter do
       expect(back).to eq(telegram_text)
     end
   end
+
+  describe "#truncate_markdown_v2" do
+    it "returns in-limit Markdown unchanged" do
+      markdown = "[x](https://example.com/a`b)"
+
+      expect(converter.truncate_markdown_v2(markdown, markdown.length)).to eq(markdown)
+    end
+
+    it "drops an incomplete link destination" do
+      markdown = "prefix [link](https://example.com/#{'a' * 20})"
+
+      expect(converter.truncate_markdown_v2(markdown, 30)).to eq("prefix \\.\\.\\.")
+    end
+
+    it "drops an incomplete code span" do
+      markdown = "prefix `#{'code' * 10}`"
+
+      expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
+    end
+
+    it "drops an incomplete entity" do
+      markdown = "prefix **#{'bold' * 10}**"
+
+      expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
+    end
+  end
 end

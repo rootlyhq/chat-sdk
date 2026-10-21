@@ -393,6 +393,66 @@ RSpec.describe ChatSDK::Telegram::Adapter do
       end
     end
 
+    context "mention_on_reply" do
+      let(:reply_adapter) do
+        described_class.new(
+          bot_token: bot_token,
+          secret_token: secret_token,
+          bot_username: bot_username,
+          mention_on_reply: true
+        )
+      end
+
+      it "treats a reply to the bot in a regular supergroup as a mention" do
+        payload = {
+          "message" => {
+            "message_id" => 111,
+            "message_thread_id" => 105,
+            "from" => {"id" => 42, "username" => "alice"},
+            "chat" => {"id" => -1001, "type" => "supergroup"},
+            "text" => "Reply",
+            "reply_to_message" => {
+              "message_id" => 105,
+              "from" => {"id" => 99, "username" => "testbot", "is_bot" => true}
+            }
+          }
+        }
+
+        event = reply_adapter.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::Mention)
+        expect(event.message.is_mention).to be true
+      end
+
+      it "excludes a forum topic root reply but keeps explicit topic replies" do
+        root_payload = {
+          "message" => {
+            "message_id" => 111,
+            "message_thread_id" => 105,
+            "is_topic_message" => true,
+            "from" => {"id" => 42, "username" => "alice"},
+            "chat" => {"id" => -1001, "type" => "supergroup"},
+            "text" => "Topic root",
+            "reply_to_message" => {
+              "message_id" => 105,
+              "from" => {"id" => 99, "username" => "testbot", "is_bot" => true}
+            }
+          }
+        }
+        reply_payload = Marshal.load(Marshal.dump(root_payload))
+        reply_payload["message"]["message_id"] = 112
+        reply_payload["message"]["text"] = "Explicit reply"
+        reply_payload["message"]["reply_to_message"]["message_id"] = 106
+
+        root_event = reply_adapter.parse_events(build_request(JSON.generate(root_payload))).first
+        reply_event = reply_adapter.parse_events(build_request(JSON.generate(reply_payload))).first
+
+        expect(root_event).to be_a(ChatSDK::Events::SubscribedMessage)
+        expect(reply_event).to be_a(ChatSDK::Events::Mention)
+        expect(reply_event.message.is_mention).to be true
+      end
+    end
+
     context "invalid JSON" do
       it "returns empty array" do
         request = build_request("not json")

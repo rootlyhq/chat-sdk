@@ -10,10 +10,12 @@ module ChatSDK
 
       attr_reader :client
 
-      def initialize(bot_token: nil, secret_token: nil, bot_username: nil, allowed_user_ids: nil, allow_unverified_webhooks: nil)
+      def initialize(bot_token: nil, secret_token: nil, bot_username: nil, allowed_user_ids: nil, allow_unverified_webhooks: nil,
+        mention_on_reply: false)
         @bot_token = bot_token || ENV["TELEGRAM_BOT_TOKEN"]
         @secret_token = secret_token || ENV["TELEGRAM_WEBHOOK_SECRET_TOKEN"]
         @bot_username = bot_username || ENV["TELEGRAM_BOT_USERNAME"]
+        @mention_on_reply = mention_on_reply
         configured_user_ids = allowed_user_ids || ENV["TELEGRAM_ALLOWED_USER_IDS"]&.split(",")
         @allowed_user_ids = configured_user_ids&.map(&:to_s)&.to_set
         @allow_unverified_webhooks = if allow_unverified_webhooks.nil?
@@ -26,6 +28,7 @@ module ChatSDK
 
         @client = ApiClient.new(@bot_token)
         @renderer = KeyboardRenderer.new
+        @format_converter = FormatConverter.new
       end
 
       def name
@@ -62,7 +65,7 @@ module ChatSDK
         payload = read_json_body(rack_request)
         return [] unless allowed_user?(payload)
 
-        EventParser.parse(payload, bot_username: @bot_username)
+        EventParser.parse(payload, bot_username: @bot_username, mention_on_reply: @mention_on_reply)
       rescue JSON::ParserError
         []
       end
@@ -207,7 +210,7 @@ module ChatSDK
           text = rendered[:text] if rendered[:text] && !rendered[:text].empty?
           reply_markup = rendered[:reply_markup]
         end
-        [text, reply_markup]
+        [@format_converter.truncate_markdown_v2(text, 4096), reply_markup]
       end
 
       def parse_telegram_message(data, channel_id)
