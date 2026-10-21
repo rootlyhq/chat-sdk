@@ -138,6 +138,45 @@ RSpec.describe "Teams parity behavior" do
         expect(event.values).to eq("firstName" => "Ada")
       end
     end
+
+    it "fans out auto-submit inputs as individual actions with the full form values" do
+      events = parse(
+        "type" => "message",
+        "from" => {"id" => "user-1"},
+        "conversation" => {"id" => "conversation-1"},
+        "value" => {
+          "actionId" => "__auto_submit",
+          "value" => "red",
+          "priority" => 2,
+          "toggle" => true,
+          "msteams" => {"type" => "task/fetch"}
+        }
+      )
+
+      expect(events.map(&:action_id)).to eq(["value", "priority", "toggle"])
+      expect(events.map(&:value)).to eq(["red", "2", nil])
+      expect(events.map(&:values)).to all(
+        eq("value" => "red", "priority" => "2")
+      )
+    end
+
+    it "fans out invoke auto-submit inputs from the action payload" do
+      events = parse(
+        "type" => "invoke",
+        "from" => {"id" => "user-1"},
+        "conversation" => {"id" => "conversation-1"},
+        "value" => {
+          "action" => {"data" => {"actionId" => "__auto_submit"}},
+          "data" => {"color" => "red", "priority" => 2}
+        }
+      )
+
+      expect(events.map(&:action_id)).to eq(["color", "priority"])
+      expect(events.map(&:value)).to eq(["red", "2"])
+      expect(events.map(&:values)).to all(
+        eq("color" => "red", "priority" => "2")
+      )
+    end
   end
 
   describe "invoke acknowledgement" do
@@ -163,6 +202,37 @@ RSpec.describe "Teams parity behavior" do
       expect(status).to eq(200)
       expect(headers["content-type"]).to eq("application/json")
       expect(JSON.parse(body.first)["value"]).to eq("OK")
+    end
+
+    it "acknowledges an auto-submit invoke with no values without dispatching actions" do
+      chat = ChatSDK::Chat.new(user_name: "bot", adapters: {teams: adapter}, state: ChatSDK::State::Memory.new)
+      endpoint = ChatSDK::Webhook::Endpoint.new(chat: chat, adapter: adapter, adapter_name: :teams)
+      allow(adapter).to receive(:verify_request!).and_return(true)
+      expect(chat).not_to receive(:dispatch)
+      request = Rack::MockRequest.env_for(
+        "/webhooks/teams",
+        method: "POST",
+        input: JSON.generate(
+          "type" => "invoke",
+          "name" => "adaptiveCard/action",
+          "from" => {"id" => "user-1"},
+          "conversation" => {"id" => "conversation-1"},
+          "value" => {
+            "action" => {"data" => {"actionId" => "__auto_submit"}}
+          }
+        ),
+        content_type: "application/json"
+      )
+
+      status, headers, body = endpoint.call(request)
+
+      expect(status).to eq(200)
+      expect(headers["content-type"]).to eq("application/json")
+      expect(JSON.parse(body.first)).to eq(
+        "statusCode" => 200,
+        "type" => "application/vnd.microsoft.activity.message",
+        "value" => "OK"
+      )
     end
 
     it "returns the Bot Framework message response" do

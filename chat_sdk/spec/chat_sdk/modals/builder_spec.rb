@@ -11,16 +11,17 @@ RSpec.describe ChatSDK::Modals::Builder do
       expect(modal.attributes[:title]).to eq("My Modal")
     end
 
-    it "builds with submit_label and callback_id" do
-      builder = described_class.new(title: "Form", submit_label: "Submit", callback_id: "form:1")
+    it "builds with submit_label, close_label, and callback_id" do
+      builder = described_class.new(title: "Form", submit_label: "Submit", close_label: "Back", callback_id: "form:1")
       modal = builder.build
       expect(modal.attributes[:submit_label]).to eq("Submit")
+      expect(modal.attributes[:close_label]).to eq("Back")
       expect(modal.attributes[:callback_id]).to eq("form:1")
     end
 
     it "builds with text_input" do
       builder = described_class.new(title: "Form") do
-        text_input id: "name", label: "Name", placeholder: "Enter name"
+        text_input id: "name", label: "Name", placeholder: "Enter name", initial_value: "Ada", max_length: 50
       end
       modal = builder.build
       input = modal.children.first
@@ -30,6 +31,8 @@ RSpec.describe ChatSDK::Modals::Builder do
       expect(input.attributes[:input_type]).to eq(:text)
       expect(input.attributes[:multiline]).to be false
       expect(input.attributes[:placeholder]).to eq("Enter name")
+      expect(input.attributes[:initial_value]).to eq("Ada")
+      expect(input.attributes[:max_length]).to eq(50)
     end
 
     it "builds with multiline text_input" do
@@ -43,7 +46,7 @@ RSpec.describe ChatSDK::Modals::Builder do
 
     it "builds with select_input and options" do
       builder = described_class.new(title: "Form") do
-        select_input id: "priority", label: "Priority", placeholder: "Choose" do
+        select_input id: "priority", label: "Priority", placeholder: "Choose", initial_option: "high", dispatch_action: true do
           option "High", value: "high"
           option "Low", value: "low", description: "Not urgent"
         end
@@ -57,6 +60,53 @@ RSpec.describe ChatSDK::Modals::Builder do
       expect(select.children.first.attributes[:text]).to eq("High")
       expect(select.children.first.attributes[:value]).to eq("high")
       expect(select.children.last.attributes[:description]).to eq("Not urgent")
+      expect(select.attributes).to include(initial_option: "high", dispatch_action: true)
+    end
+
+    it "builds radio and external select inputs" do
+      modal = described_class.new(title: "Form") do
+        radio_select_input id: "scope", label: "Scope", initial_option: "team", optional: true, dispatch_action: true do
+          option "Team", value: "team"
+          option "Personal", value: "personal"
+        end
+        external_select_input(
+          id: "owner",
+          label: "Owner",
+          placeholder: "Search people",
+          min_query_length: 2,
+          initial_option: {label: "Ada", value: "ada", description: "Engineer"},
+          optional: true
+        )
+      end.build
+
+      radio, external = modal.children
+      expect(radio.attributes).to include(
+        input_type: :radio_select, initial_option: "team", optional: true, dispatch_action: true
+      )
+      expect(radio.children.size).to eq(2)
+      expect(external.attributes).to include(
+        input_type: :external_select,
+        min_query_length: 2,
+        initial_option: {label: "Ada", value: "ada", description: "Engineer"},
+        optional: true
+      )
+    end
+
+    it "builds fields and rejects select inputs without options" do
+      modal = described_class.new(title: "Form") do
+        fields do
+          field "Team", "Platform"
+        end
+      end.build
+      expect(modal.children.first.type).to eq(:fields)
+      expect(modal.children.first.children.first.attributes).to include(label: "Team", value: "Platform")
+
+      expect do
+        described_class.new(title: "Form") { select_input(id: "empty", label: "Empty") {} }
+      end.to raise_error(ArgumentError, "Select requires at least one option")
+      expect do
+        described_class.new(title: "Form") { radio_select_input(id: "empty", label: "Empty") {} }
+      end.to raise_error(ArgumentError, "RadioSelect requires at least one option")
     end
 
     it "builds with static_text" do

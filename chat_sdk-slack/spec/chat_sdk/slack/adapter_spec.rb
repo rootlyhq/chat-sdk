@@ -2446,6 +2446,53 @@ RSpec.describe ChatSDK::Slack::Adapter do
         expect(select_block[:element][:type]).to eq("static_select")
         expect(select_block[:element][:options].size).to eq(2)
       end
+
+      it "renders modal input attributes, radio and external selects, fields, and close label" do
+        modal = ChatSDK::Modals::Builder.new(title: "Preferences", close_label: "Back") do
+          text_input id: "name", label: "Name", initial_value: "Ada", max_length: 40
+          select_input id: "team", label: "Team", initial_option: "platform", dispatch_action: true do
+            option "Platform", value: "platform"
+            option "Product", value: "product"
+          end
+          radio_select_input id: "mode", label: "Mode", initial_option: "fast", optional: true, dispatch_action: false do
+            option "Fast", value: "fast"
+            option "Careful", value: "careful"
+          end
+          external_select_input(
+            id: "owner",
+            label: "Owner",
+            placeholder: "Search people",
+            min_query_length: 2,
+            initial_option: {label: "Ada", value: "ada", description: "Engineer"}
+          )
+          fields { field "Region", "us-east-1" }
+        end.build
+
+        result = renderer.render(modal)
+        text_block, select_block, radio_block, external_block, fields_block = result[:blocks]
+
+        expect(result[:close]).to eq(type: "plain_text", text: "Back")
+        expect(text_block[:element]).to include(initial_value: "Ada", max_length: 40)
+        expect(select_block[:element][:initial_option][:value]).to eq("platform")
+        expect(select_block[:dispatch_action]).to be(true)
+        expect(radio_block[:element][:type]).to eq("radio_buttons")
+        expect(radio_block[:element][:initial_option][:value]).to eq("fast")
+        expect(radio_block[:dispatch_action]).to be(false)
+        expect(radio_block[:optional]).to be(true)
+        expect(external_block[:element]).to include(
+          type: "external_select",
+          min_query_length: 2,
+          initial_option: {
+            text: {type: "plain_text", text: "Ada"},
+            value: "ada",
+            description: {type: "plain_text", text: "Engineer"}
+          }
+        )
+        expect(fields_block).to eq(
+          type: "section",
+          fields: [{type: "mrkdwn", text: "*Region*\nus-east-1"}]
+        )
+      end
     end
   end
 end

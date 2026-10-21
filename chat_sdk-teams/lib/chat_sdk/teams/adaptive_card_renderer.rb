@@ -6,7 +6,10 @@ module ChatSDK
       def render(node)
         case node.type
         when :card then render_card(node)
-        else wrap_card([render_node(node)].compact)
+        else
+          rendered = render_node(node)
+          elements = rendered.is_a?(Array) ? rendered.flatten.compact : [rendered].compact
+          wrap_card(elements)
         end
       end
 
@@ -15,6 +18,13 @@ module ChatSDK
       def render_card(node)
         body = []
         pending_separator = false
+        if node.attributes[:image_url] && !node.attributes[:image_url].empty?
+          body << {
+            "type" => "Image",
+            "url" => node.attributes[:image_url],
+            "size" => "Stretch"
+          }
+        end
 
         node.children.each do |child|
           if child.type == :divider
@@ -25,16 +35,15 @@ module ChatSDK
           element = render_node(child)
           next unless element
 
+          elements = element.is_a?(Array) ? element.compact : [element]
+          next if elements.empty?
+
           if pending_separator
-            element["separator"] = true
+            elements.first["separator"] = true
             pending_separator = false
           end
 
-          if element.is_a?(Array)
-            body.concat(element)
-          else
-            body << element
-          end
+          body.concat(elements)
         end
 
         wrap_card(body, width: node.attributes[:width])
@@ -54,6 +63,7 @@ module ChatSDK
       def render_node(node)
         case node.type
         when :text then render_text(node)
+        when :link then render_link(node)
         when :divider then nil # handled in render_card
         when :image then render_image(node)
         when :fields then render_fields(node)
@@ -62,6 +72,7 @@ module ChatSDK
         when :button then render_action_submit(node)
         when :link_button then render_action_open_url(node)
         when :select then render_select(node)
+        when :radio_select then render_radio_select(node)
         when :text_input then render_text_input(node)
         when :table then render_table(node)
         when :chart then render_chart(node)
@@ -69,9 +80,20 @@ module ChatSDK
       end
 
       def render_text(node)
-        {
+        text = {
           "type" => "TextBlock",
           "text" => node.attributes[:content],
+          "wrap" => true
+        }
+        text["weight"] = "Bolder" if node.attributes[:style] == :bold
+        text["isSubtle"] = true if node.attributes[:style] == :muted
+        text
+      end
+
+      def render_link(node)
+        {
+          "type" => "TextBlock",
+          "text" => "[#{node.attributes[:label]}](#{node.attributes[:url]})",
           "wrap" => true
         }
       end
@@ -124,19 +146,37 @@ module ChatSDK
       end
 
       def render_actions(node)
-        actions = node.children.filter_map { |child| render_action_element(child) }
-        {
-          "type" => "ActionSet",
-          "actions" => actions
-        }
-      end
+        elements = []
+        actions = []
+        has_inputs = false
+        has_buttons = false
 
-      def render_action_element(node)
-        case node.type
-        when :button then render_action_submit(node)
-        when :link_button then render_action_open_url(node)
-        when :select then render_select(node)
+        node.children.each do |child|
+          case child.type
+          when :button
+            has_buttons = true
+            actions << render_action_submit(child)
+          when :link_button
+            actions << render_action_open_url(child)
+          when :select
+            has_inputs = true
+            elements << render_select(child)
+          when :radio_select
+            has_inputs = true
+            elements << render_radio_select(child)
+          end
         end
+
+        if has_inputs && !has_buttons
+          actions << {
+            "type" => "Action.Submit",
+            "title" => "Submit",
+            "data" => {"actionId" => AUTO_SUBMIT_ACTION_ID}
+          }
+        end
+
+        elements << {"type" => "ActionSet", "actions" => actions} unless actions.empty?
+        elements
       end
 
       def render_action_submit(node)
@@ -163,6 +203,11 @@ module ChatSDK
         }
         action["id"] = node.attributes[:id] if node.attributes[:id]
         action["tooltip"] = node.attributes[:tooltip] if node.attributes[:tooltip]
+        if node.attributes[:style] == :primary
+          action["style"] = "positive"
+        elsif node.attributes[:style] == :danger
+          action["style"] = "destructive"
+        end
         action
       end
 
@@ -178,6 +223,30 @@ module ChatSDK
           end
         }
         input["placeholder"] = node.attributes[:placeholder] if node.attributes[:placeholder]
+        if [node.attributes[:label], node.attributes[:initial_option], node.attributes[:optional]].any? { |value| !value.nil? }
+          input["label"] = node.attributes[:label] if node.attributes[:label]
+          input["style"] = "compact"
+          input["isRequired"] = !node.attributes[:optional]
+        end
+        input["value"] = node.attributes[:initial_option] unless node.attributes[:initial_option].nil?
+        input
+      end
+
+      def render_radio_select(node)
+        input = {
+          "type" => "Input.ChoiceSet",
+          "id" => node.attributes[:id],
+          "label" => node.attributes[:label],
+          "style" => "expanded",
+          "isRequired" => !node.attributes[:optional],
+          "choices" => node.children.map do |option|
+            {
+              "title" => option.attributes[:text],
+              "value" => option.attributes[:value]
+            }
+          end
+        }
+        input["value"] = node.attributes[:initial_option] unless node.attributes[:initial_option].nil?
         input
       end
 
@@ -191,6 +260,7 @@ module ChatSDK
         }
         input["placeholder"] = node.attributes[:placeholder] if node.attributes[:placeholder]
         input["value"] = node.attributes[:value] unless node.attributes[:value].nil?
+        input["maxLength"] = node.attributes[:max_length] unless node.attributes[:max_length].nil?
         input
       end
 

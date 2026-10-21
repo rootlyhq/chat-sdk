@@ -148,7 +148,28 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
       allow(test_adapter).to receive(:webhook_response).and_return(response)
 
       expect(endpoint.call(env)).to eq(response)
-      expect(test_adapter).to have_received(:webhook_response).with([])
+      expect(test_adapter).to have_received(:webhook_response).with([], anything)
+    end
+
+    it "supports adapters with a one-argument webhook response override" do
+      response = [200, {"content-type" => "application/json"}, ['{"statusCode":200}']]
+      legacy_adapter = Class.new(test_adapter.class) do
+        def webhook_response(_events)
+          [200, {"content-type" => "application/json"}, ['{"statusCode":200}']]
+        end
+      end.new
+      legacy_chat = ChatSDK::Chat.new(
+        user_name: "test-bot",
+        adapters: {webhook_test: legacy_adapter},
+        state: state
+      )
+      legacy_endpoint = described_class.new(
+        chat: legacy_chat,
+        adapter: legacy_adapter,
+        adapter_name: :webhook_test
+      )
+
+      expect(legacy_endpoint.call(env)).to eq(response)
     end
   end
 

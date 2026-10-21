@@ -7,7 +7,7 @@ Cards are rich, structured messages that render natively on each platform: Block
 Use `ChatSDK.card` with a block:
 
 ```ruby
-card = ChatSDK.card(title: "Incident Report", subtitle: "INC-42") do
+card = ChatSDK.card(title: "Incident Report", subtitle: "INC-42", image_url: "https://example.com/incident.png") do
   text "Database connection pool exhausted"
 
   fields do
@@ -43,11 +43,21 @@ thread.post(card)
 
 ### text
 
-Renders a block of text content.
+Renders a block of text content. Set `style:` to `:plain`, `:bold`, or `:muted` for supported platform styling.
 
 ```ruby
 ChatSDK.card do
   text "Hello, **world**!"
+end
+```
+
+### link
+
+Adds a link as a card child. Adapters render it using their native text or link format.
+
+```ruby
+ChatSDK.card do
+  link url: "https://example.com/runbook", label: "Open the runbook"
 end
 ```
 
@@ -104,19 +114,26 @@ end
 
 ### actions
 
-Contains interactive elements: buttons, link buttons, and select menus.
+Contains interactive elements: buttons, link buttons, select menus, and radio selects.
 
 ```ruby
 ChatSDK.card do
   actions do
     button "Click me", id: "btn_1"
     button "Danger", id: "btn_2", style: :danger, value: "dangerous"
-    link_button "Open URL", url: "https://example.com"
+    button "Unavailable", id: "btn_3", disabled: true
+    link_button "Open URL", url: "https://example.com", style: :primary
 
-    select id: "priority_select", placeholder: "Choose priority" do
+    select id: "priority_select", label: "Priority", placeholder: "Choose priority",
+      initial_option: "medium", optional: true, dispatch_action: true do
       option "Low", value: "low"
       option "Medium", value: "medium", description: "Default priority"
       option "High", value: "high"
+    end
+
+    radio_select id: "review_mode", label: "Review mode", initial_option: "quick" do
+      option "Quick", value: "quick"
+      option "Detailed", value: "detailed"
     end
   end
 end
@@ -142,6 +159,7 @@ end
 ```
 
 Buttons and link buttons also accept `tooltip:`. Teams renders it as native hover text; other adapters may ignore it.
+`disabled:` is rendered by Google Chat; Slack and Teams ignore it. Link-button styles are rendered only where the adapter supports them.
 
 ## Tables and Charts
 
@@ -191,6 +209,10 @@ ChatSDK.card do
   end
 end
 ```
+
+Select menus accept `label:`, `initial_option:` (the selected option's value), `optional:`, and `dispatch_action:` in addition to `placeholder:`. Adapters may ignore attributes they do not support. `radio_select` uses the same `option` block and renders as a native radio choice where available. Slack limits radio choices to 10 options.
+
+Card text inputs accept `max_length:`. Teams renders this as the native input maximum; Slack and Google Chat do not render card text inputs as native inputs.
 
 Handle selections with `on_action`:
 

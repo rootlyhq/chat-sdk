@@ -8,6 +8,8 @@ require "zeitwerk"
 
 module ChatSDK
   module Teams
+    AUTO_SUBMIT_ACTION_ID = "__auto_submit"
+
     class << self
       def loader
         @loader ||= begin

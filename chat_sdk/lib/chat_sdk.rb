@@ -17,8 +17,8 @@ module ChatSDK
       end
     end
 
-    def card(title: nil, subtitle: nil, width: nil, &block)
-      Cards::Builder.new(title: title, subtitle: subtitle, width: width, &block).build
+    def card(title: nil, subtitle: nil, width: nil, image_url: nil, &block)
+      Cards::Builder.new(title: title, subtitle: subtitle, width: width, image_url: image_url, &block).build
     end
   end
 end

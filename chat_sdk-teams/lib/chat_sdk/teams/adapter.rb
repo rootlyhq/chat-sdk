@@ -211,8 +211,10 @@ module ChatSDK
         @state&.set(service_url_key(conversation_id), service_url)
       end
 
-      def webhook_response(events)
-        return unless events.any? { |event| event.raw.is_a?(Hash) && event.raw["type"] == "invoke" }
+      def webhook_response(events, rack_request = nil)
+        invoke_activity = rack_request&.respond_to?(:body) && invoke_activity?(rack_request)
+        invoke_event = events.any? { |event| event.raw.is_a?(Hash) && event.raw["type"] == "invoke" }
+        return unless invoke_activity || invoke_event
 
         body = {
           "statusCode" => 200,
@@ -223,6 +225,13 @@ module ChatSDK
       end
 
       private
+
+      def invoke_activity?(rack_request)
+        activity = read_json_body(rack_request)
+        activity.is_a?(Hash) && activity["type"] == "invoke"
+      rescue JSON::ParserError
+        false
+      end
 
       def build_activity(postable_message)
         activity = {"type" => "message"}

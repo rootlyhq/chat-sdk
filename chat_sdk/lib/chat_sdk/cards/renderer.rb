@@ -9,6 +9,7 @@ module ChatSDK
         when :text then node.attributes[:content]
         when :divider then "---"
         when :image then "![#{node.attributes[:alt]}](#{node.attributes[:url]})"
+        when :link then "[#{node.attributes[:label]}](#{node.attributes[:url]})"
         when :fields then render_fields(node)
         when :field then "**#{node.attributes[:label]}**: #{node.attributes[:value]}"
         when :section then render_section(node)
@@ -17,6 +18,7 @@ module ChatSDK
         when :link_button then "[#{node.attributes[:text]}](#{node.attributes[:url]})"
         when :text_input then node.attributes[:label]
         when :select then "_#{node.attributes[:placeholder] || "Select"}_"
+        when :radio_select then "_#{node.attributes[:label] || "Select"}_"
         when :table then render_table(node)
         when :chart then render_chart(node)
         else ""

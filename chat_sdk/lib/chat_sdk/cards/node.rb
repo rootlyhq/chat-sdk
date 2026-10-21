@@ -27,6 +27,8 @@ module ChatSDK
           case node.type
           when :text
             [node.attributes[:content]]
+          when :link
+            ["#{node.attributes[:label]} (#{node.attributes[:url]})"]
           when :field
             ["#{node.attributes[:label]}: #{node.attributes[:value]}"]
           when :button, :link_button

@@ -692,6 +692,55 @@ RSpec.describe ChatSDK::GChat::Adapter do
         expect(select_widget[:selectionInput][:items].size).to eq(2)
       end
 
+      it "renders header images, text styles, links, disabled buttons, and initial selections" do
+        card = ChatSDK.card(title: "Card", image_url: "https://example.com/header.png") do
+          text "Strong", style: :bold
+          text "Subtle", style: :muted
+          link url: "https://example.com/docs", label: "Docs"
+          actions do
+            button "Disabled", id: "disabled", disabled: true
+            link_button "Primary", url: "https://example.com", style: :primary
+            select id: "scope", label: "Scope", initial_option: "team" do
+              option "Team", value: "team"
+              option "Personal", value: "personal"
+            end
+            radio_select id: "mode", label: "Mode", initial_option: "fast" do
+              option "Fast", value: "fast"
+              option "Careful", value: "careful"
+            end
+          end
+        end
+        card_data = renderer.render(card)[:cards_v2][0][:card]
+        expect(card_data[:header]).to include(
+          title: "Card", imageUrl: "https://example.com/header.png", imageType: "SQUARE"
+        )
+        widgets = card_data[:sections].flat_map { |section| section[:widgets] }
+        expect(widgets[0]).to eq(textParagraph: {text: "*Strong*"})
+        expect(widgets[1]).to eq(textParagraph: {text: "Subtle"})
+        expect(widgets[2]).to eq(textParagraph: {text: %(<a href="https://example.com/docs">Docs</a>)})
+        buttons = widgets.find { |widget| widget[:buttonList] }[:buttonList][:buttons]
+        expect(buttons[0][:disabled]).to be(true)
+        expect(buttons[1][:color]).to include(blue: 0.87)
+        selections = widgets.select { |widget| widget[:selectionInput] }.map { |widget| widget[:selectionInput] }
+        expect(selections[0]).to include(label: "Scope", type: "DROPDOWN")
+        expect(selections[0][:items].find { |item| item[:selected] }[:value]).to eq("team")
+        expect(selections[1]).to include(label: "Mode", type: "RADIO_BUTTON")
+        expect(selections[1][:items].find { |item| item[:selected] }[:value]).to eq("fast")
+      end
+
+      it "escapes HTML in link labels and URLs" do
+        card = ChatSDK.card do
+          link url: 'https://example.com/<path>"quoted"', label: 'Docs <"guide">'
+        end
+
+        widgets = renderer.render(card)[:cards_v2][0][:card][:sections][0][:widgets]
+        expect(widgets[0]).to eq(
+          textParagraph: {
+            text: %(<a href="https://example.com/&lt;path&gt;&quot;quoted&quot;">Docs &lt;&quot;guide&quot;&gt;</a>)
+          }
+        )
+      end
+
       it "renders a divider" do
         card = ChatSDK.card do
           text "Before"

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Slack installation providers, Enterprise Grid OAuth, token encryption, token resolvers, and custom webhook verification
 - Background handler execution through `handler_executor`, including `:thread`, callable executors, and `dispatch_serialized`.
 - Slack assistant thread, assistant context change, App Home, and channel membership lifecycle handlers
+- Card and modal DSL parity for styled text, links, inputs, selections, and fields across supported adapters
 
 ### Changed
 

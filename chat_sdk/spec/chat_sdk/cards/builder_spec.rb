@@ -14,6 +14,22 @@ RSpec.describe ChatSDK::Cards::Builder do
       expect(card.children.first.type).to eq(:text)
     end
 
+    it "builds an image header, styled text, and a card link" do
+      card = ChatSDK.card(title: "Test", image_url: "https://example.com/header.png") do
+        text "Important", style: :bold
+        text "Note", style: :muted
+        link url: "https://example.com", label: "Visit"
+      end
+
+      expect(card.attributes[:image_url]).to eq("https://example.com/header.png")
+      expect(card.children.map { |child| child.attributes[:style] }).to eq([:bold, :muted, nil])
+      expect(card.children.last).to have_attributes(
+        type: :link,
+        attributes: {url: "https://example.com", label: "Visit"}
+      )
+      expect(card.fallback_text).to include("Visit (https://example.com)")
+    end
+
     it "builds with fields" do
       card = ChatSDK.card(title: "Test") do
         fields do
@@ -100,20 +116,52 @@ RSpec.describe ChatSDK::Cards::Builder do
     it "keeps button tooltips" do
       card = ChatSDK.card do
         actions do
-          button "Approve", id: "approve", tooltip: "Approve the request"
+          button "Approve", id: "approve", tooltip: "Approve the request", disabled: true
+          link_button "Details", url: "https://example.com", style: :primary
         end
       end
 
       expect(card.children.first.children.first.attributes[:tooltip]).to eq("Approve the request")
+      expect(card.children.first.children.first.attributes[:disabled]).to be(true)
+      expect(card.children.first.children.last.attributes[:style]).to eq(:primary)
+    end
+
+    it "builds selects with initial values and radio selects" do
+      card = ChatSDK.card do
+        actions do
+          select id: "status", label: "Status", initial_option: "open", optional: true, dispatch_action: true do
+            option "Open", value: "open"
+          end
+          radio_select id: "priority", label: "Priority", initial_option: "high", optional: true do
+            option "High", value: "high"
+          end
+        end
+      end
+
+      select, radio = card.children.first.children
+      expect(select.attributes).to include(
+        label: "Status", initial_option: "open", optional: true, dispatch_action: true
+      )
+      expect(radio.type).to eq(:radio_select)
+      expect(radio.attributes).to include(label: "Priority", initial_option: "high", optional: true)
+    end
+
+    it "requires options for select and radio select actions" do
+      expect { ChatSDK.card { actions { select(id: "empty") {} } } }
+        .to raise_error(ArgumentError, "Select requires at least one option")
+      expect { ChatSDK.card { actions { radio_select(id: "empty", label: "Empty") {} } } }
+        .to raise_error(ArgumentError, "RadioSelect requires at least one option")
     end
 
     it "builds text inputs as card children" do
       card = ChatSDK.card do
-        text_input id: "name", label: "Your name", placeholder: "Enter a name", optional: true
+        text_input id: "name", label: "Your name", placeholder: "Enter a name", optional: true, max_length: 100
       end
 
       expect(card.children.first.type).to eq(:text_input)
-      expect(card.children.first.attributes).to include(id: "name", label: "Your name", placeholder: "Enter a name", optional: true)
+      expect(card.children.first.attributes).to include(
+        id: "name", label: "Your name", placeholder: "Enter a name", optional: true, max_length: 100
+      )
       expect(card.fallback_text).to eq("Your name")
       expect(ChatSDK::Cards::Renderer.new.render(card)).to include("Your name")
     end

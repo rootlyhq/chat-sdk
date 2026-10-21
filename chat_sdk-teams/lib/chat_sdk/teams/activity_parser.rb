@@ -133,6 +133,10 @@ module ChatSDK
           action_id ||= action["verb"] if action.is_a?(Hash)
           action_id ||= data["actionId"] || data["action"] ||
             (action unless action.is_a?(Hash)) || activity["name"] || "invoke"
+          if action_id == AUTO_SUBMIT_ACTION_ID
+            return auto_submit_actions(data, activity, conversation_id, user)
+          end
+
           value = data["value"] || (nested_data unless nested_data.is_a?(Hash)) || data
           value = value.is_a?(Hash) ? JSON.generate(value) : value.to_s
 
@@ -221,6 +225,41 @@ module ChatSDK
         def action_values(data)
           values = data.except("action", "actionId", "value", "msteams")
           values.empty? ? nil : values
+        end
+
+        def auto_submit_actions(data, activity, conversation_id, user)
+          values = auto_submit_values(data)
+          values = nil if values.empty?
+
+          data.each_with_object([]) do |(action_id, input_value), events|
+            next if %w[actionId msteams].include?(action_id)
+
+            events << ChatSDK::Events::Action.new(
+              action_id: action_id,
+              value: submit_value_to_string(input_value),
+              values: values,
+              user: user,
+              thread_id: conversation_id,
+              channel_id: conversation_id,
+              platform: :teams,
+              adapter_name: :teams,
+              raw: activity
+            )
+          end
+        end
+
+        def auto_submit_values(data)
+          data.each_with_object({}) do |(key, value), inputs|
+            next if %w[actionId msteams].include?(key)
+
+            input_value = submit_value_to_string(value)
+            inputs[key] = input_value unless input_value.nil?
+          end
+        end
+
+        def submit_value_to_string(value)
+          return value if value.is_a?(String)
+          value.to_s if value.is_a?(Numeric)
         end
 
         def bot_mentioned?(activity, bot_app_id)

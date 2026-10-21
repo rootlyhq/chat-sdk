@@ -26,7 +26,11 @@ module ChatSDK
           chat.dispatch(event, adapter_name: adapter_name)
         end
 
-        response = adapter.webhook_response(events)
+        response = if webhook_response_accepts_request?
+          adapter.webhook_response(events, request || env)
+        else
+          adapter.webhook_response(events)
+        end
         return response if response
 
         [200, {"content-type" => "text/plain"}, [""]]
@@ -53,6 +57,12 @@ module ChatSDK
       end
 
       private
+
+      def webhook_response_accepts_request?
+        parameters = adapter.method(:webhook_response).parameters
+        parameters.any? { |type, _| type == :rest } ||
+          parameters.count { |type, _| %i[req opt].include?(type) } > 1
+      end
 
       def error_context(source:, event:)
         {
