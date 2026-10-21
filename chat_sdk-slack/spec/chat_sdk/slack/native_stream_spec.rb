@@ -182,6 +182,78 @@ RSpec.describe ChatSDK::Slack::Adapter do
     end
   end
 
+  describe "client token resolution" do
+    it "uses the installation client selected by the event context" do
+      adapter = build_multi_workspace_adapter
+      adapter.parse_events(event_callback_request("T2"))
+      expect(adapter).to receive(:client_for_token).with("xoxb-t2").once.and_return(client)
+
+      result = adapter.stream(
+        channel_id: "D123",
+        thread_id: "T123",
+        stream: ["hello"],
+        options: {}
+      )
+
+      expect(result.text).to eq("hello")
+      expect(calls.map(&:first)).to eq(%i[start stop])
+    end
+
+    it "reuses the installation client when rotating native stream segments" do
+      adapter = build_multi_workspace_adapter
+      adapter.parse_events(event_callback_request("T2"))
+      expect(adapter).to receive(:client_for_token).with("xoxb-t2").once.and_return(client)
+      source = Enumerator.new do |yielder|
+        yielder << "x" * 256
+        clock[0] = 270
+        yielder << "\n\ncontinued"
+      end
+
+      adapter.stream(
+        channel_id: "D123",
+        thread_id: "T123",
+        stream: source,
+        options: {}
+      )
+
+      expect(calls.count { |call| call.first == :start }).to eq(2)
+    end
+
+    it "uses the token scoped with with_bot_token" do
+      adapter = build_multi_workspace_adapter
+      expect(adapter).to receive(:client_for_token).with("xoxb-t2").once.and_return(client)
+
+      adapter.with_bot_token("xoxb-t2") do
+        adapter.stream(
+          channel_id: "D123",
+          thread_id: "T123",
+          stream: ["hello"],
+          options: {}
+        )
+      end
+
+      expect(calls.map(&:first)).to eq(%i[start stop])
+    end
+
+    it "uses the resolved client from a bot_token callable" do
+      adapter = described_class.new(
+        bot_token: -> { "xoxb-resolved" },
+        signing_secret: "test-signing-secret"
+      )
+      expect(adapter).to receive(:client_for_token).with("xoxb-resolved").once.and_return(client)
+
+      result = adapter.stream(
+        channel_id: "D123",
+        thread_id: "T123",
+        stream: ["hello"],
+        options: {}
+      )
+
+      expect(result.text).to eq("hello")
+      expect(calls.map(&:first)).to eq(%i[start stop])
+    end
+  end
+
   describe "fallback" do
     it "uses post-and-edit when the first native call fails and permanently latches unsupported methods" do
       text = "x" * 256
@@ -496,6 +568,41 @@ RSpec.describe ChatSDK::Slack::Adapter do
     allow(instance).to receive(:client).and_return(client)
     allow(instance).to receive(:monotonic_now) { clock.fetch(0) }
     instance
+  end
+
+  def build_multi_workspace_adapter
+    instance = described_class.new(
+      client_id: "test-client-id",
+      client_secret: "test-client-secret",
+      signing_secret: "test-signing-secret"
+    )
+    instance.set_state(ChatSDK::State::Memory.new)
+    instance.set_installation("T1", bot_token: "xoxb-t1", bot_user_id: "B_T1")
+    instance.set_installation("T2", bot_token: "xoxb-t2", bot_user_id: "B_T2")
+    allow(instance).to receive(:monotonic_now) { clock.fetch(0) }
+    instance
+  end
+
+  def event_callback_request(team_id)
+    payload = {
+      "type" => "event_callback",
+      "team_id" => team_id,
+      "event" => {
+        "type" => "message",
+        "user" => "U123",
+        "text" => "hello",
+        "ts" => "1234567890.123456",
+        "channel" => "D123",
+        "channel_type" => "im"
+      }
+    }
+    env = Rack::MockRequest.env_for(
+      "/slack/events",
+      :method => "POST",
+      :input => JSON.generate(payload),
+      "CONTENT_TYPE" => "application/json"
+    )
+    Rack::Request.new(env)
   end
 
   def run_stream(source, channel_id: "C123", thread_id: "T123", options: native_options)

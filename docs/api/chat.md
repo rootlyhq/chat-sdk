@@ -21,6 +21,7 @@ ChatSDK::Chat.new(
 | `dedupe_ttl` | `Integer` | No | `600` | Deduplication TTL in seconds |
 | `streaming_update_interval` | `Float` | No | `0.5` | Min seconds between stream edits |
 | `on_lock_conflict` | `Symbol` or `Proc` | No | `:drop` | Lock conflict policy |
+| `handler_executor` | `:inline`, `:thread`, or callable | No | `:inline` | Runs handlers inline, in a thread, or through a custom executor |
 | `logger` | Logger-like object | No | `nil` | Process-wide logger; replaces `ChatSDK::Log.logger` |
 | `on_error` | Callable | No | `nil` | Receives `(exception, context)` for handler and webhook errors |
 | `log_level` | `Symbol` | No | `:info` | Log level |
@@ -107,6 +108,12 @@ chat.dispatch(event, adapter_name:)
 ```
 
 Dispatches an event through the handler pipeline. Called internally by webhook endpoints.
+
+```ruby
+chat.dispatch_serialized(payload)
+```
+
+Loads a JSON-safe payload created by a callable `handler_executor` and runs it through the normal dispatch pipeline. Call this from the worker to apply deduplication, locks, concurrency strategies, and handlers.
 
 ## Attributes
 

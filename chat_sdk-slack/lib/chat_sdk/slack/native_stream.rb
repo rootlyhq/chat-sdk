@@ -18,8 +18,9 @@ module ChatSDK
 
       attr_reader :adapter, :channel_id, :thread_id, :stream, :options, :max_age
 
-      def initialize(adapter:, channel_id:, thread_id:, stream:, options:, max_age:)
+      def initialize(adapter:, client:, channel_id:, thread_id:, stream:, options:, max_age:)
         @adapter = adapter
+        @client = client
         @channel_id = channel_id
         @thread_id = thread_id
         @stream = stream
@@ -65,7 +66,7 @@ module ChatSDK
       def build_segment
         Segment.new(
           streamer: ChatStreamer.new(
-            adapter.client,
+            @client,
             channel: channel_id,
             thread_ts: thread_id,
             recipient_user_id: options[:recipient_user_id],

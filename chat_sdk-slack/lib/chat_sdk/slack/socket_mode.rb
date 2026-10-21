@@ -92,7 +92,7 @@ module ChatSDK
         #   "interactive"      -> payload is a block_actions / view_submission body
         #   "slash_commands"    -> payload is a slash command body
         events = EventParser.parse(payload)
-        events.each { |event| block.call(event) }
+        events.each { |event| block.call(event, payload) }
       rescue JSON::ParserError
         # Ignore malformed frames (e.g. pong/control frames)
       end

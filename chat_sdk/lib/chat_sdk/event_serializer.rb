@@ -16,7 +16,7 @@ module ChatSDK
           data.merge!(
             "message_id" => event.message_id,
             "previous_message" => dump_message(event.previous_message),
-            "deleted_at" => event.deleted_at&.iso8601
+            "deleted_at" => event.deleted_at&.iso8601(6)
           )
         when :reaction
           data.merge!("emoji" => event.emoji, "user_id" => event.user_id, "message_id" => event.message_id, "added" => event.added?)
@@ -100,7 +100,7 @@ module ChatSDK
           "thread_id" => event.respond_to?(:thread_id) ? event.thread_id : nil,
           "channel_id" => event.respond_to?(:channel_id) ? event.channel_id : nil,
           "raw" => json_safe(event.raw),
-          "timestamp" => event.timestamp&.iso8601
+          "timestamp" => event.timestamp&.iso8601(6)
         }
       end
 
@@ -119,7 +119,7 @@ module ChatSDK
           "reply_to" => dump_message(message.reply_to),
           "subject" => json_safe(message.subject),
           "raw" => json_safe(message.raw),
-          "timestamp" => message.timestamp&.iso8601,
+          "timestamp" => message.timestamp&.iso8601(6),
           "is_mention" => message.is_mention
         }
       end

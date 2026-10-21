@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "stringio"
+
 module ChatSDK
   module Slack
     class Adapter < ChatSDK::Adapter::Base
@@ -10,12 +12,17 @@ module ChatSDK
 
       def initialize(bot_token: nil, signing_secret: nil,
         client_id: nil, client_secret: nil, proxy: nil, bot_user_id: nil,
+        installation_provider: nil, encryption_key: nil, webhook_verifier: nil,
         native_streaming: true, stream_segment_max_age: 240)
-        @bot_token = bot_token || ENV["SLACK_BOT_TOKEN"]
+        @bot_token = bot_token.nil? ? ENV["SLACK_BOT_TOKEN"] : bot_token
         @signing_secret = signing_secret || ENV["SLACK_SIGNING_SECRET"]
         @client_id = client_id || ENV["SLACK_CLIENT_ID"]
         @client_secret = client_secret || ENV["SLACK_CLIENT_SECRET"]
         @bot_user_id = bot_user_id || ENV["SLACK_BOT_USER_ID"]
+        @installation_provider = installation_provider
+        @webhook_verifier = webhook_verifier
+        encryption_key ||= ENV["SLACK_ENCRYPTION_KEY"]
+        @encryption_key = TokenEncryption.decode_key(encryption_key) if encryption_key
         valid_segment_max_age = stream_segment_max_age.is_a?(Numeric) &&
           !stream_segment_max_age.is_a?(Complex) &&
           !(stream_segment_max_age.respond_to?(:nan?) && stream_segment_max_age.nan?) &&
@@ -28,30 +35,62 @@ module ChatSDK
         @stream_segment_max_age = stream_segment_max_age
         @bot_user_ids = {}
         @bot_user_id_mutex = Mutex.new
+        @client_cache = {}
+        @client_cache_mutex = Mutex.new
+        @context_key = :"chat_sdk_slack_context_#{object_id}"
         @proxy = proxy || ENV["HTTPS_PROXY"] || ENV["https_proxy"]
 
-        unless @bot_token || @client_id
-          raise ChatSDK::ConfigurationError, "Slack bot_token or client_id required"
+        if !@bot_token.nil? && !@bot_token.is_a?(String) && !@bot_token.respond_to?(:call)
+          raise ChatSDK::ConfigurationError, "Slack bot_token must be a String or callable"
         end
-        raise ChatSDK::ConfigurationError, "Slack signing_secret required" unless @signing_secret
+        if !@installation_provider.nil? && !@installation_provider.respond_to?(:get_installation) && !@installation_provider.respond_to?(:call)
+          raise ChatSDK::ConfigurationError, "Slack installation_provider must respond to get_installation or call"
+        end
+        if !@webhook_verifier.nil? && !@webhook_verifier.respond_to?(:call)
+          raise ChatSDK::ConfigurationError, "Slack webhook_verifier must be callable"
+        end
+        unless @bot_token || @client_id || @installation_provider
+          raise ChatSDK::ConfigurationError, "Slack bot_token, client_id or installation_provider required"
+        end
+        if @webhook_verifier.nil? && !@signing_secret
+          raise ChatSDK::ConfigurationError, "Slack signing_secret or webhook_verifier required"
+        end
 
-        if @bot_token
+        if @bot_token.is_a?(String)
           ::Slack.configure do |config|
             config.token = @bot_token
           end
-          @client = build_client(token: @bot_token)
+          @client = client_for_token(@bot_token)
         end
 
         @renderer = BlockKitRenderer.new
         @modal_renderer = ModalRenderer.new
-        @team_clients = {}
       end
 
       # Returns the per-request client (multi-workspace) or the static client (single-workspace).
       def client
-        return @client unless @client_id
+        request_context = context
+        return client_for_token(request_context[:token]) if request_context && !request_context[:token].nil?
+        return @client if @bot_token.is_a?(String)
+        return unless @bot_token.respond_to?(:call)
 
-        ::Thread.current[:chat_sdk_slack_client] || @client
+        token = @bot_token.call
+        if token.nil? || token == false || (token.respond_to?(:empty?) && token.empty?)
+          raise ChatSDK::ConfigurationError, "Slack bot_token resolver returned no token"
+        end
+        client_for_token(token)
+      end
+
+      def multi_workspace?
+        @bot_token.nil? || !@client_id.nil?
+      end
+
+      def with_bot_token(token, installation_id: nil)
+        previous_context = context
+        set_context(token: token, installation_id: installation_id)
+        yield
+      ensure
+        set_context(previous_context)
       end
 
       # Inject state store after initialization (e.g., from Chat instance).
@@ -61,26 +100,38 @@ module ChatSDK
 
       # --- Multi-workspace installation management ---
 
-      def set_installation(team_id, bot_token:, bot_user_id: nil, team_name: nil)
+      def set_installation(team_id, bot_token:, bot_user_id: nil, team_name: nil,
+        enterprise_id: nil, enterprise_install: nil)
         raise ChatSDK::ConfigurationError, "Multi-workspace mode requires state" unless @state
 
-        @team_clients.delete(team_id)
-        @state.set(installation_key(team_id), {
-          "bot_token" => bot_token,
+        installation = {
+          "bot_token" => @encryption_key ? TokenEncryption.encrypt(bot_token, @encryption_key) : bot_token,
           "bot_user_id" => bot_user_id,
           "team_name" => team_name
-        })
+        }
+        installation["enterprise_id"] = enterprise_id unless enterprise_id.nil?
+        installation["is_enterprise_install"] = enterprise_install unless enterprise_install.nil?
+        @state.set(installation_key(team_id), installation)
         invalidate_bot_user_id(team_id)
       end
 
       def get_installation(team_id)
         return nil unless @state
 
-        @state.get(installation_key(team_id))
+        installation = @state.get(installation_key(team_id))
+        return installation unless installation.is_a?(Hash)
+
+        token_key = installation.key?("bot_token") ? "bot_token" : :bot_token
+        token = installation[token_key]
+        return installation unless TokenEncryption.encrypted?(token)
+        unless @encryption_key
+          raise ChatSDK::ConfigurationError, "Slack installation token is encrypted; configure encryption_key"
+        end
+
+        installation.merge(token_key => TokenEncryption.decrypt(token, @encryption_key))
       end
 
       def delete_installation(team_id)
-        @team_clients.delete(team_id)
         invalidate_bot_user_id(team_id)
         return unless @state
 
@@ -100,19 +151,39 @@ module ChatSDK
 
         result = temp_client.oauth_v2_access(**params)
 
-        team_id = result["team"]["id"]
-        installation = {
-          "bot_token" => result["access_token"],
-          "bot_user_id" => result["bot_user_id"],
-          "team_name" => result["team"]["name"]
-        }
+        team = hash_value(result, "team")
+        enterprise = hash_value(result, "enterprise")
+        enterprise_install = truthy_slack_value?(hash_value(result, "is_enterprise_install"))
+        enterprise_id = hash_value(enterprise, "id") || hash_value(result, "enterprise_id")
+        team_id = hash_value(team, "id")
+        installation_id = enterprise_install ? enterprise_id : team_id
+        access_token = hash_value(result, "access_token")
+        unless access_token && !access_token.empty? && installation_id && !installation_id.empty?
+          missing = enterprise_install ? "access_token or enterprise.id" : "access_token or team.id"
+          raise ChatSDK::ConfigurationError, "Slack OAuth response missing #{missing}"
+        end
 
-        set_installation(team_id,
+        installation = {
+          "bot_token" => access_token,
+          "bot_user_id" => hash_value(result, "bot_user_id"),
+          "team_name" => hash_value(team, "name") || hash_value(enterprise, "name")
+        }
+        installation["enterprise_id"] = enterprise_id unless enterprise_id.nil?
+        installation["is_enterprise_install"] = enterprise_install if hash_key?(result, "is_enterprise_install")
+
+        set_installation(installation_id,
           bot_token: installation["bot_token"],
           bot_user_id: installation["bot_user_id"],
-          team_name: installation["team_name"])
+          team_name: installation["team_name"],
+          enterprise_id: enterprise_id,
+          enterprise_install: hash_key?(result, "is_enterprise_install") ? enterprise_install : nil)
 
-        {team_id: team_id, installation: installation}
+        {
+          team_id: installation_id,
+          enterprise_id: enterprise_id,
+          enterprise_install: enterprise_install,
+          installation: installation
+        }
       end
 
       def name
@@ -123,6 +194,18 @@ module ChatSDK
       def verify_request!(rack_request)
         body = rack_request.body.read
         rack_request.body.rewind
+        if @webhook_verifier
+          begin
+            result = @webhook_verifier.call(rack_request, body)
+          rescue => e
+            raise ChatSDK::SignatureVerificationError, "Slack webhook verifier failed: #{e.message}"
+          end
+          raise ChatSDK::SignatureVerificationError, "Slack webhook verifier rejected the request" unless result
+
+          rack_request.env["rack.input"] = StringIO.new(result) if result.is_a?(String)
+          return true
+        end
+
         timestamp = rack_request.env["HTTP_X_SLACK_REQUEST_TIMESTAMP"]
         signature = rack_request.env["HTTP_X_SLACK_SIGNATURE"]
 
@@ -157,19 +240,14 @@ module ChatSDK
       end
 
       def parse_events(rack_request)
+        set_context(nil)
         body = rack_request.body.read
         rack_request.body.rewind
 
         parsed = parse_body(body, rack_request.content_type)
         return [] unless parsed
 
-        # Multi-workspace: resolve per-team client from payload
-        # Clear any stale client from a previous request on this thread (Puma thread pool safety)
-        if @client_id
-          ::Thread.current[:chat_sdk_slack_client] = nil
-          team_id = parsed["team_id"] || parsed.dig("team", "id")
-          resolve_team_client(team_id) if team_id
-        end
+        return [] unless prepare_payload_context(parsed)
 
         events = EventParser.parse(parsed)
         classify_message_events(events, parsed)
@@ -204,8 +282,10 @@ module ChatSDK
         return unless direct_message || has_recipient_context
         return unless @native_streaming && !@native_streaming_broken
 
+        stream_client = client
         NativeStream.new(
           adapter: self,
+          client: stream_client,
           channel_id: channel_id,
           thread_id: thread_id,
           stream: stream,
@@ -360,13 +440,16 @@ module ChatSDK
       end
 
       def concurrency_scope(event)
-        return unless @client_id
+        return context[:installation_id] if context && context[:installation_id]
+        return unless multi_workspace?
 
         raw = event.raw.is_a?(Hash) ? event.raw : {}
         raw_event = raw.is_a?(Hash) ? raw["event"] || raw[:event] || raw : {}
         raw_team = raw.is_a?(Hash) ? raw["team"] || raw[:team] : nil
         raw_team_id = raw_team.is_a?(Hash) ? raw_team["id"] || raw_team[:id] : raw_team
-        raw_team_id || raw["team_id"] || raw[:team_id] || raw_event["team_id"] || raw_event[:team_id] || raw_event["team"] || raw_event[:team]
+        raw_team_id || raw["team_id"] || raw[:team_id] ||
+          raw_event["team_id"] || raw_event[:team_id] ||
+          raw_event["team"] || raw_event[:team]
       end
 
       # Slack-specific: receive real-time events via Socket Mode WebSocket.
@@ -383,13 +466,12 @@ module ChatSDK
         raise ArgumentError, "start requires a block" unless block
 
         @socket_mode = SocketMode.new(app_token: app_token, bot_client: client)
-        @socket_mode.start do |event|
-          if @client_id
-            ::Thread.current[:chat_sdk_slack_client] = nil
-            team_id = concurrency_scope(event)
-            resolve_team_client(team_id) if team_id
-          end
-          classify_message_events([event], event.raw)
+        @socket_mode.start do |event, payload|
+          payload ||= event.raw
+          set_context(nil)
+          next unless prepare_payload_context(payload)
+
+          classify_message_events([event], payload)
           block.call(event)
         end
       end
@@ -418,7 +500,7 @@ module ChatSDK
 
       def build_client(token: nil)
         options = {}
-        options[:token] = token if token
+        options[:token] = token unless token.nil?
         options[:proxy] = @proxy if @proxy
         options.empty? ? ::Slack::Web::Client.new : ::Slack::Web::Client.new(options)
       end
@@ -447,23 +529,24 @@ module ChatSDK
       end
 
       def resolve_bot_user_id(event)
-        team_id = concurrency_scope(event) if @client_id
-        if @client_id
-          installation = get_installation(team_id) if team_id
-          return installation["bot_user_id"] if installation && installation["bot_user_id"]
-        end
+        request_context = context
+        return request_context[:bot_user_id] if request_context && request_context[:bot_user_id]
 
         return @bot_user_id if @bot_user_id
 
-        current_client = if @client_id
-          resolve_team_client(team_id) if team_id
-        else
-          @client
+        installation_id = if multi_workspace?
+          request_context&.[](:installation_id) || event_installation_id(event)
         end
+        installation = resolve_installation(installation_id, enterprise_install: installation_enterprise_flag(event)) if installation_id && !request_context
+        installation_bot_user_id = hash_value(installation, "bot_user_id")
+        return installation_bot_user_id if installation_bot_user_id
+
+        token = request_context&.[](:token) || hash_value(installation, "bot_token")
+        current_client = token ? client_for_token(token) : client
         return unless current_client
 
         @bot_user_id_mutex.synchronize do
-          cache_key = @client_id ? (team_id || :default) : :default
+          cache_key = multi_workspace? ? (installation_id || :default) : :default
           return @bot_user_ids[cache_key] if @bot_user_ids.key?(cache_key)
 
           bot_user_id = begin
@@ -493,22 +576,142 @@ module ChatSDK
         Array(element["elements"]).any? { |child| rich_text_element_mentions_bot?(child, bot_user_id) }
       end
 
-      def resolve_team_client(team_id)
-        return unless @client_id && @state
+      def client_for_token(token)
+        @client_cache_mutex.synchronize do
+          return @client_cache[token] if @client_cache.key?(token)
 
-        cached = @team_clients[team_id]
-        if cached
-          ::Thread.current[:chat_sdk_slack_client] = cached
-          return cached
+          @client_cache[token] = build_client(token: token)
+          @client_cache.shift while @client_cache.size > 256
+          @client_cache[token]
+        end
+      end
+
+      def context
+        ::Thread.current[@context_key]
+      end
+
+      def set_context(value)
+        ::Thread.current[@context_key] = value
+      end
+
+      def prepare_payload_context(payload)
+        return true unless multi_workspace?
+
+        identity = extract_installation(payload)
+        return true unless identity
+
+        installation = resolve_installation(
+          identity[:installation_id],
+          enterprise_install: identity[:enterprise_install]
+        )
+        token = hash_value(installation, "bot_token")
+        unless installation && token && token != false && !(token.respond_to?(:empty?) && token.empty?)
+          return true unless @bot_token.nil?
+
+          ChatSDK::Log.warn("Dropping Slack event without a resolved installation for #{identity[:installation_id]}")
+          return false
         end
 
-        installation = get_installation(team_id)
-        return unless installation
+        set_context({
+          token: token,
+          bot_user_id: hash_value(installation, "bot_user_id"),
+          installation_id: identity[:installation_id],
+          enterprise_install: identity[:enterprise_install],
+          team_id: identity[:team_id],
+          enterprise_id: identity[:enterprise_id]
+        })
+        true
+      end
 
-        new_client = build_client(token: installation["bot_token"])
-        @team_clients[team_id] = new_client
-        ::Thread.current[:chat_sdk_slack_client] = new_client
-        new_client
+      def resolve_installation(installation_id, enterprise_install:)
+        return unless installation_id
+
+        installation = if @installation_provider
+          if @installation_provider.respond_to?(:get_installation)
+            @installation_provider.get_installation(installation_id, enterprise_install: enterprise_install)
+          else
+            @installation_provider.call(installation_id, enterprise_install: enterprise_install)
+          end
+        else
+          get_installation(installation_id)
+        end
+        unless installation
+          ChatSDK::Log.warn("Slack installation not found for #{installation_id}")
+          return
+        end
+        token = hash_value(installation, "bot_token")
+        unless installation.is_a?(Hash) && token && token != false && !(token.respond_to?(:empty?) && token.empty?)
+          ChatSDK::Log.warn("Slack installation for #{installation_id} has no bot_token")
+          return
+        end
+
+        installation
+      rescue => e
+        ChatSDK::Log.error("Could not resolve Slack installation #{installation_id}: #{e.message}")
+        nil
+      end
+
+      def extract_installation(payload)
+        return unless payload.is_a?(Hash)
+
+        if hash_value(payload, "type") == "event_callback"
+          authorization = Array(hash_value(payload, "authorizations")).first
+          enterprise_flag = if hash_key?(authorization, "is_enterprise_install")
+            hash_value(authorization, "is_enterprise_install")
+          else
+            hash_value(payload, "is_enterprise_install")
+          end
+          enterprise_install = truthy_slack_value?(enterprise_flag)
+          team_id = hash_value(authorization, "team_id") || hash_value(payload, "team_id")
+          enterprise_id = hash_value(authorization, "enterprise_id") || hash_value(payload, "enterprise_id")
+        elsif hash_key?(payload, "command")
+          enterprise_install = hash_value(payload, "is_enterprise_install") == "true"
+          team_id = hash_value(payload, "team_id")
+          enterprise_id = hash_value(payload, "enterprise_id")
+        else
+          enterprise_install = truthy_slack_value?(hash_value(payload, "is_enterprise_install"))
+          team = hash_value(payload, "team")
+          enterprise = hash_value(payload, "enterprise")
+          team_id = hash_value(team, "id") || hash_value(payload, "team_id")
+          enterprise_id = hash_value(enterprise, "id") || hash_value(payload, "enterprise_id")
+        end
+
+        installation_id = enterprise_install ? enterprise_id : team_id
+        return unless installation_id
+
+        {
+          installation_id: installation_id,
+          enterprise_install: enterprise_install,
+          team_id: team_id,
+          enterprise_id: enterprise_id
+        }
+      end
+
+      def event_installation_id(event)
+        raw = event.raw.is_a?(Hash) ? event.raw : {}
+        extract_installation(raw)&.[](:installation_id) ||
+          hash_value(raw, "team_id") ||
+          hash_value(hash_value(raw, "team"), "id")
+      end
+
+      def installation_enterprise_flag(event)
+        raw = event.raw.is_a?(Hash) ? event.raw : {}
+        identity = extract_installation(raw)
+        identity ? identity[:enterprise_install] : truthy_slack_value?(hash_value(raw, "is_enterprise_install"))
+      end
+
+      def hash_value(hash, key)
+        return unless hash.is_a?(Hash)
+
+        hash.key?(key) ? hash[key] : hash[key.to_sym]
+      end
+
+      def hash_key?(hash, key)
+        hash.is_a?(Hash) && (hash.key?(key) || hash.key?(key.to_sym))
+      end
+
+      def truthy_slack_value?(value)
+        value == true || value == "true"
       end
 
       def installation_key(team_id)

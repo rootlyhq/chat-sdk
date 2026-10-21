@@ -106,7 +106,28 @@ module ChatSDK
     # Event dispatch (called by webhook endpoints)
     def dispatch(event, adapter_name:)
       adp = adapter(adapter_name)
-      @dispatcher.dispatch(event, adapter: adp, adapter_name: adapter_name)
+      executor = @config.handler_executor
+      return @dispatcher.dispatch(event, adapter: adp, adapter_name: adapter_name) if executor == :inline
+
+      if executor == :thread
+        ::Thread.new { run_background_dispatch(event, adp, adapter_name) }
+      else
+        payload = {"adapter_name" => adapter_name.to_s, "event" => EventSerializer.dump(event)}
+        begin
+          executor.call(payload)
+        rescue => e
+          raise HandlerExecutorError, "handler_executor failed for #{event.type}: #{e.class}: #{e.message}"
+        end
+      end
+      nil
+    end
+
+    # Runs a payload produced for a callable handler_executor, such as from a background job.
+    def dispatch_serialized(payload)
+      payload = payload.transform_keys(&:to_s)
+      adapter_name = payload.fetch("adapter_name").to_sym
+      event = EventSerializer.load(payload.fetch("event"))
+      @dispatcher.dispatch(event, adapter: adapter(adapter_name), adapter_name: adapter_name)
     end
 
     # Deprecated compatibility alias for Vercel Chat SDK's former API.
@@ -115,6 +136,21 @@ module ChatSDK
     end
 
     private
+
+    def run_background_dispatch(event, adp, adapter_name)
+      @dispatcher.dispatch(event, adapter: adp, adapter_name: adapter_name)
+    rescue => e
+      # Nothing above this background thread can rescue errors raised during dispatch.
+      @error_reporter.report(
+        e,
+        "Background dispatch error (#{event.type})",
+        source: :dispatch,
+        adapter: adapter_name,
+        event_type: event.type,
+        thread_id: event.respond_to?(:thread_id) ? event.thread_id : nil,
+        channel_id: event.respond_to?(:channel_id) ? event.channel_id : nil
+      )
+    end
   end
 
   class WebhookAccessor

@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../../spec/spec_helper"
+require "json"
 
 RSpec.describe ChatSDK::EventSerializer do
   let(:author) { ChatSDK::Author.new(id: "U1", name: "Alice", platform: :test) }
@@ -55,5 +56,65 @@ RSpec.describe ChatSDK::EventSerializer do
     expect(loaded.action).to eq("add-upgrade")
     expect(loaded.user.id).to eq("installer-1")
     expect(loaded.raw).to eq("type" => "installationUpdate")
+  end
+
+  it "preserves sub-second event, message, and deletion timestamps through JSON" do
+    event_timestamp = Time.iso8601("2026-10-21T18:01:00.123456Z")
+    message_timestamp = Time.iso8601("2026-10-21T18:01:00.358023Z")
+    deleted_at = Time.iso8601("2026-10-21T18:01:00.469134Z")
+    message = ChatSDK::Message.new(
+      id: "M1",
+      text: "hello",
+      author: author,
+      thread_id: "T1",
+      channel_id: "C1",
+      platform: :test,
+      timestamp: message_timestamp
+    )
+    event = ChatSDK::Events::Mention.new(
+      message: message,
+      thread_id: "T1",
+      channel_id: "C1",
+      platform: :test,
+      adapter_name: :test,
+      timestamp: event_timestamp
+    )
+    serialized_event = JSON.parse(JSON.generate(described_class.dump(event)))
+    loaded_event = described_class.load(serialized_event)
+
+    deleted_event = ChatSDK::Events::MessageDeleted.new(
+      message_id: "M1",
+      previous_message: message,
+      deleted_at: deleted_at,
+      thread_id: "T1",
+      channel_id: "C1",
+      platform: :test,
+      adapter_name: :test,
+      timestamp: event_timestamp
+    )
+    serialized_deleted_event = JSON.parse(JSON.generate(described_class.dump(deleted_event)))
+    loaded_deleted_event = described_class.load(serialized_deleted_event)
+
+    expect(loaded_event.timestamp.to_f).to eq(event_timestamp.to_f)
+    expect(loaded_event.message.timestamp.to_f).to eq(message_timestamp.to_f)
+    expect(loaded_deleted_event.deleted_at.to_f).to eq(deleted_at.to_f)
+  end
+
+  it "loads legacy whole-second timestamps" do
+    timestamp = "2026-10-21T18:01:00Z"
+    event = described_class.load(
+      "type" => "reaction",
+      "platform" => "test",
+      "adapter_name" => "test",
+      "thread_id" => "T1",
+      "channel_id" => "C1",
+      "timestamp" => timestamp,
+      "emoji" => "fire",
+      "user_id" => "U1",
+      "message_id" => "M1",
+      "added" => true
+    )
+
+    expect(event.timestamp).to eq(Time.iso8601(timestamp))
   end
 end
