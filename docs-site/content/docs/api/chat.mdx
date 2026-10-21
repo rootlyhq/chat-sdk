@@ -25,7 +25,9 @@ ChatSDK::Chat.new(
 | `streaming_update_interval` | `Float` | No | `0.5` | Minimum seconds between streaming message edits |
 | `on_lock_conflict` | `Symbol` or `Proc` | No | `:drop` | Lock conflict policy. Must be `:drop`, `:force`, or a callable |
 | `handler_executor` | `Symbol` | No | `:inline` | How event handlers are executed |
+| `logger` | Logger-like object | No | `nil` | Process-wide logger that replaces `ChatSDK::Log.logger` |
 | `log_level` | `Symbol` | No | `:info` | Log level for the SDK logger |
+| `on_error` | Callable | No | `nil` | Receives `(exception, context)` for handler and webhook errors |
 
 Raises `ConfigurationError` if `user_name` is blank, `adapters` is empty, or `state` is nil.
 
