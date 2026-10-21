@@ -99,6 +99,38 @@ RSpec.describe "handler execution" do
     expect(received).to eq([["approved", "T1"]])
   end
 
+  it "dispatches same-second reactions with distinct timestamps after JSON round-trip" do
+    payloads = []
+    received_timestamps = []
+    bot = build_bot(handler_executor: ->(payload) { payloads << payload })
+    bot.on_reaction { |event| received_timestamps << event.timestamp.to_f }
+    timestamps = [
+      Time.iso8601("2026-10-21T18:01:00.100000Z"),
+      Time.iso8601("2026-10-21T18:01:00.300000Z")
+    ]
+
+    timestamps.each do |event_timestamp|
+      event = ChatSDK::Events::Reaction.new(
+        emoji: "fire",
+        user_id: "U1",
+        message_id: "M1",
+        thread_id: "T1",
+        channel_id: "C1",
+        platform: :test,
+        adapter_name: :test,
+        timestamp: event_timestamp
+      )
+      bot.dispatch(event, adapter_name: :test)
+    end
+
+    expect(payloads.length).to eq(2)
+    payloads.each do |payload|
+      bot.dispatch_serialized(JSON.parse(JSON.generate(payload)))
+    end
+
+    expect(received_timestamps).to eq(timestamps.map(&:to_f))
+  end
+
   it "uses the registered adapter key when dispatching a serialized event" do
     payloads = []
     received = nil

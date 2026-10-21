@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Unknown `handler_executor` values now raise `ConfigurationError` instead of being ignored.
 
+### Fixed
+
+- Serialized event timestamps retain sub-second precision, preventing same-second reactions from sharing a dedupe key.
+
 ## [1.2.0] - 2026-10-21
 
 ### Added
