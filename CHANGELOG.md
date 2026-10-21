@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Configurable error reporting through `on_error:` and injectable logging with `logger:`.
+- Background handler execution through `handler_executor`, including `:thread`, callable executors, and `dispatch_serialized`.
+
+### Changed
+
+- Unknown `handler_executor` values now raise `ConfigurationError` instead of being ignored.
 
 ## [1.2.0] - 2026-10-21
 

@@ -126,7 +126,7 @@ end
 
 ## Background Processing
 
-Event handlers run synchronously in the webhook request. For long-running work, enqueue a job:
+By default, event handlers run synchronously in the webhook request. For long-running work, enqueue a job:
 
 ```ruby
 bot.on_new_mention do |thread, message|
@@ -150,3 +150,28 @@ class GenerateReportJob < ApplicationJob
   end
 end
 ```
+
+## Background handler execution
+
+Use `handler_executor` to move the full handler pipeline out of the webhook request. This helps when handlers call an LLM or do other work that can exceed a platform's acknowledgement window. Slack expects an HTTP 2xx response within 3 seconds. Teams can retry activities that take more than 15 seconds, and Google Chat allows up to 30 seconds for a synchronous response ([Slack Events API](https://docs.slack.dev/apis/events-api), [Teams activity handlers](https://learn.microsoft.com/en-us/microsoftteams/platform/bots/bot-concepts), [Google Chat interactions](https://developers.google.com/workspace/chat/receive-respond-interactions)).
+
+With a callable executor, the webhook passes a JSON-safe payload to your queue. The worker must call `dispatch_serialized` to load the event and run the normal dispatch pipeline:
+
+```ruby
+class ChatSdkDispatchJob < ApplicationJob
+  queue_as :default
+
+  def perform(payload)
+    ChatBot.instance.dispatch_serialized(payload)
+  end
+end
+
+# In the ChatSDK::Chat initializer:
+handler_executor: ->(payload) { ChatSdkDispatchJob.perform_later(payload) }
+```
+
+Deduplication, locks, and concurrency strategies run in the worker. Use a persistent state backend shared by the web and worker processes, such as Redis, PostgreSQL, or MySQL. `State::Memory` cannot share deduplication or lock state across processes. Webhook retries can enqueue duplicate jobs; the worker deduplicates them before handlers run.
+
+The `:thread` executor runs in the current process and can lose work if that process exits. In Rails, raw threads do not run inside the Rails executor. If handlers access Active Record, wrap `dispatch_serialized` in `Rails.application.executor.wrap` in your own worker, or use the Active Job approach above.
+
+Interactions that use a short-lived `trigger_id`, such as opening a modal from an action or slash command, must reach the relevant API quickly in the worker. Keep `handler_executor: :inline` in tests that need handlers to run synchronously.

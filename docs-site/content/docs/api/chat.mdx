@@ -24,7 +24,7 @@ ChatSDK::Chat.new(
 | `dedupe_ttl` | `Integer` | No | `600` | Deduplication window in seconds for incoming events |
 | `streaming_update_interval` | `Float` | No | `0.5` | Minimum seconds between streaming message edits |
 | `on_lock_conflict` | `Symbol` or `Proc` | No | `:drop` | Lock conflict policy. Must be `:drop`, `:force`, or a callable |
-| `handler_executor` | `Symbol` | No | `:inline` | How event handlers are executed |
+| `handler_executor` | `:inline`, `:thread`, or callable | No | `:inline` | Runs handlers inline, in a thread, or through a custom executor |
 | `logger` | Logger-like object | No | `nil` | Process-wide logger that replaces `ChatSDK::Log.logger` |
 | `log_level` | `Symbol` | No | `:info` | Log level for the SDK logger |
 | `on_error` | Callable | No | `nil` | Receives `(exception, context)` for handler and webhook errors |
@@ -141,6 +141,14 @@ chat.dispatch(event, adapter_name: :slack)
 ```
 
 Dispatches a parsed event through the handler pipeline. Called internally by webhook endpoints; you can also call it directly for testing or custom ingestion.
+
+#### dispatch\_serialized(payload)
+
+```ruby
+chat.dispatch_serialized(payload)
+```
+
+Loads a JSON-safe payload created by a callable `handler_executor` and runs it through the normal dispatch pipeline. Call this from the worker to apply deduplication, locks, concurrency strategies, and handlers.
 
 ## Attributes
 
