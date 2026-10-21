@@ -4,7 +4,7 @@ module ChatSDK
   module Telegram
     class EventParser
       class << self
-        def parse(payload, bot_username: nil)
+        def parse(payload, bot_username: nil, mention_on_reply: false)
           return [] unless payload.is_a?(Hash)
 
           if payload["callback_query"]
@@ -12,7 +12,7 @@ module ChatSDK
           elsif payload["message_reaction"]
             parse_message_reaction(payload["message_reaction"])
           elsif payload["message"]
-            parse_message(payload["message"], bot_username: bot_username)
+            parse_message(payload["message"], bot_username: bot_username, mention_on_reply: mention_on_reply)
           else
             []
           end
@@ -20,7 +20,7 @@ module ChatSDK
 
         private
 
-        def parse_message(message, bot_username: nil)
+        def parse_message(message, bot_username: nil, mention_on_reply: false)
           return parse_bot_command(message, extract_user(message), message.dig("chat", "id")&.to_s, resolve_thread_id(message)) if bot_command?(message)
 
           user = extract_user(message)
@@ -28,6 +28,7 @@ module ChatSDK
           chat_type = message.dig("chat", "type")
           text = message["text"] || ""
           thread_id = resolve_thread_id(message)
+          reply_mention = reply_to_bot?(message, bot_username, mention_on_reply)
 
           msg = ChatSDK::Message.new(
             id: message["message_id"]&.to_s,
@@ -36,11 +37,12 @@ module ChatSDK
             thread_id: thread_id,
             channel_id: chat_id,
             platform: :telegram,
+            is_mention: reply_mention ? true : nil,
             reply_to: build_reply_to(message["reply_to_message"], chat_id),
             raw: message
           )
 
-          event_class = if mention?(text, bot_username)
+          event_class = if mention?(text, bot_username) || reply_mention
             ChatSDK::Events::Mention
           elsif chat_type == "private"
             ChatSDK::Events::DirectMessage
@@ -147,6 +149,18 @@ module ChatSDK
           return false unless bot_username
 
           /(?<!\w)@#{Regexp.escape(bot_username)}(?![\w-])/i.match?(text)
+        end
+
+        def reply_to_bot?(message, bot_username, mention_on_reply)
+          return false unless mention_on_reply && bot_username
+
+          reply = message["reply_to_message"] || {}
+          bot_user = reply["from"] || {}
+          return false unless bot_user["is_bot"] && bot_user["username"].to_s.casecmp?(bot_username)
+
+          topic_root_reply = message["is_topic_message"] &&
+            reply["message_id"].to_s == message["message_thread_id"].to_s
+          !topic_root_reply
         end
 
         def build_reply_to(reply, chat_id)
