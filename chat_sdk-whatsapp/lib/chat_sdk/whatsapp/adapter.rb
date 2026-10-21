@@ -127,11 +127,11 @@ module ChatSDK
         parse_whatsapp_message(result, channel_id)
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         @client.send_reaction(to: channel_id, message_id: message_id, emoji: emoji)
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji: "") # rubocop:disable Lint/UnusedMethodArgument
+      def remove_reaction(channel_id:, message_id:, emoji: "", **_options) # rubocop:disable Lint/UnusedMethodArgument
         @client.send_reaction(to: channel_id, message_id: message_id, emoji: "")
       end
 
