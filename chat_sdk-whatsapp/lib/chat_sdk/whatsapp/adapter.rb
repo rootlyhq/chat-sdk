@@ -45,7 +45,7 @@ module ChatSDK
 
       # Outbound
       def post_message(channel_id:, message:, thread_id: nil)
-        phone_number_id = outbound_phone_number_id(thread_id)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
         payload = prepare_message_payload(message)
 
         result = if payload[:type] == "text" && payload.dig(:text, :body)
@@ -89,19 +89,26 @@ module ChatSDK
         components
       end
 
-      def post_template(channel_id:, template_name:, language_code: "en", components: nil)
-        @client.send_template(to: channel_id, template_name: template_name, language_code: language_code, components: components)
+      def post_template(channel_id:, template_name:, language_code: "en", components: nil, thread_id: nil)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
+        @client.send_template(
+          to: channel_id,
+          template_name: template_name,
+          language_code: language_code,
+          components: components,
+          phone_number_id: phone_number_id
+        )
       end
 
       def mark_as_read(message_id:, channel_id: nil, thread_id: nil, message: nil) # rubocop:disable Lint/UnusedMethodArgument
         @client.mark_as_read(
           message_id: message_id,
-          phone_number_id: outbound_phone_number_id(thread_id)
+          phone_number_id: outbound_phone_number_id(channel_id, thread_id)
         )
       end
 
       def reply_message(channel_id:, message_id:, message:, thread_id: nil)
-        phone_number_id = outbound_phone_number_id(thread_id)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
         payload = prepare_message_payload(message)
         payload[:context] = {message_id: message_id}
         result = @client.send_message(to: channel_id, phone_number_id: phone_number_id, **payload)
@@ -118,7 +125,7 @@ module ChatSDK
       end
 
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
-        phone_number_id = outbound_phone_number_id(thread_id)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
         content_type = detect_content_type(filename)
         media_type = media_type_for(content_type)
 
@@ -148,7 +155,7 @@ module ChatSDK
           to: channel_id,
           message_id: message_id,
           emoji: emoji,
-          phone_number_id: outbound_phone_number_id(thread_id)
+          phone_number_id: outbound_phone_number_id(channel_id, thread_id)
         )
       end
 
@@ -157,7 +164,7 @@ module ChatSDK
           to: channel_id,
           message_id: message_id,
           emoji: "",
-          phone_number_id: outbound_phone_number_id(thread_id)
+          phone_number_id: outbound_phone_number_id(channel_id, thread_id)
         )
       end
 
@@ -231,14 +238,20 @@ module ChatSDK
         )
       end
 
-      def outbound_phone_number_id(thread_id)
+      def outbound_phone_number_id(channel_id, thread_id)
         return @phone_number_id unless thread_id
 
-        match = thread_id.match(/\Awhatsapp:([^:]+):.+\z/) if thread_id.is_a?(String)
+        match = thread_id.match(/\Awhatsapp:([^:]+):(.+)\z/) if thread_id.is_a?(String)
         phone_number_id = match && match[1]
-        return phone_number_id if phone_number_id&.match?(/\A\d+\z/)
+        unless phone_number_id&.match?(/\A\d+\z/)
+          raise ChatSDK::Error, "Invalid WhatsApp phone number ID in thread ID: #{thread_id.inspect}"
+        end
 
-        raise ChatSDK::Error, "Invalid WhatsApp phone number ID in thread ID: #{thread_id.inspect}"
+        unless match[2] == channel_id.to_s
+          raise ChatSDK::Error, "WhatsApp thread recipient does not match channel ID: #{thread_id.inspect}"
+        end
+
+        phone_number_id
       end
     end
   end

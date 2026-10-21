@@ -609,6 +609,21 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       expect(stub).not_to have_been_requested
     end
 
+    it "rejects a thread recipient that does not match the channel before making a request" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/.*/messages})
+        .to_return(status: 200, body: JSON.generate({"messages" => [{"id" => "wamid"}]}))
+
+      expect {
+        subject.post_message(
+          channel_id: "15551234567",
+          message: "Hello!",
+          thread_id: "whatsapp:987654321:15559876543"
+        )
+      }.to raise_error(ChatSDK::Error, /recipient does not match channel ID/)
+
+      expect(stub).not_to have_been_requested
+    end
+
     it "sends a card message as interactive" do
       stub_request(:post, %r{graph\.facebook\.com/v25\.0/#{phone_number_id}/messages})
         .with { |req|
@@ -970,6 +985,24 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       expect(stub).to have_been_requested
       expect(result).to be_a(Hash)
       expect(result.dig("messages", 0, "id")).to eq("wamid.template123")
+    end
+
+    it "uses the phone number ID from the thread" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/987654321/messages})
+        .to_return(
+          status: 200,
+          body: JSON.generate({"messages" => [{"id" => "wamid.template-thread"}]}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.post_template(
+        channel_id: "15551234567",
+        template_name: "hello_world",
+        thread_id: "whatsapp:987654321:15551234567"
+      )
+
+      expect(stub).to have_been_requested
+      expect(result.dig("messages", 0, "id")).to eq("wamid.template-thread")
     end
 
     it "sends a template with components and custom language" do
