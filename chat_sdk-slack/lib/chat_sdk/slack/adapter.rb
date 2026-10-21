@@ -395,11 +395,13 @@ module ChatSDK
       end
 
       def classify_mention(event, payload)
+        raw_event = payload["event"] || {}
+        return true if raw_event["type"] == "app_mention"
+
         bot_user_id = resolve_bot_user_id(event)
         return true if event.type == :mention && bot_user_id.nil?
         return nil if bot_user_id.nil?
 
-        raw_event = payload["event"] || {}
         text = raw_event["text"].to_s
         masked_text = ChatSDK::Format::Mentions.mask_code_spans(text)
         text_mentions_bot = /<@#{Regexp.escape(bot_user_id)}(?:\|[^>]*)?>/.match?(masked_text)
@@ -407,19 +409,23 @@ module ChatSDK
       end
 
       def resolve_bot_user_id(event)
+        team_id = concurrency_scope(event) if @client_id
         if @client_id
-          team_id = concurrency_scope(event)
           installation = get_installation(team_id) if team_id
           return installation["bot_user_id"] if installation && installation["bot_user_id"]
         end
 
         return @bot_user_id if @bot_user_id
 
-        current_client = client
+        current_client = if @client_id
+          resolve_team_client(team_id) if team_id
+        else
+          @client
+        end
         return unless current_client
 
         @bot_user_id_mutex.synchronize do
-          cache_key = @client_id ? (concurrency_scope(event) || :default) : :default
+          cache_key = @client_id ? (team_id || :default) : :default
           return @bot_user_ids[cache_key] if @bot_user_ids.key?(cache_key)
 
           bot_user_id = begin
@@ -455,7 +461,7 @@ module ChatSDK
         cached = @team_clients[team_id]
         if cached
           ::Thread.current[:chat_sdk_slack_client] = cached
-          return
+          return cached
         end
 
         installation = get_installation(team_id)
@@ -464,6 +470,7 @@ module ChatSDK
         new_client = build_client(token: installation["bot_token"])
         @team_clients[team_id] = new_client
         ::Thread.current[:chat_sdk_slack_client] = new_client
+        new_client
       end
 
       def installation_key(team_id)
