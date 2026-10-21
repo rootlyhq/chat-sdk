@@ -58,6 +58,114 @@ RSpec.describe ChatSDK::EventSerializer do
     expect(loaded.raw).to eq("type" => "installationUpdate")
   end
 
+  it "round-trips assistant thread started events and stringifies context keys" do
+    event = ChatSDK::Events::AssistantThreadStarted.new(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: ChatSDK::Events::AssistantContext.new(channel_id: "C456", team_id: "T789", force_search: true),
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev1"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.123456Z")
+    )
+
+    dumped = JSON.parse(JSON.generate(described_class.dump(event)))
+    loaded = described_class.load(dumped)
+
+    expect(dumped["context"]).to eq("channel_id" => "C456", "team_id" => "T789", "enterprise_id" => nil, "thread_entry_point" => nil, "force_search" => true)
+    expect(loaded).to be_a(ChatSDK::Events::AssistantThreadStarted)
+    expect(loaded.thread_id).to eq("1234.5678")
+    expect(loaded.thread_ts).to eq("1234.5678")
+    expect(loaded.channel_id).to eq("D123")
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.context).to eq(event.context)
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev1")
+    expect(loaded.timestamp).to eq(event.timestamp)
+  end
+
+  it "round-trips assistant context changed events" do
+    event = ChatSDK::Events::AssistantContextChanged.new(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: {
+        "channel_id" => "C456",
+        "team_id" => "T789",
+        "enterprise_id" => "E1",
+        "thread_entry_point" => "sidebar",
+        "force_search" => true
+      },
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev2"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.234567Z")
+    )
+
+    loaded = described_class.load(JSON.parse(JSON.generate(described_class.dump(event))))
+
+    expect(loaded).to be_a(ChatSDK::Events::AssistantContextChanged)
+    expect(loaded.thread_id).to eq("1234.5678")
+    expect(loaded.channel_id).to eq("D123")
+    expect(loaded.thread_ts).to eq("1234.5678")
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.context).to eq(event.context)
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev2")
+    expect(loaded.timestamp).to eq(event.timestamp)
+  end
+
+  it "round-trips App Home opened events" do
+    event = ChatSDK::Events::AppHomeOpened.new(
+      user_id: "U123",
+      channel_id: "D123",
+      tab: "home",
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev3"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.345678Z")
+    )
+
+    loaded = described_class.load(JSON.parse(JSON.generate(described_class.dump(event))))
+
+    expect(loaded).to be_a(ChatSDK::Events::AppHomeOpened)
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.channel_id).to eq("D123")
+    expect(loaded.tab).to eq("home")
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev3")
+    expect(loaded.timestamp).to eq(event.timestamp)
+  end
+
+  it "round-trips member joined channel events" do
+    event = ChatSDK::Events::MemberJoinedChannel.new(
+      user_id: "U123",
+      channel_id: "C456",
+      inviter_id: "U789",
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev4"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.456789Z")
+    )
+
+    loaded = described_class.load(JSON.parse(JSON.generate(described_class.dump(event))))
+
+    expect(loaded).to be_a(ChatSDK::Events::MemberJoinedChannel)
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.channel_id).to eq("C456")
+    expect(loaded.inviter_id).to eq("U789")
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev4")
+    expect(loaded.timestamp).to eq(event.timestamp)
+  end
+
   it "preserves sub-second event, message, and deletion timestamps through JSON" do
     event_timestamp = Time.iso8601("2026-10-21T18:01:00.123456Z")
     message_timestamp = Time.iso8601("2026-10-21T18:01:00.358023Z")

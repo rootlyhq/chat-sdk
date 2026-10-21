@@ -33,6 +33,18 @@ module ChatSDK
             "action" => event.action,
             "user" => dump_author(event.user)
           )
+        when :assistant_thread_started, :assistant_context_changed
+          data.merge!(
+            "thread_ts" => event.thread_ts,
+            "user_id" => event.user_id,
+            "context" => event.context.to_h.transform_keys(&:to_s)
+          )
+        when :app_home_opened
+          data["user_id"] = event.user_id
+          data["tab"] = event.tab
+        when :member_joined_channel
+          data["user_id"] = event.user_id
+          data["inviter_id"] = event.inviter_id
         end
         data
       end
@@ -85,6 +97,24 @@ module ChatSDK
             user: load_author(data["user"]),
             **common
           )
+        when :assistant_thread_started, :assistant_context_changed
+          event_class = if type == :assistant_thread_started
+            Events::AssistantThreadStarted
+          else
+            Events::AssistantContextChanged
+          end
+          event_class.new(
+            thread_ts: data["thread_ts"],
+            user_id: data["user_id"],
+            context: data["context"] || {},
+            **common
+          )
+        when :app_home_opened
+          common.delete(:thread_id)
+          Events::AppHomeOpened.new(user_id: data["user_id"], tab: data["tab"], **common)
+        when :member_joined_channel
+          common.delete(:thread_id)
+          Events::MemberJoinedChannel.new(user_id: data["user_id"], inviter_id: data["inviter_id"], **common)
         else
           raise ArgumentError, "unsupported queued event type: #{type}"
         end

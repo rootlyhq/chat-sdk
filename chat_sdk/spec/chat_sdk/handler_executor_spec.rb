@@ -113,6 +113,111 @@ RSpec.describe "handler execution" do
     expect(received).to eq([["approved", "T1"]])
   end
 
+  it "dispatches all serialized Slack lifecycle events to their registered handlers" do
+    payloads = []
+    received = {}
+    bot = build_bot(handler_executor: ->(payload) { payloads << payload })
+    bot.on_assistant_thread_started { |event| received[event.type] = event }
+    bot.on_assistant_context_changed { |event| received[event.type] = event }
+    bot.on_app_home_opened { |event| received[event.type] = event }
+    bot.on_member_joined_channel { |event| received[event.type] = event }
+
+    timestamp = Time.iso8601("2026-10-21T18:01:00.123456Z")
+    common = {platform: :slack, adapter_name: :slack, timestamp: timestamp}
+    thread_context = ChatSDK::Events::AssistantContext.new(
+      channel_id: "C456",
+      team_id: "T789",
+      enterprise_id: "E123",
+      thread_entry_point: "sidebar",
+      force_search: true
+    )
+    changed_context = ChatSDK::Events::AssistantContext.new(
+      channel_id: "C789",
+      team_id: "T123",
+      enterprise_id: "E456",
+      thread_entry_point: "home",
+      force_search: false
+    )
+    events = [
+      ChatSDK::Events::AssistantThreadStarted.new(
+        thread_id: "1234.5678",
+        channel_id: "D123",
+        thread_ts: "1234.5678",
+        user_id: "U123",
+        context: thread_context,
+        raw: {"event_id" => "Ev1"},
+        **common
+      ),
+      ChatSDK::Events::AssistantContextChanged.new(
+        thread_id: "1234.5678",
+        channel_id: "D123",
+        thread_ts: "1234.5678",
+        user_id: "U456",
+        context: changed_context,
+        raw: {"event_id" => "Ev2"},
+        **common
+      ),
+      ChatSDK::Events::AppHomeOpened.new(
+        user_id: "U789",
+        channel_id: "D789",
+        tab: "home",
+        raw: {"event_id" => "Ev3"},
+        **common
+      ),
+      ChatSDK::Events::MemberJoinedChannel.new(
+        user_id: "U987",
+        channel_id: "C987",
+        inviter_id: "U654",
+        raw: {"event_id" => "Ev4"},
+        **common
+      )
+    ]
+
+    events.each { |event| bot.dispatch(event, adapter_name: :test) }
+    payloads.each { |payload| bot.dispatch_serialized(JSON.parse(JSON.generate(payload))) }
+
+    expect(received[:assistant_thread_started]).to have_attributes(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: thread_context,
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev1"},
+      timestamp: timestamp
+    )
+    expect(received[:assistant_context_changed]).to have_attributes(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U456",
+      context: changed_context,
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev2"},
+      timestamp: timestamp
+    )
+    expect(received[:app_home_opened]).to have_attributes(
+      user_id: "U789",
+      channel_id: "D789",
+      tab: "home",
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev3"},
+      timestamp: timestamp
+    )
+    expect(received[:member_joined_channel]).to have_attributes(
+      user_id: "U987",
+      channel_id: "C987",
+      inviter_id: "U654",
+      platform: :slack,
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev4"},
+      timestamp: timestamp
+    )
+  end
+
   it "dispatches same-second reactions with distinct timestamps after JSON round-trip" do
     payloads = []
     received_timestamps = []
