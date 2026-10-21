@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative "../../../spec/spec_helper"
+require "json"
 
 RSpec.describe ChatSDK::EventSerializer do
   let(:author) { ChatSDK::Author.new(id: "U1", name: "Alice", platform: :test) }
@@ -65,10 +66,12 @@ RSpec.describe ChatSDK::EventSerializer do
       user_id: "U123",
       context: ChatSDK::Events::AssistantContext.new(channel_id: "C456", team_id: "T789", force_search: true),
       platform: :slack,
-      adapter_name: :slack
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev1"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.123456Z")
     )
 
-    dumped = described_class.dump(event)
+    dumped = JSON.parse(JSON.generate(described_class.dump(event)))
     loaded = described_class.load(dumped)
 
     expect(dumped["context"]).to eq("channel_id" => "C456", "team_id" => "T789", "enterprise_id" => nil, "thread_entry_point" => nil, "force_search" => true)
@@ -78,6 +81,10 @@ RSpec.describe ChatSDK::EventSerializer do
     expect(loaded.channel_id).to eq("D123")
     expect(loaded.user_id).to eq("U123")
     expect(loaded.context).to eq(event.context)
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev1")
+    expect(loaded.timestamp).to eq(event.timestamp)
   end
 
   it "round-trips assistant context changed events" do
@@ -86,15 +93,31 @@ RSpec.describe ChatSDK::EventSerializer do
       channel_id: "D123",
       thread_ts: "1234.5678",
       user_id: "U123",
-      context: {"enterprise_id" => "E1", "thread_entry_point" => "sidebar"},
+      context: {
+        "channel_id" => "C456",
+        "team_id" => "T789",
+        "enterprise_id" => "E1",
+        "thread_entry_point" => "sidebar",
+        "force_search" => true
+      },
       platform: :slack,
-      adapter_name: :slack
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev2"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.234567Z")
     )
 
-    loaded = described_class.load(described_class.dump(event))
+    loaded = described_class.load(JSON.parse(JSON.generate(described_class.dump(event))))
 
     expect(loaded).to be_a(ChatSDK::Events::AssistantContextChanged)
-    expect(loaded.context).to eq(ChatSDK::Events::AssistantContext.new(enterprise_id: "E1", thread_entry_point: "sidebar"))
+    expect(loaded.thread_id).to eq("1234.5678")
+    expect(loaded.channel_id).to eq("D123")
+    expect(loaded.thread_ts).to eq("1234.5678")
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.context).to eq(event.context)
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev2")
+    expect(loaded.timestamp).to eq(event.timestamp)
   end
 
   it "round-trips App Home opened events" do
@@ -103,15 +126,21 @@ RSpec.describe ChatSDK::EventSerializer do
       channel_id: "D123",
       tab: "home",
       platform: :slack,
-      adapter_name: :slack
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev3"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.345678Z")
     )
 
-    loaded = described_class.load(described_class.dump(event))
+    loaded = described_class.load(JSON.parse(JSON.generate(described_class.dump(event))))
 
     expect(loaded).to be_a(ChatSDK::Events::AppHomeOpened)
     expect(loaded.user_id).to eq("U123")
     expect(loaded.channel_id).to eq("D123")
     expect(loaded.tab).to eq("home")
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev3")
+    expect(loaded.timestamp).to eq(event.timestamp)
   end
 
   it "round-trips member joined channel events" do
@@ -120,14 +149,80 @@ RSpec.describe ChatSDK::EventSerializer do
       channel_id: "C456",
       inviter_id: "U789",
       platform: :slack,
-      adapter_name: :slack
+      adapter_name: :slack,
+      raw: {"event_id" => "Ev4"},
+      timestamp: Time.iso8601("2026-10-21T18:01:00.456789Z")
     )
 
-    loaded = described_class.load(described_class.dump(event))
+    loaded = described_class.load(JSON.parse(JSON.generate(described_class.dump(event))))
 
     expect(loaded).to be_a(ChatSDK::Events::MemberJoinedChannel)
     expect(loaded.user_id).to eq("U123")
     expect(loaded.channel_id).to eq("C456")
     expect(loaded.inviter_id).to eq("U789")
+    expect(loaded.platform).to eq(:slack)
+    expect(loaded.adapter_name).to eq(:slack)
+    expect(loaded.raw).to eq("event_id" => "Ev4")
+    expect(loaded.timestamp).to eq(event.timestamp)
+  end
+
+  it "preserves sub-second event, message, and deletion timestamps through JSON" do
+    event_timestamp = Time.iso8601("2026-10-21T18:01:00.123456Z")
+    message_timestamp = Time.iso8601("2026-10-21T18:01:00.358023Z")
+    deleted_at = Time.iso8601("2026-10-21T18:01:00.469134Z")
+    message = ChatSDK::Message.new(
+      id: "M1",
+      text: "hello",
+      author: author,
+      thread_id: "T1",
+      channel_id: "C1",
+      platform: :test,
+      timestamp: message_timestamp
+    )
+    event = ChatSDK::Events::Mention.new(
+      message: message,
+      thread_id: "T1",
+      channel_id: "C1",
+      platform: :test,
+      adapter_name: :test,
+      timestamp: event_timestamp
+    )
+    serialized_event = JSON.parse(JSON.generate(described_class.dump(event)))
+    loaded_event = described_class.load(serialized_event)
+
+    deleted_event = ChatSDK::Events::MessageDeleted.new(
+      message_id: "M1",
+      previous_message: message,
+      deleted_at: deleted_at,
+      thread_id: "T1",
+      channel_id: "C1",
+      platform: :test,
+      adapter_name: :test,
+      timestamp: event_timestamp
+    )
+    serialized_deleted_event = JSON.parse(JSON.generate(described_class.dump(deleted_event)))
+    loaded_deleted_event = described_class.load(serialized_deleted_event)
+
+    expect(loaded_event.timestamp.to_f).to eq(event_timestamp.to_f)
+    expect(loaded_event.message.timestamp.to_f).to eq(message_timestamp.to_f)
+    expect(loaded_deleted_event.deleted_at.to_f).to eq(deleted_at.to_f)
+  end
+
+  it "loads legacy whole-second timestamps" do
+    timestamp = "2026-10-21T18:01:00Z"
+    event = described_class.load(
+      "type" => "reaction",
+      "platform" => "test",
+      "adapter_name" => "test",
+      "thread_id" => "T1",
+      "channel_id" => "C1",
+      "timestamp" => timestamp,
+      "emoji" => "fire",
+      "user_id" => "U1",
+      "message_id" => "M1",
+      "added" => true
+    )
+
+    expect(event.timestamp).to eq(Time.iso8601(timestamp))
   end
 end
