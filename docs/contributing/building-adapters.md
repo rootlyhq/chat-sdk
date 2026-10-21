@@ -173,6 +173,8 @@ These methods have default implementations that raise `NotSupportedError`. Overr
 | `open_modal` | `:modals` |
 | `start_typing` | `:typing_indicator` |
 
+Adapters that need persistent state can implement `set_state(state)`. `ChatSDK::Chat` calls it during construction with its configured state adapter.
+
 ## Declaring Capabilities
 
 Use the `capabilities` class method to declare what your adapter supports. Only declare capabilities for methods you actually implement:

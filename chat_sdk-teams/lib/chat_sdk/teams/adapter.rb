@@ -6,6 +6,7 @@ module ChatSDK
   module Teams
     class Adapter < ChatSDK::Adapter::Base
       DEFAULT_SERVICE_URL = "https://smba.trafficmanager.net/teams/"
+      USER_SERVICE_URL_TTL = 30 * 24 * 60 * 60
       VERIFIED_JWT_CLAIMS_ENV_KEY = "chat_sdk.teams.verified_jwt_claims"
 
       capabilities :edit_messages, :delete_messages, :threads, :direct_messages,
@@ -58,8 +59,10 @@ module ChatSDK
 
         conversation_id = activity.dig("conversation", "id")
         claims = rack_request.env[VERIFIED_JWT_CLAIMS_ENV_KEY]
-        if conversation_id && trusted_service_url?(activity["serviceUrl"], claims)
-          register_service_url(conversation_id, activity["serviceUrl"])
+        if trusted_service_url?(activity["serviceUrl"], claims)
+          register_service_url(conversation_id, activity["serviceUrl"]) if conversation_id
+          user_id = activity.dig("from", "id")
+          @state&.set(user_service_url_key(user_id), activity["serviceUrl"], ttl: USER_SERVICE_URL_TTL) if user_id
         end
 
         ActivityParser.parse(activity, bot_app_id: @app_id)
@@ -149,7 +152,7 @@ module ChatSDK
 
       def open_dm(user_id)
         require_capability!(:direct_messages)
-        service_url = @service_urls.values.first || @default_service_url
+        service_url = @state&.get(user_service_url_key(user_id)) || @service_urls.values.first || @default_service_url
 
         payload = {
           "bot" => {"id" => @app_id},
@@ -248,12 +251,7 @@ module ChatSDK
       end
 
       def service_url_for(channel_id)
-        url = @service_urls[channel_id]
-        if !url && @state
-          url = @state.get(service_url_key(channel_id))
-          @service_urls[channel_id] = url if url
-        end
-        url ||= @default_service_url
+        url = @service_urls[channel_id] || @state&.get(service_url_key(channel_id)) || @default_service_url
         unless url
           raise ChatSDK::PlatformError.new(
             "No service URL for conversation #{channel_id}. Register it first or receive an activity.",
@@ -265,6 +263,10 @@ module ChatSDK
 
       def service_url_key(conversation_id)
         "chat_sdk:teams:service_url:#{conversation_id}"
+      end
+
+      def user_service_url_key(user_id)
+        "chat_sdk:teams:user_service_url:#{user_id}"
       end
 
       def trusted_service_url?(service_url, claims)
