@@ -124,8 +124,16 @@ module ChatSDK
           run_length = 1
           run_length += 1 while chars[index + run_length] == "`"
           closing = index + run_length
-          closing += 1 while closing < chars.length &&
-              !(chars[closing] == "`" && backtick_run_length(chars, closing) == run_length)
+          while closing < chars.length
+            if chars[closing] == "`"
+              candidate_run_length = backtick_run_length(chars, closing)
+              break if candidate_run_length == run_length
+
+              closing += candidate_run_length
+            else
+              closing += 1
+            end
+          end
           return [masked.join, index] if closing >= chars.length
 
           closing_end = closing + run_length

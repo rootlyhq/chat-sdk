@@ -249,6 +249,12 @@ RSpec.describe ChatSDK::Telegram::FormatConverter do
       expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
     end
 
+    it "does not close a single-backtick span with a triple-backtick run" do
+      markdown = "prefix `abc``` trailing"
+
+      expect(converter.truncate_markdown_v2(markdown, 20)).to eq("prefix \\.\\.\\.")
+    end
+
     it "drops an incomplete entity" do
       markdown = "prefix **#{"bold" * 10}**"
 
