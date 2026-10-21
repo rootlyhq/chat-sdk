@@ -8,8 +8,10 @@ RSpec.describe ChatSDK::Slack::TokenEncryption do
   describe ".encrypt and .decrypt" do
     it "round trips plaintext" do
       encrypted = described_class.encrypt("xoxb-test-token", key)
+      decrypted = described_class.decrypt(encrypted, key)
 
-      expect(described_class.decrypt(encrypted, key)).to eq("xoxb-test-token")
+      expect(decrypted).to eq("xoxb-test-token")
+      expect(decrypted.encoding).to eq(Encoding::UTF_8)
       expect(encrypted.keys).to contain_exactly("iv", "data", "tag")
     end
 
@@ -30,7 +32,7 @@ RSpec.describe ChatSDK::Slack::TokenEncryption do
 
     it "rejects tampered ciphertext" do
       encrypted = described_class.encrypt("xoxb-test-token", key)
-      encrypted["data"] = Base64.strict_encode64("tampered")
+      encrypted["data"] = ["tampered"].pack("m0")
 
       expect { described_class.decrypt(encrypted, key) }.to raise_error(OpenSSL::Cipher::CipherError)
     end
@@ -59,17 +61,17 @@ RSpec.describe ChatSDK::Slack::TokenEncryption do
     end
 
     it "decodes base64 keys" do
-      expect(described_class.decode_key(Base64.strict_encode64((0..31).to_a.pack("C*"))))
+      expect(described_class.decode_key([(0..31).to_a.pack("C*")].pack("m0")))
         .to eq((0..31).to_a.pack("C*"))
     end
 
     it "strips surrounding whitespace" do
-      expect(described_class.decode_key("  #{Base64.strict_encode64((0..31).to_a.pack("C*"))}\n"))
+      expect(described_class.decode_key("  #{[(0..31).to_a.pack("C*")].pack("m0")}\n"))
         .to eq((0..31).to_a.pack("C*"))
     end
 
     it "rejects keys with the wrong decoded length" do
-      expect { described_class.decode_key(Base64.strict_encode64("short")) }
+      expect { described_class.decode_key(["short"].pack("m0")) }
         .to raise_error(
           ChatSDK::ConfigurationError,
           "Encryption key must decode to exactly 32 bytes (received 5). Use a 64-char hex string or 44-char base64 string."

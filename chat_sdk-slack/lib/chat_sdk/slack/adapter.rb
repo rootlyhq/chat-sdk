@@ -571,11 +571,10 @@ module ChatSDK
         )
         token = hash_value(installation, "bot_token")
         unless installation && token && token != false && !(token.respond_to?(:empty?) && token.empty?)
-          unless @bot_token.is_a?(String)
-            ChatSDK::Log.warn("Dropping Slack event without a resolved installation for #{identity[:installation_id]}")
-            return false
-          end
-          return true
+          return true unless @bot_token.nil?
+
+          ChatSDK::Log.warn("Dropping Slack event without a resolved installation for #{identity[:installation_id]}")
+          return false
         end
 
         set_context({

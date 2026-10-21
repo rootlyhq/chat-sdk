@@ -1,6 +1,5 @@
 # frozen_string_literal: true
 
-require "base64"
 require "openssl"
 require "securerandom"
 
@@ -20,9 +19,9 @@ module ChatSDK
           [trimmed].pack("H*")
         else
           begin
-            Base64.strict_decode64(trimmed)
+            trimmed.unpack1("m0")
           rescue ArgumentError
-            Base64.decode64(trimmed)
+            trimmed.unpack1("m")
           end
         end
         return decoded if decoded.bytesize == KEY_LENGTH
@@ -40,9 +39,9 @@ module ChatSDK
         encrypted = cipher.update(plaintext) + cipher.final
 
         {
-          "iv" => Base64.strict_encode64(iv),
-          "data" => Base64.strict_encode64(encrypted),
-          "tag" => Base64.strict_encode64(cipher.auth_tag(TAG_LENGTH))
+          "iv" => [iv].pack("m0"),
+          "data" => [encrypted].pack("m0"),
+          "tag" => [cipher.auth_tag(TAG_LENGTH)].pack("m0")
         }
       end
 
@@ -50,13 +49,13 @@ module ChatSDK
         cipher = OpenSSL::Cipher.new("aes-256-gcm")
         cipher.decrypt
         cipher.key = key
-        iv = Base64.strict_decode64(field(encrypted, "iv"))
-        tag = Base64.strict_decode64(field(encrypted, "tag"))
+        iv = field(encrypted, "iv").unpack1("m0")
+        tag = field(encrypted, "tag").unpack1("m0")
         raise ArgumentError, "Invalid AES-256-GCM token fields" unless iv.bytesize == IV_LENGTH && tag.bytesize == TAG_LENGTH
 
         cipher.iv = iv
         cipher.auth_tag = tag
-        cipher.update(Base64.strict_decode64(field(encrypted, "data"))) + cipher.final
+        (cipher.update(field(encrypted, "data").unpack1("m0")) + cipher.final).force_encoding(Encoding::UTF_8)
       end
 
       def encrypted?(value)

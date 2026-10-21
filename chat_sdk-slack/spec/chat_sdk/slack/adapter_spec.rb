@@ -1460,6 +1460,24 @@ RSpec.describe ChatSDK::Slack::Adapter do
       expect(adapter.client.token).to eq("xoxb-static-fallback")
     end
 
+    it "uses a callable bot token as a fallback when a multi-workspace provider misses" do
+      provider = double("installation provider", get_installation: nil)
+      resolver = double("token resolver", call: "xoxb-callable-fallback")
+      adapter = described_class.new(
+        bot_token: resolver,
+        client_id: "client",
+        installation_provider: provider,
+        signing_secret: signing_secret
+      )
+
+      events = adapter.parse_events(request_for(installation_payload(team_id: "T_UNKNOWN")))
+
+      expect(events.size).to eq(1)
+      expect(adapter.client.token).to eq("xoxb-callable-fallback")
+      expect(provider).to have_received(:get_installation).with("T_UNKNOWN", enterprise_install: false)
+      expect(resolver).to have_received(:call).once
+    end
+
     it "uses the provider bot_user_id for mention classification" do
       provider = double("installation provider")
       allow(provider).to receive(:get_installation)
