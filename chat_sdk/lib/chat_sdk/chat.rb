@@ -3,18 +3,27 @@
 module ChatSDK
   class Chat
     attr_reader :config, :state, :history
+    # @api private
+    attr_reader :error_reporter
 
     def initialize(user_name:, adapters:, state:, **options)
       @config = Config.new(user_name: user_name, adapters: adapters, state: state, **options)
       @state = state
+      ChatSDK::Log.logger = @config.logger if @config.logger
+      ChatSDK::Log.level = @config.log_level if @config.log_level
       @adapters = adapters
       @adapters.each_value { |adapter| adapter.set_state(state) if adapter.respond_to?(:set_state) }
       @registry = EventRegistry.new
       @history = History.new(self)
       @webhooks = {}
-      @dispatcher = Dispatcher.new(chat: self, config: @config, state: @state, registry: @registry)
-
-      ChatSDK::Log.level = @config.log_level
+      @error_reporter = ErrorReporter.new(@config.on_error)
+      @dispatcher = Dispatcher.new(
+        chat: self,
+        config: @config,
+        state: @state,
+        registry: @registry,
+        error_reporter: @error_reporter
+      )
     end
 
     # Event registration

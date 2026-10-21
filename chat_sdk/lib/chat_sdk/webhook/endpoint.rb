@@ -12,6 +12,7 @@ module ChatSDK
       end
 
       def call(env)
+        current_event = nil
         request = Rack::Request.new(env) if defined?(Rack)
 
         adapter.verify_request!(request || env)
@@ -20,7 +21,10 @@ module ChatSDK
         return ack if ack
 
         events = adapter.parse_events(request || env)
-        events.each { |event| chat.dispatch(event, adapter_name: adapter_name) }
+        events.each do |event|
+          current_event = event
+          chat.dispatch(event, adapter_name: adapter_name)
+        end
 
         response = if webhook_response_accepts_request?
           adapter.webhook_response(events, request || env)
@@ -34,7 +38,17 @@ module ChatSDK
         ChatSDK::Log.warn("Signature verification failed: #{e.message}")
         [401, {"content-type" => "text/plain"}, ["Unauthorized"]]
       rescue => e
-        ChatSDK::Log.error("Webhook error: #{e.message}")
+        chat.error_reporter.report(
+          e,
+          "Webhook error",
+          source: :webhook,
+          adapter: adapter_name,
+          event_type: current_event&.type,
+          thread_id: current_event&.respond_to?(:thread_id) ? current_event.thread_id : nil,
+          channel_id: current_event&.respond_to?(:channel_id) ? current_event.channel_id : nil
+        )
+        # Platforms retry non-2xx responses, which can repeat handler side effects.
+        # Logging and on_error surface failures without causing a redelivery.
         [200, {"content-type" => "text/plain"}, [""]]
       end
 

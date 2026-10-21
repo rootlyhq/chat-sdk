@@ -32,7 +32,15 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
   end
 
   let(:state) { ChatSDK::State::Memory.new }
-  let(:chat) { ChatSDK::Chat.new(user_name: "test-bot", adapters: {webhook_test: test_adapter}, state: state) }
+  let(:reported_errors) { [] }
+  let(:chat) do
+    ChatSDK::Chat.new(
+      user_name: "test-bot",
+      adapters: {webhook_test: test_adapter},
+      state: state,
+      on_error: ->(error, context) { reported_errors << [error, context] }
+    )
+  end
   let(:endpoint) { described_class.new(chat: chat, adapter: test_adapter, adapter_name: :webhook_test) }
 
   let(:app) { endpoint }
@@ -109,6 +117,7 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
 
       expect(status).to eq(401)
       expect(body).to eq(["Unauthorized"])
+      expect(reported_errors).to be_empty
     end
   end
 
@@ -188,6 +197,13 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
       status, _headers, _body = endpoint.call(env)
 
       expect(status).to eq(200)
+      expect(reported_errors.last.last).to include(
+        source: :handler,
+        adapter: :webhook_test,
+        event_type: :mention,
+        thread_id: "T1",
+        channel_id: "C1"
+      )
     end
   end
 
@@ -198,6 +214,9 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
       status, _headers, _body = endpoint.call(env)
 
       expect(status).to eq(200)
+      expect(reported_errors.last.first).to be_a(RuntimeError)
+      expect(reported_errors.last.first.message).to eq("something broke")
+      expect(reported_errors.last.last).to eq({source: :webhook, adapter: :webhook_test})
     end
   end
 end

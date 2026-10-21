@@ -11,11 +11,12 @@ module ChatSDK
       end
     end
 
-    def initialize(chat:, config:, state:, registry:)
+    def initialize(chat:, config:, state:, registry:, error_reporter:)
       @chat = chat
       @config = config
       @state = state
       @registry = registry
+      @error_reporter = error_reporter
       @slot_mutex = Mutex.new
       @slot_condition = ConditionVariable.new
       @active_slots = Hash.new(0)
@@ -24,7 +25,7 @@ module ChatSDK
     def dispatch(event, adapter:, adapter_name:)
       ChatSDK::Instrumentation.instrument("dispatch.chat_sdk", adapter: adapter_name, event_type: event.type) do
         if %i[message_updated message_deleted].include?(event.type)
-          return execute_event(event, build_thread(event, adapter))
+          return execute_event(event, build_thread(event, adapter), adapter_name: adapter_name)
         end
 
         concurrency_scope = adapter.concurrency_scope(event)
@@ -35,32 +36,32 @@ module ChatSDK
         strategy = @config.concurrency[:strategy]
 
         if strategy == :concurrent
-          return with_concurrent_slot(thread_key) { execute_event(event, thread) }
+          return with_concurrent_slot(thread_key) { execute_event(event, thread, adapter_name: adapter_name) }
         end
 
         owner = "#{Process.pid}:#{::Thread.current.object_id}:#{SecureRandom.uuid}"
         if %i[queue burst debounce].include?(strategy)
-          dispatch_queued(event, adapter, thread_key, owner, strategy)
+          dispatch_queued(event, adapter, adapter_name, thread_key, owner, strategy)
         else
-          dispatch_locked(event, thread, thread_key, owner, strategy)
+          dispatch_locked(event, thread, adapter_name, thread_key, owner, strategy)
         end
       end
     end
 
     private
 
-    def dispatch_locked(event, thread, thread_key, owner, strategy)
+    def dispatch_locked(event, thread, adapter_name, thread_key, owner, strategy)
       acquired = acquire_lock(thread_key, event, owner, force: strategy == :force)
       return unless acquired
 
       heartbeat = start_lock_heartbeat(thread_key, owner)
-      execute_event(event, thread)
+      execute_event(event, thread, adapter_name: adapter_name)
     ensure
       stop_lock_heartbeat(heartbeat)
       release_lock(thread_key, owner) if acquired
     end
 
-    def dispatch_queued(event, adapter, thread_key, owner, strategy)
+    def dispatch_queued(event, adapter, adapter_name, thread_key, owner, strategy)
       queue_key = "chat_sdk:queue:#{thread_key}"
       acquired = acquire_lock(thread_key, event, owner, apply_conflict_policy: false)
       pre_enqueued = false
@@ -74,23 +75,23 @@ module ChatSDK
 
       heartbeat = start_lock_heartbeat(thread_key, owner)
       if strategy == :queue
-        execute_event(event, build_thread(event, adapter)) unless pre_enqueued
+        execute_event(event, build_thread(event, adapter), adapter_name: adapter_name) unless pre_enqueued
       else
         enqueue(queue_key, event) unless pre_enqueued
         sleep(@config.concurrency[:debounce].to_f) if strategy == :burst
       end
 
       if strategy == :debounce
-        debounce_loop(queue_key, adapter, heartbeat)
+        debounce_loop(queue_key, adapter, adapter_name, heartbeat)
       else
-        drain_loop(queue_key, adapter, strategy, heartbeat)
+        drain_loop(queue_key, adapter, adapter_name, strategy, heartbeat)
       end
     ensure
       stop_lock_heartbeat(heartbeat)
       release_lock(thread_key, owner) if acquired
     end
 
-    def drain_loop(queue_key, adapter, strategy, heartbeat)
+    def drain_loop(queue_key, adapter, adapter_name, strategy, heartbeat)
       loop do
         break if heartbeat&.ownership_lost?
 
@@ -105,12 +106,12 @@ module ChatSDK
           events[0...-1].filter_map { |queued| queued.message if queued.respond_to?(:message) }
         end
         context = {skipped: skipped, total_since_last_handler: skipped.length + 1}
-        execute_event(current, build_thread(current, adapter), context: context)
+        execute_event(current, build_thread(current, adapter), adapter_name: adapter_name, context: context)
         ::Thread.pass
       end
     end
 
-    def debounce_loop(queue_key, adapter, heartbeat)
+    def debounce_loop(queue_key, adapter, adapter_name, heartbeat)
       skipped = []
       loop do
         sleep(@config.concurrency[:debounce].to_f)
@@ -132,7 +133,7 @@ module ChatSDK
           message.thread_id == latest.thread_id
         end
         context = {skipped: relevant, total_since_last_handler: relevant.length + 1}
-        execute_event(latest, build_thread(latest, adapter), context: context)
+        execute_event(latest, build_thread(latest, adapter), adapter_name: adapter_name, context: context)
         skipped.clear
       end
     end
@@ -262,29 +263,29 @@ module ChatSDK
       ChatSDK::Thread.new(id: thread_id, channel_id: channel_id, adapter: adapter, chat: @chat, current_message: current_message)
     end
 
-    def execute_event(event, thread, context: nil)
+    def execute_event(event, thread, adapter_name:, context: nil)
       if %i[mention subscribed_message direct_message].include?(event.type)
-        route_message_event(event, thread, context)
+        route_message_event(event, thread, adapter_name, context)
         return
       end
 
       @registry.handlers_for(event).each do |handler|
-        execute_handler(handler, event, thread, context: context)
+        execute_handler(handler, event, thread, adapter_name: adapter_name, context: context)
       end
     end
 
-    def route_message_event(event, thread, context)
+    def route_message_event(event, thread, adapter_name, context)
       message = event.message
       dm_handlers = @registry.handlers_for_type(:direct_message, event: event)
       if event.type == :direct_message && dm_handlers.any?
-        run_handlers(dm_handlers, event, thread, context)
+        run_handlers(dm_handlers, event, thread, adapter_name, context)
         return
       end
 
       message.is_mention = true if event.type == :direct_message
 
       if thread&.subscribed?
-        run_handlers(@registry.handlers_for_type(:subscribed_message, event: event), event, thread, context)
+        run_handlers(@registry.handlers_for_type(:subscribed_message, event: event), event, thread, adapter_name, context)
         return
       end
 
@@ -297,17 +298,19 @@ module ChatSDK
       end
 
       if message.is_mention
-        run_handlers(@registry.handlers_for_type(:mention, event: event), event, thread, context)
+        run_handlers(@registry.handlers_for_type(:mention, event: event), event, thread, adapter_name, context)
         return
       end
 
       @registry.handlers_for_type(:new_message, event: event).each do |handler|
-        execute_handler(handler, event, thread, context: context)
+        execute_handler(handler, event, thread, adapter_name: adapter_name, context: context)
       end
     end
 
-    def run_handlers(handlers, event, thread, context)
-      handlers.each { |handler| execute_handler(handler, event, thread, context: context) }
+    def run_handlers(handlers, event, thread, adapter_name, context)
+      handlers.each do |handler|
+        execute_handler(handler, event, thread, adapter_name: adapter_name, context: context)
+      end
     end
 
     def detect_mention(text)
@@ -315,7 +318,7 @@ module ChatSDK
       /(?<![[:word:]])@#{Regexp.escape(@config.user_name)}\b/i.match?(masked_text)
     end
 
-    def execute_handler(handler, event, thread, context: nil)
+    def execute_handler(handler, event, thread, adapter_name:, context: nil)
       ChatSDK::Instrumentation.instrument("handler.chat_sdk", handler_type: event.type) do
         ChatSDK::AI::ConversationScope.with(thread) do
           case event.type
@@ -330,8 +333,15 @@ module ChatSDK
         end
       end
     rescue => e
-      ChatSDK::Log.error("Handler error (#{event.type}): #{e.message}")
-      ChatSDK::Log.debug(e.backtrace&.first(5)&.join("\n"))
+      @error_reporter.report(
+        e,
+        "Handler error (#{event.type})",
+        source: :handler,
+        adapter: adapter_name,
+        event_type: event.type,
+        thread_id: event.respond_to?(:thread_id) ? event.thread_id : nil,
+        channel_id: event.respond_to?(:channel_id) ? event.channel_id : nil
+      )
     end
 
     def add_thread_to_event(event, thread)
