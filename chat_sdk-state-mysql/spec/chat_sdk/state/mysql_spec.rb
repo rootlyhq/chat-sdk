@@ -1,18 +1,31 @@
 # frozen_string_literal: true
 
 require_relative "../../spec_helper"
+require "uri"
 
 def mysql_url
   ENV["MYSQL_URL"] || "mysql2://root@localhost/chat_sdk_dev"
 end
 
+def mysql_options
+  uri = URI.parse(mysql_url)
+  {
+    host: uri.host,
+    port: uri.port,
+    username: uri.user && URI.decode_www_form_component(uri.user),
+    password: uri.password && URI.decode_www_form_component(uri.password),
+    database: URI.decode_www_form_component(uri.path.delete_prefix("/"))
+  }
+end
+
 def mysql_available?
-  conn = Mysql2::Client.new(mysql_url)
+  conn = Mysql2::Client.new(mysql_options)
   conn.query("SELECT 1")
-  conn.close
   true
 rescue Mysql2::Error
   false
+ensure
+  conn&.close
 end
 
 RSpec.describe ChatSDK::State::Mysql, if: mysql_available? do
@@ -60,7 +73,7 @@ RSpec.describe ChatSDK::State::Mysql, if: mysql_available? do
 
   describe "auto_migrate" do
     it "creates tables automatically" do
-      conn = Mysql2::Client.new(mysql_url)
+      conn = Mysql2::Client.new(mysql_options)
       described_class.new(connection: conn, auto_migrate: true)
       result = conn.query("SHOW TABLES LIKE 'chat_sdk_%'")
       table_names = result.map { |row| row.values.first }
