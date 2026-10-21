@@ -181,11 +181,13 @@ module ChatSDK
         award_path = "#{noteable_path(thread)}/notes/#{message_id}/award_emoji"
         name = to_gitlab_emoji(emoji)
 
-        @client.request_api(:post, award_path, body: {"name" => name})
-      rescue ChatSDK::PlatformError => error
-        raise unless error.status == 404 && @bot_user_id
-        raise unless @client.request_all(award_path).any? do |award|
-          award["name"] == name && award.dig("user", "id").to_s == @bot_user_id
+        begin
+          @client.request_api(:post, award_path, body: {"name" => name})
+        rescue ChatSDK::PlatformError => error
+          raise unless error.status == 404 && @bot_user_id
+          raise unless @client.request_all(award_path).any? do |award|
+            award["name"] == name && award.dig("user", "id").to_s == @bot_user_id
+          end
         end
       end
 

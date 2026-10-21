@@ -362,6 +362,25 @@ RSpec.describe ChatSDK::GitLab::Adapter do
       expect(WebMock).not_to have_requested(:delete, "#{award_endpoint}/700")
     end
 
+    it "does not treat a missing discussion as a duplicate award" do
+      discussion_endpoint = "#{api_url}/projects/42/merge_requests/3/discussions/abcdef"
+      award_endpoint = "#{api_url}/projects/42/merge_requests/3/notes/501/award_emoji"
+      stub_request(:get, discussion_endpoint)
+        .to_return(status: 404, body: '{"message":"404 Discussion Not Found"}', headers: {"Content-Type" => "application/json"})
+      stub_request(:get, award_endpoint).with(query: {"page" => "1", "per_page" => "100"})
+        .to_return(status: 200, body: '[{"id":700,"name":"thumbsup","user":{"id":99}}]', headers: {"Content-Type" => "application/json"})
+      award_post = stub_request(:post, award_endpoint)
+        .with(body: {"name" => "thumbsup"})
+        .to_return(status: 201, body: '{"name":"thumbsup"}', headers: {"Content-Type" => "application/json"})
+
+      expect do
+        adapter.add_reaction(channel_id: channel_id, thread_id: thread_id, message_id: "501", emoji: "thumbs_up")
+      end.to raise_error(ChatSDK::PlatformError)
+
+      expect(award_post).not_to have_been_requested
+      expect(WebMock).not_to have_requested(:get, award_endpoint)
+    end
+
     it "uses the GitLab page cursor for note history" do
       endpoint = "#{api_url}/projects/42/merge_requests/3/notes"
       stub_request(:get, endpoint)
