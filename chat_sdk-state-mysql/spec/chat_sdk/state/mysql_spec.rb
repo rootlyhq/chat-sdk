@@ -25,6 +25,23 @@ RSpec.describe ChatSDK::State::Mysql, if: mysql_available? do
 
   before { subject.clear }
 
+  describe ".parse_url" do
+    it "coerces numeric and boolean query values while preserving strings" do
+      options = described_class.parse_url(
+        "mysql2://root@localhost/chat_sdk_test?connect_timeout=5&read_timeout=6&write_timeout=7&reconnect=true&local_infile=false&encoding=utf8mb4"
+      )
+
+      expect(options).to include(
+        connect_timeout: 5,
+        read_timeout: 6,
+        write_timeout: 7,
+        reconnect: true,
+        local_infile: false,
+        encoding: "utf8mb4"
+      )
+    end
+  end
+
   it_behaves_like "a chat_sdk state adapter"
 
   describe "TTL expiration" do

@@ -17,7 +17,20 @@ module ChatSDK
         options[:password] = URI::DEFAULT_PARSER.unescape(uri.password) if uri.password
         database = uri.path.delete_prefix("/")
         options[:database] = URI::DEFAULT_PARSER.unescape(database) unless database.empty?
-        options.merge!(URI.decode_www_form(uri.query.to_s).to_h.transform_keys(&:to_sym))
+        query_options = URI.decode_www_form(uri.query.to_s).to_h
+        query_options.transform_values! do |value|
+          case value
+          when /\A\d+\z/
+            value.to_i
+          when "true"
+            true
+          when "false"
+            false
+          else
+            value
+          end
+        end
+        options.merge!(query_options.transform_keys(&:to_sym))
         options
       end
 
