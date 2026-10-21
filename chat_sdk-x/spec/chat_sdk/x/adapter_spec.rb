@@ -220,6 +220,19 @@ RSpec.describe ChatSDK::X::Adapter do
         expect(event.message.is_mention).to be false
       end
 
+      it "leaves mention classification unset when mention entities are unavailable" do
+        payload = {
+          "tweet_create_events" => [
+            {"id" => "tweet-125", "text" => "hello", "author_id" => "user-456"},
+            {"id" => "tweet-126", "text" => "hello", "author_id" => "user-456", "entities" => {"mentions" => "invalid"}}
+          ]
+        }
+
+        events = subject.parse_events(build_request(JSON.generate(payload)))
+
+        expect(events.map { |event| event.message.is_mention }).to eq([nil, nil])
+      end
+
       it "skips mentions from the bot itself" do
         payload = {
           "tweet_create_events" => [
