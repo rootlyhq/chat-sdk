@@ -342,7 +342,27 @@ module ChatSDK
 
       def finish_fallback
         warn_skipped_stop_blocks if options[:stop_blocks]
-        @fallback_message
+        message_with_text(@fallback_message, @accumulated)
+      end
+
+      def message_with_text(message, text)
+        return unless message
+
+        ChatSDK::Message.new(
+          id: message.id,
+          text: text.dup,
+          author: message.author,
+          thread_id: message.thread_id,
+          channel_id: message.channel_id,
+          platform: message.platform,
+          attachments: message.attachments,
+          links: message.links,
+          reply_to: message.reply_to,
+          subject: message.subject,
+          raw: message.raw,
+          timestamp: message.timestamp,
+          is_mention: message.is_mention
+        )
       end
 
       def warn_skipped_stop_blocks

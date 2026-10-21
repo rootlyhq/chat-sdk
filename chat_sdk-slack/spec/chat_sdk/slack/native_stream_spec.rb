@@ -192,6 +192,7 @@ RSpec.describe ChatSDK::Slack::Adapter do
       result = run_stream([text, " tail"])
 
       expect(result).to be_a(ChatSDK::Message)
+      expect(result.text).to eq("#{text} tail")
       expect(calls.map(&:first)).to include(:post_message, :update)
       expect(calls.find { |call| call.first == :update }.last[:text]).to eq("#{text} tail")
       expect(adapter.instance_variable_get(:@native_streaming_broken)).to be(true)

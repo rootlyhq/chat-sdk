@@ -22,11 +22,13 @@ RSpec.describe ChatSDK::Streaming::Stream do
     it "posts placeholder message, yields stream, and final flush edits message" do
       stream = build_stream(placeholder: "Thinking...")
 
-      stream.run do |s|
+      result = stream.run do |s|
         s << "Hello "
         s << "world"
       end
 
+      expect(result.id).to eq("msg_1")
+      expect(result.text).to eq("Hello world")
       expect(adapter.posted_messages.size).to eq(1)
       posted = adapter.posted_messages.first
       expect(posted[:message].text).to eq("Thinking...")
@@ -47,6 +49,14 @@ RSpec.describe ChatSDK::Streaming::Stream do
     expect(message).to be_a(ChatSDK::Message)
     expect(message.id).to eq("msg_1")
     expect(message.text).to eq("Hello")
+  end
+
+  it "returns the final text without a placeholder after multiple flushes" do
+    message = build_stream.run(["first", " ", "second"])
+
+    expect(message.id).to eq("msg_1")
+    expect(message.text).to eq("first second")
+    expect(adapter.edited_messages.size).to be >= 2
   end
 
   it "returns nil when it posts no message" do
