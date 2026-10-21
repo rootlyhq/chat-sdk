@@ -22,7 +22,11 @@ module ChatSDK
         events = adapter.parse_events(request || env)
         events.each { |event| chat.dispatch(event, adapter_name: adapter_name) }
 
-        response = adapter.webhook_response(events, request || env)
+        response = if webhook_response_accepts_request?
+          adapter.webhook_response(events, request || env)
+        else
+          adapter.webhook_response(events)
+        end
         return response if response
 
         [200, {"content-type" => "text/plain"}, [""]]
@@ -32,6 +36,14 @@ module ChatSDK
       rescue => e
         ChatSDK::Log.error("Webhook error: #{e.message}")
         [200, {"content-type" => "text/plain"}, [""]]
+      end
+
+      private
+
+      def webhook_response_accepts_request?
+        parameters = adapter.method(:webhook_response).parameters
+        parameters.any? { |type, _| type == :rest } ||
+          parameters.count { |type, _| %i[req opt].include?(type) } > 1
       end
     end
   end
