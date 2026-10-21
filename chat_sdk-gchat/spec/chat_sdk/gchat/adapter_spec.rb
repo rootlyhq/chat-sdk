@@ -13,6 +13,10 @@ RSpec.describe ChatSDK::GChat::Adapter do
   before do
     allow(Google::Auth).to receive(:get_application_default).and_return(mock_credentials)
     allow(Google::Apps::Chat::V1::ChatService::Client).to receive(:new).and_return(mock_client)
+    allow(mock_client).to receive(:update_message)
+    allow(mock_client).to receive(:delete_message)
+    allow(mock_client).to receive(:create_reaction)
+    allow(mock_client).to receive(:delete_reaction)
   end
 
   it_behaves_like "a chat_sdk platform adapter"
