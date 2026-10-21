@@ -440,6 +440,32 @@ RSpec.describe ChatSDK::Discord::Adapter do
       expect(messages.first.text).to eq("Second")
       expect(cursor).to eq("msg-1")
     end
+
+    it "sets mention metadata from bot mentions" do
+      stub_request(:get, "https://discord.com/api/v10/channels/ch123/messages?limit=50")
+        .to_return(
+          status: 200,
+          body: JSON.generate([
+            {
+              "id" => "msg-mention",
+              "content" => "Hello bot",
+              "author" => {"id" => "u1", "username" => "alice"},
+              "mentions" => [{"id" => application_id}]
+            },
+            {
+              "id" => "msg-other",
+              "content" => "Hello someone",
+              "author" => {"id" => "u2", "username" => "bob"},
+              "mentions" => [{"id" => "other-user"}]
+            }
+          ]),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      messages, = subject.fetch_messages(channel_id: "ch123")
+
+      expect(messages.map(&:is_mention)).to eq([true, false])
+    end
   end
 
   describe "#start_typing" do
