@@ -434,6 +434,33 @@ RSpec.describe ChatSDK::GChat::Adapter do
         update_mask: an_instance_of(Google::Protobuf::FieldMask)
       )
     end
+
+    it "accepts a full resource name from the same space" do
+      allow(mock_client).to receive(:update_message).and_return(double("result"))
+
+      subject.edit_message(
+        channel_id: "SPACE1",
+        message_id: "spaces/SPACE1/messages/MSG1",
+        message: "Updated text"
+      )
+
+      expect(mock_client).to have_received(:update_message).with(
+        message: hash_including(name: "spaces/SPACE1/messages/MSG1"),
+        update_mask: an_instance_of(Google::Protobuf::FieldMask)
+      )
+    end
+
+    it "rejects a message from another space" do
+      expect {
+        subject.edit_message(
+          channel_id: "SPACE1",
+          message_id: "spaces/SPACE2/messages/MSG1",
+          message: "Updated text"
+        )
+      }.to raise_error(ChatSDK::Error, /Invalid Google Chat message ID/)
+
+      expect(mock_client).not_to have_received(:update_message)
+    end
   end
 
   describe "#delete_message" do
@@ -444,6 +471,65 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
       expect(mock_client).to have_received(:delete_message).with(
         name: "spaces/SPACE1/messages/MSG1"
+      )
+    end
+
+    it "rejects a message from another space" do
+      expect {
+        subject.delete_message(
+          channel_id: "SPACE1",
+          message_id: "spaces/SPACE2/messages/MSG1"
+        )
+      }.to raise_error(ChatSDK::Error, /Invalid Google Chat message ID/)
+
+      expect(mock_client).not_to have_received(:delete_message)
+    end
+
+    it "rejects traversal and encoded slashes" do
+      ["..", "MSG/../OTHER", "MSG%2FOTHER"].each do |message_id|
+        expect {
+          subject.delete_message(channel_id: "SPACE1", message_id: message_id)
+        }.to raise_error(ChatSDK::Error, /Invalid Google Chat message ID/)
+      end
+
+      expect(mock_client).not_to have_received(:delete_message)
+    end
+  end
+
+  describe "reaction message names" do
+    it "validates message IDs before creating or deleting reactions" do
+      expect {
+        subject.add_reaction(
+          channel_id: "SPACE1",
+          message_id: "spaces/SPACE2/messages/MSG1",
+          emoji: "👍"
+        )
+      }.to raise_error(ChatSDK::Error, /Invalid Google Chat message ID/)
+
+      expect {
+        subject.remove_reaction(
+          channel_id: "SPACE1",
+          message_id: "MSG/../OTHER",
+          emoji: "👍"
+        )
+      }.to raise_error(ChatSDK::Error, /Invalid Google Chat message ID/)
+
+      expect(mock_client).not_to have_received(:create_reaction)
+      expect(mock_client).not_to have_received(:delete_reaction)
+    end
+
+    it "accepts a full resource name from the same space" do
+      allow(mock_client).to receive(:create_reaction).and_return(double("result"))
+
+      subject.add_reaction(
+        channel_id: "SPACE1",
+        message_id: "spaces/SPACE1/messages/MSG1",
+        emoji: "👍"
+      )
+
+      expect(mock_client).to have_received(:create_reaction).with(
+        parent: "spaces/SPACE1/messages/MSG1",
+        reaction: {emoji: {unicode: "👍"}}
       )
     end
   end
