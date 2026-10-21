@@ -60,6 +60,29 @@ gchat = ChatSDK::GChat::Adapter.new(
 )
 ```
 
+## Per-request credentials
+
+Per-request credentials are a chat-sdk extension; upstream `vercel/chat` configures one credentials value per adapter. A resolver can select credentials for each outbound channel:
+
+```ruby
+gchat = ChatSDK::GChat::Adapter.new(
+  project_number: "123456",
+  credentials_resolver: ->(channel_id) { credentials_for_channel(channel_id) }
+)
+```
+
+The resolver receives the channel ID and may return any value accepted by `credentials:`. Returning `nil` uses the adapter-wide credentials or Application Default Credentials. Alternatively, `with_credentials` scopes credentials to outbound calls made inside its block:
+
+```ruby
+gchat.with_credentials(tenant_credentials) do
+  gchat.post_message(channel_id: "SPACE_ID", message: "Hello")
+end
+```
+
+Opening a new direct-message space has no channel ID yet, so it uses the scoped or adapter-wide credentials rather than calling the resolver.
+
+The resolver is evaluated when an outbound call runs, including in background jobs dispatched by `handler_executor`. The `with_credentials` scope is thread-local and does not carry into those jobs; establish the scope inside the job or use the resolver.
+
 ## Environment Variables
 
 | Variable | Description |

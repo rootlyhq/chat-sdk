@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Google Chat per-request outbound credentials with `credentials_resolver` and `with_credentials`
 - Google Chat endpoint-URL audience and Pub/Sub webhook verification options
 
 ### Fixed
