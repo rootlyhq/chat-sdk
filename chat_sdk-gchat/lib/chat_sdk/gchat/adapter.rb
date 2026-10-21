@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "digest"
+
 module ChatSDK
   module GChat
     class Adapter < ChatSDK::Adapter::Base
@@ -268,19 +270,11 @@ module ChatSDK
       end
 
       def credential_cache_key(credentials)
-        service_account_key = case credentials
+        case credentials
         when Hash
-          credentials
+          [:hash, Digest::SHA256.hexdigest(JSON.generate(credentials))]
         when String
-          JSON.parse(File.read(credentials))
-        end
-
-        if service_account_key
-          [
-            :service_account,
-            service_account_key["client_email"] || service_account_key[:client_email],
-            service_account_key["private_key_id"] || service_account_key[:private_key_id]
-          ]
+          [:path, File.expand_path(credentials)]
         else
           [:object, credentials.object_id]
         end

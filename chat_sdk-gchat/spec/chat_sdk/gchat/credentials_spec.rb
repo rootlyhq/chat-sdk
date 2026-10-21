@@ -152,13 +152,13 @@ RSpec.describe ChatSDK::GChat::Adapter do
   end
 
   describe "credential client cache" do
-    it "reuses clients for matching service-account fingerprints" do
+    it "reuses clients for matching hashes" do
       credentials = {
         "client_email" => "tenant@example.com",
         "private_key_id" => "key-1",
         "private_key" => "not-used-by-this-spec"
       }
-      matching_credentials = credentials.merge("private_key" => "another-value")
+      matching_credentials = credentials.dup
       resolved_credentials = Object.new
       resolved_client = instance_double(client_class)
       allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
@@ -170,6 +170,53 @@ RSpec.describe ChatSDK::GChat::Adapter do
       second_client = adapter.with_credentials(matching_credentials) { adapter.client }
 
       expect(second_client).to equal(first_client)
+      expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).once
+      expect(client_class).to have_received(:new).twice
+    end
+
+    it "does not reuse clients for hashes missing a private_key_id" do
+      first_credentials = {
+        "client_email" => "tenant@example.com",
+        "private_key" => "first-key"
+      }
+      second_credentials = first_credentials.merge("private_key" => "second-key")
+      first_resolved_credentials = Object.new
+      second_resolved_credentials = Object.new
+      first_client = instance_double(client_class)
+      second_client = instance_double(client_class)
+      allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
+        .and_return(first_resolved_credentials, second_resolved_credentials)
+      stub_clients(default_client, first_client, second_client)
+      adapter = build_adapter
+
+      first = adapter.with_credentials(first_credentials) { adapter.client }
+      second = adapter.with_credentials(second_credentials) { adapter.client }
+
+      expect(second).not_to equal(first)
+      expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).twice
+      expect(client_class).to have_received(:new).exactly(3).times
+    end
+
+    it "reuses clients for a path without reading the file for the cache key" do
+      path = "service-account.json"
+      file_open_count = 0
+      resolved_credentials = Object.new
+      resolved_client = instance_double(client_class)
+      allow(File).to receive(:open).with(path) do
+        file_open_count += 1
+        double("credential file")
+      end
+      expect(File).not_to receive(:read)
+      allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
+        .and_return(resolved_credentials)
+      stub_clients(default_client, resolved_client)
+      adapter = build_adapter
+
+      first = adapter.with_credentials(path) { adapter.client }
+      second = adapter.with_credentials(path) { adapter.client }
+
+      expect(second).to equal(first)
+      expect(file_open_count).to eq(1)
       expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).once
       expect(client_class).to have_received(:new).twice
     end
