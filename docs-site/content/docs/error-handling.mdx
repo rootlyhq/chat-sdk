@@ -107,7 +107,7 @@ bot.on_new_mention do |thread, message|
 end
 ```
 
-Configure `on_error:` to report handler and webhook failures. The callback receives `(exception, context)`. The context includes `source` (`:handler` or `:webhook`), `adapter`, and `event_type`, `thread_id`, and `channel_id` when available. For errors raised before an event is parsed, the event-specific values are absent.
+Configure `on_error:` to report handler and webhook failures. The callback receives `(exception, context)`. The context includes `source` (`:handler`, `:webhook`, or `:dispatch` for failures in a `handler_executor: :thread` background dispatch outside a handler), `adapter`, and `event_type`, `thread_id`, and `channel_id` when available. For errors raised before an event is parsed, the event-specific values are absent.
 
 ```ruby
 bot = ChatSDK::Chat.new(
