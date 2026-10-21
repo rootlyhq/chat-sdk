@@ -35,6 +35,12 @@ module ChatSDK
         raise NotImplementedError
       end
 
+      # Stream using a platform-native API, or return nil before consuming
+      # chunks to delegate to the core post+edit fallback.
+      def stream(channel_id:, thread_id:, stream:, options: {})
+        nil
+      end
+
       def reply_message(channel_id:, message_id:, message:, thread_id: nil)
         require_capability!(:replies)
         raise NotImplementedError

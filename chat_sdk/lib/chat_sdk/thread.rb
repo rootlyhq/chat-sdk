@@ -27,6 +27,8 @@ module ChatSDK
     end
 
     def post(content)
+      return handle_stream(content.stream, content.to_stream_options) if content.is_a?(StreamingPlan)
+
       message = PostableMessage.from(content)
       adapter.post_message(channel_id: channel_id, message: message, thread_id: id)
     end
@@ -62,15 +64,24 @@ module ChatSDK
       adapter.post_ephemeral(channel_id: channel_id, user_id: user_id, message: message, thread_id: id)
     end
 
-    def post_stream(placeholder: nil, &block)
-      stream = Streaming::Stream.new(
-        adapter: adapter,
-        channel_id: channel_id,
-        thread_id: id,
-        placeholder: placeholder,
-        update_interval: chat.config.streaming_update_interval
-      )
-      stream.run(&block)
+    def post_stream(source = nil, placeholder: nil, **plan_options, &block)
+      raise ArgumentError, "provide either a stream source or a block" if !source.nil? && block
+      raise ArgumentError, "a stream source or block is required" if source.nil? && !block
+
+      if block
+        source = Enumerator.new do |yielder|
+          block.call(Streaming::Writer.new(yielder))
+        end
+      end
+
+      if source.is_a?(StreamingPlan)
+        options = StreamingPlan.new(source.stream, **source.options.merge(plan_options)).to_stream_options
+        source = source.stream
+      else
+        options = StreamingPlan.new(source, **plan_options).to_stream_options
+      end
+
+      handle_stream(source, options.merge(placeholder: placeholder))
     end
 
     def edit(message_id, content)
@@ -90,8 +101,8 @@ module ChatSDK
       call_adapter(:remove_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji, thread_id: id)
     end
 
-    def post_ai_stream(enumerable, placeholder: "Thinking...")
-      ChatSDK::AI::StreamHandler.stream_to_thread(self, enumerable, placeholder: placeholder)
+    def post_ai_stream(enumerable, placeholder: "Thinking...", **plan_options)
+      ChatSDK::AI::StreamHandler.stream_to_thread(self, enumerable, placeholder: placeholder, **plan_options)
     end
 
     def upload(io:, filename:, comment: nil)
@@ -128,6 +139,60 @@ module ChatSDK
     end
 
     private
+
+    def handle_stream(source, caller_options)
+      options = caller_options.merge(
+        update_interval: caller_options[:update_interval] || chat.config.streaming_update_interval
+      )
+      if current_message
+        options[:recipient_user_id] = current_message.author&.id
+        options[:recipient_team_id] = extract_recipient_team_id(current_message.raw)
+      end
+      options = options.reject { |_, value| value.nil? }
+      normalized_source = Enumerator.new do |yielder|
+        source.each do |item|
+          chunk = Streaming::Chunk.normalize(item)
+          yielder << chunk unless chunk.nil?
+        end
+      end
+
+      if adapter.respond_to?(:stream)
+        native_message = adapter.stream(
+          channel_id: channel_id,
+          thread_id: id,
+          stream: normalized_source,
+          options: options
+        )
+        return native_message if native_message
+      end
+
+      text_source = Enumerator.new do |yielder|
+        normalized_source.each do |item|
+          text = Streaming::Chunk.text_of(item)
+          yielder << text if text
+        end
+      end
+      Streaming::Stream.new(
+        adapter: adapter,
+        channel_id: channel_id,
+        thread_id: id,
+        placeholder: options[:placeholder],
+        update_interval: options[:update_interval],
+        ai_generated: options[:ai_generated] || false
+      ).run(text_source)
+    end
+
+    def extract_recipient_team_id(raw)
+      return unless raw.is_a?(Hash)
+
+      team_id = raw[:team_id] || raw["team_id"]
+      team = raw[:team] || raw["team"]
+      user = raw[:user] || raw["user"]
+      team_id ||= team if team.is_a?(String)
+      team_id ||= team[:id] || team["id"] if team.is_a?(Hash)
+      team_id ||= user[:team_id] || user["team_id"] if user.is_a?(Hash)
+      team_id if team_id.is_a?(String) && !team_id.empty?
+    end
 
     def state_key(suffix = nil)
       base = "#{adapter.name}:#{channel_id}:#{id}"
