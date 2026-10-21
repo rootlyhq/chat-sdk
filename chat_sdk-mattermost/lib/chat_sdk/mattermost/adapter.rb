@@ -214,7 +214,7 @@ module ChatSDK
         super # raises NotSupportedError
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         require_capability!(:typing_indicator)
         @client.send_typing(channel_id: channel_id)
       end

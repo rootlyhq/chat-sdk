@@ -131,7 +131,8 @@ module ChatSDK
             properties: {
               adapter_name: {type: "string", description: "Adapter name"},
               channel_id: {type: "string", description: "Channel ID"},
-              thread_id: {type: "string", description: "Thread ID (optional)"}
+              thread_id: {type: "string", description: "Thread ID (optional)"},
+              message_id: {type: "string", description: "Current message ID (optional)"}
             },
             required: %w[adapter_name channel_id]
           },

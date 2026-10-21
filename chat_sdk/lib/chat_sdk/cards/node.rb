@@ -31,6 +31,8 @@ module ChatSDK
             ["#{node.attributes[:label]}: #{node.attributes[:value]}"]
           when :button, :link_button
             [node.attributes[:text]]
+          when :text_input
+            [node.attributes[:label]]
           when :table
             table_text(node)
           when :chart

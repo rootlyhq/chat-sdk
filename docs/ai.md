@@ -50,13 +50,13 @@ result = executor.execute(:post_message, {
 })
 ```
 
-AI tools are confined to the current channel by default. A thread-scoped executor permits sibling threads in that channel; pass `strict_scope: true` to allow only the exact thread. For jobs outside an event handler, pass a `ChatSDK::Thread`, `ChatSDK::Channel`, or scope hash explicitly:
+AI tools are confined to the current channel by default. A thread-scoped executor permits sibling threads in that channel; pass `strict_scope: true` to allow only the exact thread. A tool invoked inside a handler with no conversation requires an explicit scope; use `scope: false` only when workspace-wide access is intentional. For jobs outside an event handler, pass a `ChatSDK::Thread`, `ChatSDK::Channel`, or scope hash explicitly:
 
 ```ruby
 executor = ChatSDK::AI.create_executor(chat: chat, scope: thread, strict_scope: true)
 ```
 
-Pass `scope: false` only when workspace-wide access is intentional. Direct-message tools are approval-controlled and are not constrained by conversation scope, matching the upstream SDK.
+Unscoped tools invoked by scripts or jobs retain the existing behavior and emit a warning once per tool. Direct-message tools target users rather than the current channel, so they are not limited to the current channel scope; they still require an explicit scope when invoked inside a handler without a conversation.
 
 See [Agent Tools](ai/agent-tools.md) for full details.
 

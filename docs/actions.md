@@ -50,6 +50,7 @@ The event object passed to `on_action` provides:
 |-----------|------|-------------|
 | `action_id` | `String` | The `id` of the clicked element |
 | `value` | `String` | The `value` attached to the button or selected option |
+| `values` | `Hash` or `nil` | Submitted action values when the adapter provides them |
 | `user` | `Author` | The user who performed the action |
 | `thread` | `Thread` | For posting replies |
 | `trigger_id` | `String` | For opening modals (platform-dependent) |

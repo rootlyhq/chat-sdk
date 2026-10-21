@@ -68,6 +68,25 @@ RSpec.describe ChatSDK::Thread do
     end
   end
 
+  describe "#start_typing" do
+    it "passes the current message ID when available" do
+      message = ChatSDK::Message.new(
+        id: "M123", text: "hello", author: nil, thread_id: "T123",
+        channel_id: "C123", platform: :test
+      )
+      current_thread = described_class.new(
+        id: "T123", channel_id: "C123", adapter: adapter, chat: bot,
+        current_message: message
+      )
+
+      current_thread.start_typing
+
+      expect(adapter.typing_started.last[:channel_id]).to eq("C123")
+      expect(adapter.typing_started.last[:thread_id]).to eq("T123")
+      expect(adapter.typing_started.last[:message_id]).to eq("M123")
+    end
+  end
+
   describe "#state / #set_state" do
     it "stores and retrieves state" do
       thread.set_state({count: 1})

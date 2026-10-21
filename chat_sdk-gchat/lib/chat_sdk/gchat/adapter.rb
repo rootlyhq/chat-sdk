@@ -164,7 +164,7 @@ module ChatSDK
         super
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         super
       end
 

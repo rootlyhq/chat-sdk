@@ -19,6 +19,7 @@ RSpec.describe ChatSDK::AI::ToolExecutor do
       expect(result[:text]).to eq("hello")
       expect(result[:id]).to be_a(String)
       expect(adapter.posted_messages.size).to eq(1)
+      expect(adapter.posted_messages.last[:message].ai_generated).to be(true)
     end
 
     it "executes post_message with string keys" do
@@ -36,12 +37,14 @@ RSpec.describe ChatSDK::AI::ToolExecutor do
       result = executor.execute(:send_direct_message, {adapter_name: "test", user_id: "U1", text: "hi"})
       expect(result[:channel_id]).to eq("dm_U1")
       expect(adapter.dm_channels.size).to eq(1)
+      expect(adapter.posted_messages.last[:message].ai_generated).to be(true)
     end
 
     it "executes edit_message" do
       result = executor.execute(:edit_message, {adapter_name: "test", channel_id: "C1", message_id: "M1", text: "updated"})
       expect(result[:success]).to be true
       expect(adapter.edited_messages.size).to eq(1)
+      expect(adapter.edited_messages.last[:message].ai_generated).to be(true)
     end
 
     it "executes delete_message" do
@@ -66,6 +69,89 @@ RSpec.describe ChatSDK::AI::ToolExecutor do
       result = executor.execute(:start_typing, {adapter_name: "test", channel_id: "C1"})
       expect(result[:success]).to be true
       expect(adapter.typing_started.size).to eq(1)
+    end
+
+    it "uses the handler's current message ID for typing indicators" do
+      incoming = ChatSDK::Message.new(
+        id: "M_CURRENT", text: "hello",
+        author: ChatSDK::Author.new(id: "U1", name: "user", platform: :test),
+        thread_id: "T1", channel_id: "C1", platform: :test
+      )
+      thread = ChatSDK::Thread.new(id: "T1", channel_id: "C1", adapter: adapter, chat: chat, current_message: incoming)
+
+      ChatSDK::AI::ConversationScope.with(thread) do
+        executor.execute(:start_typing, {adapter_name: "test", channel_id: "C1", thread_id: "T1"})
+      end
+
+      expect(adapter.typing_started.last[:message_id]).to eq("M_CURRENT")
+    end
+
+    it "allows direct-message tools inside a conversation handler" do
+      thread = ChatSDK::Thread.new(id: "T1", channel_id: "C1", adapter: adapter, chat: chat)
+
+      ChatSDK::AI::ConversationScope.with(thread) do
+        executor.execute(:send_direct_message, {adapter_name: "test", user_id: "U1", text: "hello"})
+      end
+
+      expect(adapter.dm_channels.size).to eq(1)
+    end
+
+    it "resolves an implicit scope when the tool executes" do
+      thread = ChatSDK::Thread.new(id: "T1", channel_id: "C1", adapter: adapter, chat: chat)
+      scoped_executor = nil
+
+      ChatSDK::AI::ConversationScope.with(thread) do
+        scoped_executor = described_class.new(chat: chat)
+      end
+
+      allow(ChatSDK::Log).to receive(:warn)
+      expect do
+        scoped_executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C2"})
+      end.not_to raise_error
+      expect(ChatSDK::Log).to have_received(:warn).once
+    end
+
+    it "warns once per tool when used outside a handler without a scope" do
+      allow(ChatSDK::Log).to receive(:warn)
+
+      2.times { executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C1"}) }
+      executor.execute(:fetch_thread, {adapter_name: "test", channel_id: "C1"})
+
+      expect(ChatSDK::Log).to have_received(:warn).twice
+    end
+
+    it "rejects an empty scope ID at executor creation" do
+      expect do
+        described_class.new(chat: chat, scope: {adapter_name: :test, channel_id: "", thread_id: "T1"})
+      end.to raise_error(ChatSDK::ConfigurationError, /channel_id must not be empty/)
+    end
+
+    it "rejects an empty thread scope ID but accepts a channel scope" do
+      expect do
+        described_class.new(chat: chat, scope: {adapter_name: :test, channel_id: "C1", thread_id: ""})
+      end.to raise_error(ChatSDK::ConfigurationError, /thread_id must not be empty/)
+
+      expect do
+        described_class.new(chat: chat, scope: {adapter_name: :test, channel_id: "C1", thread_id: nil})
+      end.not_to raise_error
+    end
+
+    it "requires scope for tools run inside a handler without a conversation" do
+      expect do
+        ChatSDK::AI::ConversationScope.with(nil) do
+          executor.execute(:fetch_messages, {adapter_name: "test", channel_id: "C1"})
+        end
+      end.to raise_error(ChatSDK::Error, /requires an explicit scope/)
+    end
+
+    it "allows workspace-wide access with scope false inside a handler" do
+      unscoped = described_class.new(chat: chat, scope: false)
+
+      expect do
+        ChatSDK::AI::ConversationScope.with(nil) do
+          unscoped.execute(:fetch_messages, {adapter_name: "test", channel_id: "C1"})
+        end
+      end.not_to raise_error
     end
 
     it "executes fetch_messages" do

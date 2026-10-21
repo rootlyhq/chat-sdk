@@ -42,6 +42,14 @@ bot.on_direct_message do |thread, _message|
 end
 ```
 
+### start_typing
+
+Starts a typing indicator when supported. The current inbound message ID is passed to adapters when available.
+
+```ruby
+thread.start_typing
+```
+
 ### post_ephemeral(content, user_id:)
 
 Posts a message visible only to the specified user.

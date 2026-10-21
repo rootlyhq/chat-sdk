@@ -51,6 +51,10 @@ module ChatSDK
       adapter.mark_as_read(channel_id: channel_id, thread_id: id, message_id: message_id, message: target.is_a?(ChatSDK::Message) ? target : nil)
     end
 
+    def start_typing
+      adapter.start_typing(channel_id: channel_id, thread_id: id, message_id: current_message&.id)
+    end
+
     def post_ephemeral(content, user_id:)
       message = PostableMessage.from(content)
       adapter.post_ephemeral(channel_id: channel_id, user_id: user_id, message: message, thread_id: id)
