@@ -36,6 +36,7 @@ module ChatBot
       user_name: "my-bot",
       adapters: { slack: slack },
       state: state,
+      logger: Rails.logger,
       log_level: Rails.env.production? ? :info : :debug
     )
 

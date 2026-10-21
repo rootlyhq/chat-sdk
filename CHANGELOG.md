@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Configurable error reporting through `on_error:` and injectable logging with `logger:`.
 - Slack installation providers, Enterprise Grid OAuth, token encryption, token resolvers, and custom webhook verification
 
 ### Fixed
