@@ -317,19 +317,23 @@ RSpec.describe "Teams parity behavior" do
         .to raise_error(ArgumentError, /https:\/\/graph\.microsoft\.com/)
     end
 
-    it "validates the cursor path against the escaped chat id" do
+    it "accepts raw and percent-encoded cursor paths for the same chat id" do
       client = graph_adapter
-      chat_id = "19:abc@thread.v2"
-      cursor = "https://graph.microsoft.com/v1.0/chats/19%3Aabc%40thread.v2/messages?$skiptoken=next"
+      chat_id = "19:x@thread.v2"
+      raw_cursor = "https://graph.microsoft.com/v1.0/chats/19:x@thread.v2/messages?$skiptoken=raw"
+      encoded_cursor = "https://graph.microsoft.com/v1.0/chats/19%3Ax%40thread.v2/messages?$skiptoken=encoded"
       stub_graph_token
-      stub_request(:get, cursor)
-        .to_return(status: 200, body: JSON.generate("value" => []), headers: {"Content-Type" => "application/json"})
+      [raw_cursor, encoded_cursor].each do |cursor|
+        stub_request(:get, cursor)
+          .to_return(status: 200, body: JSON.generate("value" => []), headers: {"Content-Type" => "application/json"})
+      end
 
-      expect(client.fetch_messages(channel_id: chat_id, cursor: cursor)).to eq([[], nil])
+      expect(client.fetch_messages(channel_id: chat_id, cursor: raw_cursor)).to eq([[], nil])
+      expect(client.fetch_messages(channel_id: chat_id, cursor: encoded_cursor)).to eq([[], nil])
       expect {
         client.fetch_messages(
           channel_id: chat_id,
-          cursor: "https://graph.microsoft.com/v1.0/chats/other-chat/messages?$skiptoken=next"
+          cursor: "https://graph.microsoft.com/v1.0/chats/19:y@thread.v2/messages?$skiptoken=other"
         )
       }.to raise_error(ArgumentError, /requested chat path/)
       expect {

@@ -271,12 +271,26 @@ module ChatSDK
         return false unless service_url.is_a?(String)
 
         uri = URI.parse(service_url)
-        return false unless uri.is_a?(URI::HTTPS) && uri.host
+        return false unless uri.scheme&.casecmp?("https") && uri.host
 
         service_url_claim = claims.is_a?(Hash) ? claims["serviceurl"] : nil
-        service_url_claim.nil? || service_url == service_url_claim
+        service_url_claim.nil? ||
+          (service_url_claim.is_a?(String) &&
+            normalize_service_url(service_url) == normalize_service_url(service_url_claim))
       rescue URI::InvalidURIError
         false
+      end
+
+      def normalize_service_url(service_url)
+        uri = URI.parse(service_url)
+        return unless uri.scheme && uri.host
+
+        uri.scheme = uri.scheme.downcase
+        uri.host = uri.host.downcase
+        uri.path = uri.path.delete_suffix("/")
+        uri.to_s
+      rescue URI::InvalidURIError
+        nil
       end
 
       def channel_thread_id(channel_id, activity_id)

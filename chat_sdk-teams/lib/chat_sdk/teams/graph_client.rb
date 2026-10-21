@@ -139,9 +139,10 @@ module ChatSDK
 
       def validate_graph_url!(url, chat_id)
         uri = URI.parse(url)
-        expected_path = URI.parse(chat_messages_url(chat_id)).path
+        expected_path = URI::DEFAULT_PARSER.unescape(URI.parse(chat_messages_url(chat_id)).path)
+        actual_path = URI::DEFAULT_PARSER.unescape(uri.path)
         valid = uri.is_a?(URI::HTTPS) && uri.host == "graph.microsoft.com" &&
-          uri.port == 443 && !uri.userinfo && !uri.fragment && uri.path == expected_path
+          uri.port == 443 && !uri.userinfo && !uri.fragment && actual_path == expected_path
         unless valid
           raise ArgumentError,
             "Graph pagination cursor must use https://graph.microsoft.com and the requested chat path"

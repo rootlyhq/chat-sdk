@@ -106,6 +106,18 @@ RSpec.describe ChatSDK::Teams::Adapter do
           expected_url: "https://smba.trafficmanager.net/teams/"
         },
         {
+          conversation_id: "normalized-trailing-slash-conversation",
+          service_url: "https://smba.trafficmanager.net/amer",
+          claim: "https://smba.trafficmanager.net/amer/",
+          expected_url: "https://smba.trafficmanager.net/amer"
+        },
+        {
+          conversation_id: "normalized-case-conversation",
+          service_url: "https://smba.trafficmanager.net/amer",
+          claim: "HTTPS://SMBA.TRAFFICMANAGER.NET/amer",
+          expected_url: "https://smba.trafficmanager.net/amer"
+        },
+        {
           conversation_id: "mismatch-conversation",
           service_url: "https://attacker.example/teams/",
           claim: "https://smba.trafficmanager.net/teams/",
@@ -153,6 +165,8 @@ RSpec.describe ChatSDK::Teams::Adapter do
 
       expect(state.get("chat_sdk:teams:service_url:matching-conversation"))
         .to eq("https://smba.trafficmanager.net/teams/")
+      expect(state.get("chat_sdk:teams:service_url:normalized-trailing-slash-conversation"))
+        .to eq("https://smba.trafficmanager.net/amer")
       expect(state.get("chat_sdk:teams:service_url:insecure-conversation")).to be_nil
     end
 
