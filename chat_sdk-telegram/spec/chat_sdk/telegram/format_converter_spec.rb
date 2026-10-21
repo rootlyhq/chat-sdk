@@ -238,19 +238,19 @@ RSpec.describe ChatSDK::Telegram::FormatConverter do
     end
 
     it "drops an incomplete link destination" do
-      markdown = "prefix [link](https://example.com/#{'a' * 20})"
+      markdown = "prefix [link](https://example.com/#{"a" * 20})"
 
       expect(converter.truncate_markdown_v2(markdown, 30)).to eq("prefix \\.\\.\\.")
     end
 
     it "drops an incomplete code span" do
-      markdown = "prefix `#{'code' * 10}`"
+      markdown = "prefix `#{"code" * 10}`"
 
       expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
     end
 
     it "drops an incomplete entity" do
-      markdown = "prefix **#{'bold' * 10}**"
+      markdown = "prefix **#{"bold" * 10}**"
 
       expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
     end

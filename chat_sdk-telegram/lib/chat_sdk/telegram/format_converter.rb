@@ -98,7 +98,7 @@ module ChatSDK
             if chars[index + 1] == "("
               closing = index + 2
               closing += 1 while closing < chars.length &&
-                (chars[closing] != ")" || escaped_at?(chars, closing))
+                  (chars[closing] != ")" || escaped_at?(chars, closing))
               return opening if closing == chars.length
             end
           end
@@ -125,14 +125,14 @@ module ChatSDK
           run_length += 1 while chars[index + run_length] == "`"
           closing = index + run_length
           closing += 1 while closing < chars.length &&
-            !(chars[closing] == "`" && backtick_run_length(chars, closing) == run_length)
-          return [masked, index] if closing >= chars.length
+              !(chars[closing] == "`" && backtick_run_length(chars, closing) == run_length)
+          return [masked.join, index] if closing >= chars.length
 
           closing_end = closing + run_length
           (index...closing_end).each { |position| masked[position] = " " }
           index = closing_end
         end
-        [masked, nil]
+        [masked.join, nil]
       end
 
       def mask_links(text)
@@ -150,7 +150,7 @@ module ChatSDK
             opening = openings.pop
             closing = index + 2
             closing += 1 while closing < chars.length &&
-              (chars[closing] != ")" || escaped_at?(chars, closing))
+                (chars[closing] != ")" || escaped_at?(chars, closing))
             if closing < chars.length
               (opening..closing).each { |position| masked[position] = " " }
               index = closing
@@ -170,7 +170,7 @@ module ChatSDK
       def escaped_at?(chars, index)
         backslashes = 0
         backslashes += 1 while index - backslashes - 1 >= 0 &&
-          chars[index - backslashes - 1] == "\\"
+            chars[index - backslashes - 1] == "\\"
         backslashes.odd?
       end
 
