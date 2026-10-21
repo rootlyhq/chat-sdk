@@ -940,6 +940,45 @@ RSpec.describe ChatSDK::Telegram::Adapter do
       expect(collected_events[1].message.text).to eq("World")
     end
 
+    it "treats replies to the bot as mentions when configured" do
+      adapter = described_class.new(
+        bot_token: bot_token,
+        secret_token: secret_token,
+        bot_username: bot_username,
+        mention_on_reply: true
+      )
+      update = {
+        "update_id" => 100,
+        "message" => {
+          "message_id" => 111,
+          "from" => {"id" => 42, "username" => "alice"},
+          "chat" => {"id" => -1001, "type" => "group"},
+          "text" => "Reply",
+          "reply_to_message" => {
+            "message_id" => 105,
+            "from" => {"id" => 99, "username" => "testbot", "is_bot" => true}
+          }
+        }
+      }
+      call_count = 0
+      allow(adapter.client).to receive(:get_updates) do
+        call_count += 1
+        raise StopIteration if call_count > 1
+
+        [update]
+      end
+
+      events = []
+      begin
+        adapter.poll(timeout: 0) { |event| events << event }
+      rescue StopIteration
+        # expected
+      end
+
+      expect(events.first).to be_a(ChatSDK::Events::Mention)
+      expect(events.first.message.is_mention).to be true
+    end
+
     it "handles non-array responses gracefully" do
       call_count = 0
       allow(subject.client).to receive(:get_updates) do
