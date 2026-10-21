@@ -25,6 +25,34 @@ RSpec.describe "Slack lifecycle events" do
     )
   end
 
+  it "ignores unknown assistant context keys" do
+    event = ChatSDK::Events::AssistantThreadStarted.new(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: {channel_id: "C456", new_context_key: "ignored"},
+      platform: :slack,
+      adapter_name: :slack
+    )
+
+    expect(event.context).to eq(ChatSDK::Events::AssistantContext.new(channel_id: "C456"))
+  end
+
+  it "coerces nil assistant context to an empty AssistantContext" do
+    event = ChatSDK::Events::AssistantThreadStarted.new(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: nil,
+      platform: :slack,
+      adapter_name: :slack
+    )
+
+    expect(event.context).to eq(ChatSDK::Events::AssistantContext.new)
+  end
+
   it "dispatches assistant thread started events to their handler" do
     event = assistant_thread_started
     received = nil

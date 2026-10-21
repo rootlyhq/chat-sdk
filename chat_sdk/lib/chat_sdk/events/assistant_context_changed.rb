@@ -11,16 +11,7 @@ module ChatSDK
         @channel_id = channel_id
         @thread_ts = thread_ts
         @user_id = user_id
-        @context = assistant_context(context)
-      end
-
-      private
-
-      def assistant_context(context)
-        context = {} if context.nil?
-        return Events::AssistantContext.new(**context.transform_keys(&:to_sym)) if context.is_a?(Hash)
-
-        context
+        @context = AssistantContext.coerce(context)
       end
     end
   end

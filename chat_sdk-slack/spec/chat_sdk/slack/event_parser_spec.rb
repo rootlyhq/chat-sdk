@@ -69,6 +69,22 @@ RSpec.describe ChatSDK::Slack::EventParser do
     expect(parsed.adapter_name).to eq(:slack)
   end
 
+  it "ignores unknown Slack assistant context fields" do
+    event = {
+      "type" => "assistant_thread_started",
+      "assistant_thread" => {
+        "user_id" => "U123",
+        "channel_id" => "D456",
+        "thread_ts" => "1234567890.654321",
+        "context" => {"channel_id" => "C789", "future_context_key" => "ignored"}
+      }
+    }
+
+    parsed = described_class.parse({"type" => "event_callback", "event" => event}).first
+
+    expect(parsed.context).to eq(ChatSDK::Events::AssistantContext.new(channel_id: "C789"))
+  end
+
   it "parses assistant_thread_context_changed" do
     event = {
       "type" => "assistant_thread_context_changed",
