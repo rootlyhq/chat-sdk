@@ -2,6 +2,31 @@
 
 ChatSDK is designed to handle concurrent events safely, even across multiple processes. It uses per-thread locking, queueing, and event deduplication to prevent race conditions.
 
+## Background execution
+
+Assuming `adapter` and `state` are configured, a plain Ruby worker can use a callable `handler_executor` to enqueue JSON-safe payloads for another thread to process with `dispatch_serialized`:
+
+```ruby
+require "json"
+
+dispatch_queue = Queue.new
+bot = ChatSDK::Chat.new(
+  user_name: "my-bot",
+  adapters: {slack: adapter},
+  state: state,
+  handler_executor: ->(payload) { dispatch_queue << JSON.generate(payload) }
+)
+
+worker = Thread.new do
+  loop do
+    payload = JSON.parse(dispatch_queue.pop)
+    bot.dispatch_serialized(payload)
+  end
+end
+```
+
+This in-memory queue is an example for a single process. Use a durable queue and a persistent state backend shared by web and worker processes when jobs must survive restarts or coordinate deduplication and locks across processes.
+
 ## Strategies
 
 Configure how overlapping messages on the same thread are handled with `concurrency`:
