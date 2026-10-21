@@ -15,7 +15,15 @@ module ChatSDK
       def render_card(node)
         @used_native_table = false
         @chart_count = 0
-        node.children.map { |child| render_node(child) }.compact
+        blocks = []
+        if node.attributes[:title]
+          blocks << {type: "header", text: {type: "plain_text", text: truncate_text(node.attributes[:title], 150)}}
+        end
+        if node.attributes[:subtitle]
+          blocks << {type: "context", elements: [{type: "mrkdwn", text: truncate_mrkdwn(node.attributes[:subtitle], 3000)}]}
+        end
+        blocks.concat(node.children.map { |child| render_node(child) }.compact)
+        blocks
       end
 
       def render_node(node)
@@ -28,19 +36,20 @@ module ChatSDK
         when :actions then render_actions(node)
         when :table then render_table(node)
         when :chart then render_chart(node)
+        when :text_input then {type: "section", text: {type: "mrkdwn", text: truncate_mrkdwn(node.attributes[:label], 3000)}}
         end
       end
 
       def render_text(node)
         {
           type: "section",
-          text: {type: "mrkdwn", text: node.attributes[:content]}
+          text: {type: "mrkdwn", text: truncate_mrkdwn(node.attributes[:content], 3000)}
         }
       end
 
       def render_image(node)
         block = {type: "image", image_url: node.attributes[:url]}
-        block[:alt_text] = node.attributes[:alt] || " "
+        block[:alt_text] = truncate_text(node.attributes[:alt] || " ", 2000)
         block
       end
 
@@ -48,7 +57,7 @@ module ChatSDK
         {
           type: "section",
           fields: node.children.map do |field|
-            {type: "mrkdwn", text: "*#{field.attributes[:label]}*\n#{field.attributes[:value]}"}
+            {type: "mrkdwn", text: truncate_mrkdwn("*#{field.attributes[:label]}*\n#{field.attributes[:value]}", 2000)}
           end
         }
       end
@@ -57,7 +66,7 @@ module ChatSDK
         block = {type: "section"}
         text_children = node.children.select { |c| c.type == :text }
         if text_children.any?
-          block[:text] = {type: "mrkdwn", text: text_children.map { |t| t.attributes[:content] }.join("\n")}
+          block[:text] = {type: "mrkdwn", text: truncate_mrkdwn(text_children.map { |t| t.attributes[:content] }.join("\n"), 3000)}
         end
         block
       end
@@ -80,7 +89,7 @@ module ChatSDK
       def render_button(node)
         btn = {
           type: "button",
-          text: {type: "plain_text", text: node.attributes[:text]},
+          text: {type: "plain_text", text: truncate_text(node.attributes[:text], 75)},
           action_id: node.attributes[:id]
         }
         btn[:value] = node.attributes[:value] if node.attributes[:value]
@@ -89,16 +98,19 @@ module ChatSDK
         elsif node.attributes[:style] == :danger
           btn[:style] = "danger"
         end
+        btn[:visible_to_user_ids] = node.attributes[:visible_to] if node.attributes[:visible_to]&.any?
         btn
       end
 
       def render_link_button(node)
-        {
+        button = {
           type: "button",
-          text: {type: "plain_text", text: node.attributes[:text]},
+          text: {type: "plain_text", text: truncate_text(node.attributes[:text], 75)},
           url: node.attributes[:url],
           action_id: node.attributes[:id] || "link_#{node.attributes[:url].hash.abs}"
         }
+        button[:visible_to_user_ids] = node.attributes[:visible_to] if node.attributes[:visible_to]&.any?
+        button
       end
 
       def render_select(node)
@@ -108,18 +120,18 @@ module ChatSDK
           options: node.children.map { |opt| render_option(opt) }
         }
         if node.attributes[:placeholder]
-          sel[:placeholder] = {type: "plain_text", text: node.attributes[:placeholder]}
+          sel[:placeholder] = {type: "plain_text", text: truncate_text(node.attributes[:placeholder], 150)}
         end
         sel
       end
 
       def render_option(node)
         opt = {
-          text: {type: "plain_text", text: node.attributes[:text]},
+          text: {type: "plain_text", text: truncate_text(node.attributes[:text], 75)},
           value: node.attributes[:value]
         }
         if node.attributes[:description]
-          opt[:description] = {type: "plain_text", text: node.attributes[:description]}
+          opt[:description] = {type: "plain_text", text: truncate_text(node.attributes[:description], 75)}
         end
         opt
       end
@@ -190,7 +202,46 @@ module ChatSDK
       end
 
       def fallback_block(text)
-        {type: "section", text: {type: "mrkdwn", text: "```#{text}```"}}
+        {type: "section", text: {type: "mrkdwn", text: truncate_mrkdwn("```#{text}```", 3000)}}
+      end
+
+      def truncate_text(text, limit)
+        text = text.to_s
+        return text if text.length <= limit
+
+        "#{text[0, limit - 1]}…"
+      end
+
+      def truncate_mrkdwn(text, limit)
+        text = text.to_s
+        return text if text.length <= limit
+
+        prefix = clean_prefix(text[0, limit - 1])
+        4.times do
+          bold_close = prefix.count("*").odd? ? "*" : ""
+          fence_close = open_fence?(prefix) ? "\n```" : ""
+          available = limit - 1 - bold_close.length - fence_close.length
+          next_prefix = clean_prefix(text[0, available])
+          break if next_prefix == prefix
+
+          prefix = next_prefix
+        end
+
+        bold_close = prefix.count("*").odd? ? "*" : ""
+        fence_close = open_fence?(prefix) ? "\n```" : ""
+        suffix = "#{bold_close}…#{fence_close}"
+        prefix = clean_prefix(prefix[0, limit - suffix.length]) while prefix.length + suffix.length > limit
+        "#{prefix}#{suffix}"
+      end
+
+      def clean_prefix(text)
+        text
+          .sub(/<(?:[@#!]|[a-z][a-z\d+.-]*(?::|$))[^>]*\z/i, "")
+          .sub(/&(?:#?[a-z\d]*)?\z/i, "")
+      end
+
+      def open_fence?(text)
+        text.scan("```").length.odd?
       end
     end
   end

@@ -5,6 +5,20 @@ require_relative "../../spec_helper"
 RSpec.describe ChatSDK::Slack::FormatConverter do
   subject(:converter) { described_class.new }
 
+  describe "#normalize_inbound_text" do
+    it "normalizes Slack special mentions and labeled email and telephone links" do
+      text = "<!here> <!channel> <!everyone> <!subteam^S1|@team> <mailto:a@b|email> <tel:123|call>"
+
+      expect(converter.normalize_inbound_text(text)).to eq("@here @channel @everyone @team email call")
+    end
+
+    it "preserves tokens inside inline and fenced code" do
+      text = "<!here> `<!here>` ```\n<!channel>\n```"
+
+      expect(converter.normalize_inbound_text(text)).to eq("@here `<!here>` ```\n<!channel>\n```")
+    end
+  end
+
   # ────────────────────────────────────────────────────────────────────────────
   # to_markdown — Slack mrkdwn → standard Markdown
   # ────────────────────────────────────────────────────────────────────────────

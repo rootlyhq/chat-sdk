@@ -7,6 +7,8 @@ Docs: https://chat-sdk.ai
 ## Core Gem
 
 - `chat_sdk` — Core SDK with Chat, Thread, Message, Channel, Author, Dispatcher, EventRegistry, Config, and errors
+  - `Chat#on_new_message(pattern = nil)` handles non-mention messages matching a Regexp, or all messages reaching ordinary-message routing when no pattern is provided.
+  - `Message#is_mention` reports `true`, `false`, or `nil` when mention status is unknown.
 
 ## Platform Adapters (11)
 
@@ -32,6 +34,7 @@ Docs: https://chat-sdk.ai
 ## Cards DSL
 
 Cross-platform card builder for rich messages. Renders to each platform's native format (Block Kit, Adaptive Cards, Google Cards v2, embeds, inline keyboards, etc.).
+Cards support `text_input` children and optional `visible_to` user IDs on buttons.
 
 ## AI Integration
 
@@ -39,6 +42,7 @@ Cross-platform card builder for rich messages. Renders to each platform's native
 - `ChatSDK::AI::ToolExecutor` — Execute tool calls from LLM responses
 - `ChatSDK::AI::StreamHandler` — Stream AI responses to chat in real time
 - `ChatSDK::AI::Converter#to_ai_messages` — Convert chat history to LLM-ready message format
+- `ChatSDK::PostableMessage#ai_generated` — Mark messages created by AI tools
 
 ## Streaming
 

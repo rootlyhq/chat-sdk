@@ -19,7 +19,8 @@ require "chat_sdk/slack"
 slack = ChatSDK::Slack::Adapter.new(
   bot_token: ENV["SLACK_BOT_TOKEN"],       # or set SLACK_BOT_TOKEN env var
   signing_secret: ENV["SLACK_SIGNING_SECRET"], # or set SLACK_SIGNING_SECRET env var
-  proxy: ENV["HTTPS_PROXY"]                # optional Web API egress proxy
+  proxy: ENV["HTTPS_PROXY"],               # optional Web API egress proxy
+  bot_user_id: ENV["SLACK_BOT_USER_ID"]     # optional bot user ID
 )
 ```
 
@@ -32,6 +33,7 @@ Both parameters fall back to environment variables if not provided.
 | `SLACK_BOT_TOKEN` | Bot User OAuth Token (starts with `xoxb-`) |
 | `SLACK_SIGNING_SECRET` | Signing Secret from your Slack app settings |
 | `HTTPS_PROXY` | Optional HTTP(S) proxy used for Slack Web API and upload requests |
+| `SLACK_BOT_USER_ID` | Optional bot user ID used to classify mentions without an `auth.test` lookup |
 
 ## Slack App Setup
 
@@ -103,6 +105,10 @@ client.conversations_list(types: "public_channel")
 ## Cards Rendering
 
 Cards built with `ChatSDK.card` are rendered as Slack Block Kit JSON. The `BlockKitRenderer` handles the translation automatically.
+
+Inbound Slack text normalizes broadcast, user-group, email, and telephone tokens while preserving code spans. Bot mentions are classified from mrkdwn and rich-text blocks when the bot user ID is available. Multi-workspace dispatch keys are scoped by team ID.
+
+File uploads use Slack's `files_upload_v2` API. Block Kit text is truncated to Slack's field limits without splitting markup tokens, entities, or open code fences.
 
 ## Message IDs
 

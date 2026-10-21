@@ -50,7 +50,7 @@ module ChatSDK
           )
           message = ChatSDK::Message.new(
             id: event["ts"],
-            text: event["text"] || "",
+            text: message_text(event),
             author: author,
             thread_id: event["thread_ts"] || event["ts"],
             channel_id: event["channel"],
@@ -80,7 +80,7 @@ module ChatSDK
           )
           message = ChatSDK::Message.new(
             id: event["ts"],
-            text: event["text"] || "",
+            text: message_text(event),
             author: author,
             thread_id: event["thread_ts"] || event["ts"],
             channel_id: event["channel"],
@@ -128,6 +128,37 @@ module ChatSDK
             adapter_name: :slack,
             raw: payload
           )]
+        end
+
+        def message_text(event)
+          blocks = event["blocks"]
+          text = if blocks.is_a?(Array) && !blocks.empty? && blocks.all? { |block| %w[section header context image divider actions table].include?(block["type"]) }
+            blocks.filter_map { |block| block_text(block) }.join("\n")
+          else
+            event["text"] || ""
+          end
+          FormatConverter.new.normalize_inbound_text(text)
+        end
+
+        def block_text(block)
+          case block["type"]
+          when "section", "header"
+            texts = [block.dig("text", "text")]
+            texts.concat(Array(block["fields"]).map { |field| field["text"] })
+            texts.compact.reject(&:empty?).join("\n")
+          when "context"
+            Array(block["elements"]).filter_map { |element| element.dig("text") }.reject(&:empty?).join("\n")
+          when "image"
+            block["alt_text"]
+          when "actions"
+            Array(block["elements"]).filter_map do |element|
+              element.dig("text", "text") || element.dig("placeholder", "text")
+            end.reject(&:empty?).join(" ")
+          when "table"
+            Array(block["rows"]).map do |row|
+              Array(row).map { |cell| cell.dig("text") || cell.to_s }.join(" | ")
+            end.join("\n")
+          end
         end
 
         def parse_message_deleted(event, payload)

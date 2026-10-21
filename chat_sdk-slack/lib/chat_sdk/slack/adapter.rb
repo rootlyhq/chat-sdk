@@ -9,11 +9,14 @@ module ChatSDK
         :scheduled_messages
 
       def initialize(bot_token: nil, signing_secret: nil,
-        client_id: nil, client_secret: nil, proxy: nil)
+        client_id: nil, client_secret: nil, proxy: nil, bot_user_id: nil)
         @bot_token = bot_token || ENV["SLACK_BOT_TOKEN"]
         @signing_secret = signing_secret || ENV["SLACK_SIGNING_SECRET"]
         @client_id = client_id || ENV["SLACK_CLIENT_ID"]
         @client_secret = client_secret || ENV["SLACK_CLIENT_SECRET"]
+        @bot_user_id = bot_user_id || ENV["SLACK_BOT_USER_ID"]
+        @bot_user_ids = {}
+        @bot_user_id_mutex = Mutex.new
         @proxy = proxy || ENV["HTTPS_PROXY"] || ENV["https_proxy"]
 
         unless @bot_token || @client_id
@@ -153,7 +156,13 @@ module ChatSDK
           resolve_team_client(team_id) if team_id
         end
 
-        EventParser.parse(parsed)
+        events = EventParser.parse(parsed)
+        events.each do |event|
+          next unless %i[mention subscribed_message direct_message].include?(event.type)
+
+          event.message.is_mention = classify_mention(event, parsed)
+        end
+        events
       end
 
       # Outbound
@@ -201,10 +210,12 @@ module ChatSDK
       end
 
       def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
-        params = {channels: channel_id, file: Faraday::Multipart::FilePart.new(io, nil, filename)}
+        content = io.read
+        io.rewind if io.respond_to?(:rewind)
+        params = {channel_id: channel_id, filename: filename, content: content}
         params[:thread_ts] = thread_id if thread_id
         params[:initial_comment] = comment if comment
-        client.files_upload(**params)
+        client.files_upload_v2(**params)
       end
 
       def add_reaction(channel_id:, message_id:, emoji:)
@@ -315,9 +326,19 @@ module ChatSDK
         result["channel"]
       end
 
-      def start_typing(channel_id:, thread_id: nil)
+      def start_typing(channel_id:, thread_id: nil, message_id: nil)
         # Slack doesn't have a native typing indicator API for bots
         # This is a no-op but the capability is declared for streaming support
+      end
+
+      def concurrency_scope(event)
+        return unless @client_id
+
+        raw = event.raw.is_a?(Hash) ? event.raw : {}
+        raw_event = raw.is_a?(Hash) ? raw["event"] || raw[:event] || raw : {}
+        raw_team = raw.is_a?(Hash) ? raw["team"] || raw[:team] : nil
+        raw_team_id = raw_team.is_a?(Hash) ? raw_team["id"] || raw_team[:id] : raw_team
+        raw_team_id || raw["team_id"] || raw[:team_id] || raw_event["team_id"] || raw_event[:team_id] || raw_event["team"] || raw_event[:team]
       end
 
       # Slack-specific: receive real-time events via Socket Mode WebSocket.
@@ -359,6 +380,53 @@ module ChatSDK
         options[:token] = token if token
         options[:proxy] = @proxy if @proxy
         options.empty? ? ::Slack::Web::Client.new : ::Slack::Web::Client.new(options)
+      end
+
+      def classify_mention(event, payload)
+        bot_user_id = resolve_bot_user_id(event)
+        return true if event.type == :mention && bot_user_id.nil?
+        return nil if bot_user_id.nil?
+
+        raw_event = payload["event"] || {}
+        text = raw_event["text"].to_s
+        text_mentions_bot = ChatSDK::Format::Mentions.mask_code_spans(text).include?("<@#{bot_user_id}>")
+        text_mentions_bot || rich_text_mentions_bot?(raw_event["blocks"], bot_user_id)
+      end
+
+      def resolve_bot_user_id(event)
+        if @client_id
+          team_id = concurrency_scope(event)
+          installation = get_installation(team_id) if team_id
+          return installation["bot_user_id"] if installation && installation["bot_user_id"]
+        end
+
+        return @bot_user_id if @bot_user_id
+
+        current_client = client
+        return unless current_client
+
+        @bot_user_id_mutex.synchronize do
+          return @bot_user_ids[current_client.object_id] if @bot_user_ids.key?(current_client.object_id)
+
+          @bot_user_ids[current_client.object_id] = begin
+            current_client.auth_test["user_id"]
+          rescue ::Slack::Web::Api::Errors::SlackError, Faraday::Error, SocketError, Timeout::Error
+            nil
+          end
+        end
+      end
+
+      def rich_text_mentions_bot?(blocks, bot_user_id)
+        Array(blocks).any? { |block| rich_text_element_mentions_bot?(block, bot_user_id) }
+      end
+
+      def rich_text_element_mentions_bot?(element, bot_user_id)
+        return false unless element.is_a?(Hash)
+        return false if %w[rich_text_preformatted preformatted code].include?(element["type"])
+        return false if element.dig("style", "code")
+        return true if element["type"] == "user" && element["user_id"] == bot_user_id
+
+        Array(element["elements"]).any? { |child| rich_text_element_mentions_bot?(child, bot_user_id) }
       end
 
       def resolve_team_client(team_id)
