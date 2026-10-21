@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Slack assistant thread, assistant context change, App Home, and channel membership lifecycle handlers
+
 ## [1.2.0] - 2026-10-21
 
 ### Added

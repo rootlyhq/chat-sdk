@@ -8,6 +8,7 @@ Docs: https://chat-sdk.ai
 
 - `chat_sdk` — Core SDK with Chat, Thread, Message, Channel, Author, Dispatcher, EventRegistry, Config, and errors
   - `Chat#on_new_message(pattern = nil)` handles non-mention messages matching a Regexp, or all messages reaching ordinary-message routing when no pattern is provided.
+  - Slack lifecycle handlers: `Chat#on_assistant_thread_started`, `Chat#on_assistant_context_changed`, `Chat#on_app_home_opened`, and `Chat#on_member_joined_channel`.
   - `Message#is_mention` reports `true`, `false`, or `nil` when mention status is unknown.
 
 ## Platform Adapters (12)

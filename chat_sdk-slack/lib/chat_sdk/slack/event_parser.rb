@@ -37,9 +37,62 @@ module ChatSDK
             parse_reaction(event, payload, added: true)
           when "reaction_removed"
             parse_reaction(event, payload, added: false)
+          when "assistant_thread_started"
+            parse_assistant_thread(event, payload, ChatSDK::Events::AssistantThreadStarted)
+          when "assistant_thread_context_changed"
+            parse_assistant_thread(event, payload, ChatSDK::Events::AssistantContextChanged)
+          when "app_home_opened"
+            parse_app_home_opened(event, payload)
+          when "member_joined_channel"
+            parse_member_joined_channel(event, payload)
           else
             []
           end
+        end
+
+        def parse_assistant_thread(event, payload, event_class)
+          assistant_thread = event["assistant_thread"]
+          return [] unless assistant_thread
+
+          thread_ts = assistant_thread["thread_ts"]
+          context = assistant_thread["context"] || {}
+          [event_class.new(
+            thread_id: thread_ts,
+            channel_id: assistant_thread["channel_id"],
+            thread_ts: thread_ts,
+            user_id: assistant_thread["user_id"],
+            context: context,
+            platform: :slack,
+            adapter_name: :slack,
+            raw: payload,
+            timestamp: slack_time(event["event_ts"])
+          )]
+        end
+
+        def parse_app_home_opened(event, payload)
+          return [] unless event["tab"] == "home"
+
+          [ChatSDK::Events::AppHomeOpened.new(
+            user_id: event["user"],
+            channel_id: event["channel"],
+            tab: event["tab"],
+            platform: :slack,
+            adapter_name: :slack,
+            raw: payload,
+            timestamp: slack_time(event["event_ts"])
+          )]
+        end
+
+        def parse_member_joined_channel(event, payload)
+          [ChatSDK::Events::MemberJoinedChannel.new(
+            user_id: event["user"],
+            channel_id: event["channel"],
+            inviter_id: event["inviter"],
+            platform: :slack,
+            adapter_name: :slack,
+            raw: payload,
+            timestamp: slack_time(event["event_ts"])
+          )]
         end
 
         def parse_mention(event, payload)

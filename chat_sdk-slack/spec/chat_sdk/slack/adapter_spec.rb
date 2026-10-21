@@ -170,6 +170,112 @@ RSpec.describe ChatSDK::Slack::Adapter do
       end
     end
 
+    context "assistant_thread_started event" do
+      it "parses a raw Slack thread ID and context" do
+        payload = {
+          "type" => "event_callback",
+          "event_id" => "Ev123",
+          "event" => {
+            "type" => "assistant_thread_started",
+            "event_ts" => "1234567890.123456",
+            "assistant_thread" => {
+              "user_id" => "U123",
+              "channel_id" => "D789",
+              "thread_ts" => "1234567890.654321",
+              "context" => {"channel_id" => "C456", "team_id" => "T789"}
+            }
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::AssistantThreadStarted)
+        expect(event.thread_id).to eq("1234567890.654321")
+        expect(event.thread_ts).to eq("1234567890.654321")
+        expect(event.channel_id).to eq("D789")
+        expect(event.context.channel_id).to eq("C456")
+        expect(event.context.team_id).to eq("T789")
+        expect(event.raw["event_id"]).to eq("Ev123")
+        expect(event.timestamp).to eq(Time.at(1_234_567_890.123456))
+      end
+    end
+
+    context "assistant_thread_context_changed event" do
+      it "parses the assistant thread context" do
+        payload = {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "assistant_thread_context_changed",
+            "event_ts" => "1234567890.123456",
+            "assistant_thread" => {
+              "user_id" => "U123",
+              "channel_id" => "D789",
+              "thread_ts" => "1234567890.654321",
+              "context" => {"team_id" => "T789"}
+            }
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::AssistantContextChanged)
+        expect(event.context.team_id).to eq("T789")
+      end
+    end
+
+    context "app_home_opened event" do
+      it "parses home tab opens and ignores other tabs" do
+        payload = {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "app_home_opened",
+            "user" => "U123",
+            "channel" => "D789",
+            "tab" => "home",
+            "event_ts" => "1234567890.123456"
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::AppHomeOpened)
+        expect(event.user_id).to eq("U123")
+        expect(event.channel_id).to eq("D789")
+        expect(event.tab).to eq("home")
+        expect(subject.parse_events(build_request(JSON.generate(
+          payload.merge("event" => payload["event"].merge("tab" => "messages"))
+        )))).to eq([])
+      end
+    end
+
+    context "member_joined_channel event" do
+      it "parses the member and inviter IDs" do
+        payload = {
+          "type" => "event_callback",
+          "event" => {
+            "type" => "member_joined_channel",
+            "user" => "U123",
+            "channel" => "C789",
+            "inviter" => "U456",
+            "event_ts" => "1234567890.123456"
+          }
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event).to be_a(ChatSDK::Events::MemberJoinedChannel)
+        expect(event.user_id).to eq("U123")
+        expect(event.channel_id).to eq("C789")
+        expect(event.inviter_id).to eq("U456")
+      end
+    end
+
+    it "ignores assistant thread events with missing assistant_thread data" do
+      payload = {"type" => "event_callback", "event" => {"type" => "assistant_thread_started"}}
+
+      expect(subject.parse_events(build_request(JSON.generate(payload)))).to eq([])
+    end
+
     context "message event (channel)" do
       it "parses into a SubscribedMessage event" do
         payload = {

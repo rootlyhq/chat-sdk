@@ -56,4 +56,78 @@ RSpec.describe ChatSDK::EventSerializer do
     expect(loaded.user.id).to eq("installer-1")
     expect(loaded.raw).to eq("type" => "installationUpdate")
   end
+
+  it "round-trips assistant thread started events and stringifies context keys" do
+    event = ChatSDK::Events::AssistantThreadStarted.new(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: ChatSDK::Events::AssistantContext.new(channel_id: "C456", team_id: "T789", force_search: true),
+      platform: :slack,
+      adapter_name: :slack
+    )
+
+    dumped = described_class.dump(event)
+    loaded = described_class.load(dumped)
+
+    expect(dumped["context"]).to eq("channel_id" => "C456", "team_id" => "T789", "enterprise_id" => nil, "thread_entry_point" => nil, "force_search" => true)
+    expect(loaded).to be_a(ChatSDK::Events::AssistantThreadStarted)
+    expect(loaded.thread_id).to eq("1234.5678")
+    expect(loaded.thread_ts).to eq("1234.5678")
+    expect(loaded.channel_id).to eq("D123")
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.context).to eq(event.context)
+  end
+
+  it "round-trips assistant context changed events" do
+    event = ChatSDK::Events::AssistantContextChanged.new(
+      thread_id: "1234.5678",
+      channel_id: "D123",
+      thread_ts: "1234.5678",
+      user_id: "U123",
+      context: {"enterprise_id" => "E1", "thread_entry_point" => "sidebar"},
+      platform: :slack,
+      adapter_name: :slack
+    )
+
+    loaded = described_class.load(described_class.dump(event))
+
+    expect(loaded).to be_a(ChatSDK::Events::AssistantContextChanged)
+    expect(loaded.context).to eq(ChatSDK::Events::AssistantContext.new(enterprise_id: "E1", thread_entry_point: "sidebar"))
+  end
+
+  it "round-trips App Home opened events" do
+    event = ChatSDK::Events::AppHomeOpened.new(
+      user_id: "U123",
+      channel_id: "D123",
+      tab: "home",
+      platform: :slack,
+      adapter_name: :slack
+    )
+
+    loaded = described_class.load(described_class.dump(event))
+
+    expect(loaded).to be_a(ChatSDK::Events::AppHomeOpened)
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.channel_id).to eq("D123")
+    expect(loaded.tab).to eq("home")
+  end
+
+  it "round-trips member joined channel events" do
+    event = ChatSDK::Events::MemberJoinedChannel.new(
+      user_id: "U123",
+      channel_id: "C456",
+      inviter_id: "U789",
+      platform: :slack,
+      adapter_name: :slack
+    )
+
+    loaded = described_class.load(described_class.dump(event))
+
+    expect(loaded).to be_a(ChatSDK::Events::MemberJoinedChannel)
+    expect(loaded.user_id).to eq("U123")
+    expect(loaded.channel_id).to eq("C456")
+    expect(loaded.inviter_id).to eq("U789")
+  end
 end
