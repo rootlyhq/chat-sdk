@@ -15,6 +15,13 @@ module ChatSDK
       def render_card(node)
         body = []
         pending_separator = false
+        if node.attributes[:image_url] && !node.attributes[:image_url].empty?
+          body << {
+            "type" => "Image",
+            "url" => node.attributes[:image_url],
+            "size" => "Stretch"
+          }
+        end
 
         node.children.each do |child|
           if child.type == :divider
@@ -54,6 +61,7 @@ module ChatSDK
       def render_node(node)
         case node.type
         when :text then render_text(node)
+        when :link then render_link(node)
         when :divider then nil # handled in render_card
         when :image then render_image(node)
         when :fields then render_fields(node)
@@ -62,6 +70,7 @@ module ChatSDK
         when :button then render_action_submit(node)
         when :link_button then render_action_open_url(node)
         when :select then render_select(node)
+        when :radio_select then render_radio_select(node)
         when :text_input then render_text_input(node)
         when :table then render_table(node)
         when :chart then render_chart(node)
@@ -69,9 +78,20 @@ module ChatSDK
       end
 
       def render_text(node)
-        {
+        text = {
           "type" => "TextBlock",
           "text" => node.attributes[:content],
+          "wrap" => true
+        }
+        text["weight"] = "Bolder" if node.attributes[:style] == :bold
+        text["isSubtle"] = true if node.attributes[:style] == :muted
+        text
+      end
+
+      def render_link(node)
+        {
+          "type" => "TextBlock",
+          "text" => "[#{node.attributes[:label]}](#{node.attributes[:url]})",
           "wrap" => true
         }
       end
@@ -136,6 +156,7 @@ module ChatSDK
         when :button then render_action_submit(node)
         when :link_button then render_action_open_url(node)
         when :select then render_select(node)
+        when :radio_select then render_radio_select(node)
         end
       end
 
@@ -163,6 +184,11 @@ module ChatSDK
         }
         action["id"] = node.attributes[:id] if node.attributes[:id]
         action["tooltip"] = node.attributes[:tooltip] if node.attributes[:tooltip]
+        if node.attributes[:style] == :primary
+          action["style"] = "positive"
+        elsif node.attributes[:style] == :danger
+          action["style"] = "destructive"
+        end
         action
       end
 
@@ -178,6 +204,30 @@ module ChatSDK
           end
         }
         input["placeholder"] = node.attributes[:placeholder] if node.attributes[:placeholder]
+        if [node.attributes[:label], node.attributes[:initial_option], node.attributes[:optional]].any? { |value| !value.nil? }
+          input["label"] = node.attributes[:label] if node.attributes[:label]
+          input["style"] = "compact"
+          input["isRequired"] = !node.attributes[:optional]
+        end
+        input["value"] = node.attributes[:initial_option] unless node.attributes[:initial_option].nil?
+        input
+      end
+
+      def render_radio_select(node)
+        input = {
+          "type" => "Input.ChoiceSet",
+          "id" => node.attributes[:id],
+          "label" => node.attributes[:label],
+          "style" => "expanded",
+          "isRequired" => !node.attributes[:optional],
+          "choices" => node.children.map do |option|
+            {
+              "title" => option.attributes[:text],
+              "value" => option.attributes[:value]
+            }
+          end
+        }
+        input["value"] = node.attributes[:initial_option] unless node.attributes[:initial_option].nil?
         input
       end
 
@@ -191,6 +241,7 @@ module ChatSDK
         }
         input["placeholder"] = node.attributes[:placeholder] if node.attributes[:placeholder]
         input["value"] = node.attributes[:value] unless node.attributes[:value].nil?
+        input["maxLength"] = node.attributes[:max_length] unless node.attributes[:max_length].nil?
         input
       end
 

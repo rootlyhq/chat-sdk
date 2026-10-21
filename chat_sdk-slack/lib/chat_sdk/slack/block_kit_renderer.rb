@@ -22,6 +22,13 @@ module ChatSDK
         if node.attributes[:subtitle]
           blocks << {type: "context", elements: [{type: "mrkdwn", text: truncate_mrkdwn(node.attributes[:subtitle], 3000)}]}
         end
+        if node.attributes[:image_url] && !node.attributes[:image_url].empty?
+          blocks << {
+            type: "image",
+            image_url: node.attributes[:image_url],
+            alt_text: truncate_text(node.attributes[:title] || "Card image", 2000)
+          }
+        end
         blocks.concat(node.children.map { |child| render_node(child) }.compact)
         blocks
       end
@@ -29,6 +36,7 @@ module ChatSDK
       def render_node(node)
         case node.type
         when :text then render_text(node)
+        when :link then render_link(node)
         when :divider then {type: "divider"}
         when :image then render_image(node)
         when :fields then render_fields(node)
@@ -41,10 +49,21 @@ module ChatSDK
       end
 
       def render_text(node)
+        content = node.attributes[:content]
+        content = "*#{truncate_mrkdwn(content, 2998)}*" if node.attributes[:style] == :bold
+        return {type: "context", elements: [{type: "mrkdwn", text: truncate_mrkdwn(content, 3000)}]} if node.attributes[:style] == :muted
+
         {
           type: "section",
-          text: {type: "mrkdwn", text: truncate_mrkdwn(node.attributes[:content], 3000)}
+          text: {type: "mrkdwn", text: truncate_mrkdwn(content, 3000)}
         }
+      end
+
+      def render_link(node)
+        url = node.attributes[:url]
+        label_budget = [2997 - url.to_s.length, 0].max
+        label = truncate_mrkdwn(node.attributes[:label], label_budget)
+        {type: "section", text: {type: "mrkdwn", text: "<#{url}|#{label}>"}}
       end
 
       def render_image(node)
@@ -83,6 +102,7 @@ module ChatSDK
         when :button then render_button(node)
         when :link_button then render_link_button(node)
         when :select then render_select(node)
+        when :radio_select then render_radio_select(node)
         end
       end
 
@@ -109,6 +129,11 @@ module ChatSDK
           url: node.attributes[:url],
           action_id: node.attributes[:id] || "link_#{node.attributes[:url].hash.abs}"
         }
+        if node.attributes[:style] == :primary
+          button[:style] = "primary"
+        elsif node.attributes[:style] == :danger
+          button[:style] = "danger"
+        end
         button[:visible_to_user_ids] = node.attributes[:visible_to] if node.attributes[:visible_to]&.any?
         button
       end
@@ -122,7 +147,30 @@ module ChatSDK
         if node.attributes[:placeholder]
           sel[:placeholder] = {type: "plain_text", text: truncate_text(node.attributes[:placeholder], 150)}
         end
+        if node.attributes[:initial_option] && !node.attributes[:initial_option].empty?
+          initial_option = sel[:options].find { |option| option[:value] == node.attributes[:initial_option] }
+          sel[:initial_option] = initial_option if initial_option
+        end
         sel
+      end
+
+      def render_radio_select(node)
+        options = node.children.first(10).map do |option|
+          rendered = {
+            text: {type: "mrkdwn", text: truncate_mrkdwn(option.attributes[:text], 75)},
+            value: option.attributes[:value]
+          }
+          if option.attributes[:description]
+            rendered[:description] = {type: "mrkdwn", text: truncate_mrkdwn(option.attributes[:description], 75)}
+          end
+          rendered
+        end
+        element = {type: "radio_buttons", action_id: node.attributes[:id], options: options}
+        if node.attributes[:initial_option] && !node.attributes[:initial_option].empty?
+          initial_option = options.find { |option| option[:value] == node.attributes[:initial_option] }
+          element[:initial_option] = initial_option if initial_option
+        end
+        element
       end
 
       def render_option(node)

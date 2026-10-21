@@ -103,4 +103,52 @@ RSpec.describe ChatSDK::Slack::BlockKitRenderer do
     expect(fence.length).to be <= 3_000
     expect(fence).to end_with("\n```")
   end
+
+  it "renders styled text, card links, and header images" do
+    card = ChatSDK.card(title: "Incident", image_url: "https://example.com/header.png") do
+      text "Quiet note", style: :muted
+      text "Important", style: :bold
+      link url: "https://example.com/details", label: "Details"
+    end
+
+    blocks = renderer.render(card)
+
+    expect(blocks[1]).to eq(
+      type: "image",
+      image_url: "https://example.com/header.png",
+      alt_text: "Incident"
+    )
+    expect(blocks[2]).to eq(
+      type: "context",
+      elements: [{type: "mrkdwn", text: "Quiet note"}]
+    )
+    expect(blocks[3].dig(:text, :text)).to eq("*Important*")
+    expect(blocks[4].dig(:text, :text)).to eq("<https://example.com/details|Details>")
+  end
+
+  it "renders initial and radio selections while ignoring unsupported action attributes" do
+    card = ChatSDK.card do
+      actions do
+        button "Disabled", id: "disabled", disabled: true
+        link_button "Primary link", url: "https://example.com", style: :primary
+        select id: "choice", label: "Choice", initial_option: "a", dispatch_action: true do
+          option "A", value: "a"
+          option "B", value: "b"
+        end
+        radio_select id: "radio", label: "Radio", initial_option: "9" do
+          12.times { |index| option "Option #{index}", value: index.to_s }
+        end
+      end
+    end
+
+    elements = renderer.render(card).first[:elements]
+
+    expect(elements[0]).not_to have_key(:disabled)
+    expect(elements[1][:style]).to eq("primary")
+    expect(elements[2][:initial_option]).to eq(elements[2][:options][0])
+    expect(elements[2]).not_to have_key(:dispatch_action)
+    expect(elements[3][:type]).to eq("radio_buttons")
+    expect(elements[3][:options].size).to eq(10)
+    expect(elements[3][:initial_option][:value]).to eq("9")
+  end
 end

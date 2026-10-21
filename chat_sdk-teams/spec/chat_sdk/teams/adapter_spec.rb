@@ -646,6 +646,39 @@ RSpec.describe ChatSDK::Teams::Adapter do
         expect(choice_set["choices"][0]).to eq({"title" => "SEV1", "value" => "sev1"})
       end
 
+      it "renders card styles, links, input options, and radio selections" do
+        card = ChatSDK.card(image_url: "https://example.com/header.png") do
+          text "Strong", style: :bold
+          text "Subtle", style: :muted
+          link url: "https://example.com/docs", label: "Docs"
+          text_input id: "name", label: "Name", max_length: 80
+          actions do
+            link_button "Open", url: "https://example.com", style: :primary
+            button "Disabled", id: "disabled", disabled: true
+            select id: "scope", label: "Scope", initial_option: "team", optional: true do
+              option "Team", value: "team"
+              option "Personal", value: "personal"
+            end
+            radio_select id: "mode", label: "Mode", initial_option: "fast" do
+              option "Fast", value: "fast"
+              option "Careful", value: "careful"
+            end
+          end
+        end
+        body = renderer.render(card)["body"]
+
+        expect(body[0]).to eq("type" => "Image", "url" => "https://example.com/header.png", "size" => "Stretch")
+        expect(body[1]).to include("weight" => "Bolder")
+        expect(body[2]).to include("isSubtle" => true)
+        expect(body[3]["text"]).to eq("[Docs](https://example.com/docs)")
+        expect(body[4]["maxLength"]).to eq(80)
+        actions = body[5]["actions"]
+        expect(actions[0]["style"]).to eq("positive")
+        expect(actions[1]).not_to have_key("disabled")
+        expect(actions[2]).to include("style" => "compact", "isRequired" => false, "value" => "team")
+        expect(actions[3]).to include("style" => "expanded", "value" => "fast")
+      end
+
       it "renders a section as Container" do
         card = ChatSDK.card do
           section "Details" do

@@ -24,10 +24,16 @@ module ChatSDK
       end
 
       def build_header(node)
-        return nil unless node.attributes[:title]
+        image_url = node.attributes[:image_url]
+        has_image_url = image_url && !image_url.empty?
+        return nil unless node.attributes[:title] || has_image_url
 
-        header = {title: node.attributes[:title]}
+        header = {title: node.attributes[:title] || ""}
         header[:subtitle] = node.attributes[:subtitle] if node.attributes[:subtitle]
+        if has_image_url
+          header[:imageUrl] = image_url
+          header[:imageType] = "SQUARE"
+        end
         header
       end
 
@@ -60,11 +66,13 @@ module ChatSDK
       def render_widget(node)
         case node.type
         when :text then render_text(node)
+        when :link then render_link(node)
         when :fields then render_fields(node)
         when :image then render_image(node)
         when :actions then render_actions(node)
         when :divider then {divider: {}}
         when :select then render_select(node)
+        when :radio_select then render_radio_select(node)
         end
       end
 
@@ -78,7 +86,13 @@ module ChatSDK
       end
 
       def render_text(node)
-        {textParagraph: {text: node.attributes[:content]}}
+        text = node.attributes[:content]
+        text = "*#{text}*" if node.attributes[:style] == :bold
+        {textParagraph: {text: text}}
+      end
+
+      def render_link(node)
+        {textParagraph: {text: %(<a href="#{node.attributes[:url]}">#{node.attributes[:label]}</a>)}}
       end
 
       def render_fields(node)
@@ -106,10 +120,15 @@ module ChatSDK
         widgets = []
         buttons = []
         node.children.each do |child|
-          if child.type == :select
+          if %i[select radio_select].include?(child.type)
             widgets << render_button_list(buttons) unless buttons.empty?
             buttons = []
-            widgets << render_select(child)
+            widget = if child.type == :radio_select
+              render_radio_select(child)
+            else
+              render_select(child)
+            end
+            widgets << widget
           else
             btn = render_action_element(child)
             buttons << btn if btn
@@ -152,36 +171,56 @@ module ChatSDK
         elsif node.attributes[:style] == :danger
           btn[:color] = {red: 0.87, green: 0.17, blue: 0.17, alpha: 1.0}
         end
+        btn[:disabled] = true if node.attributes[:disabled]
 
         btn
       end
 
       def render_link_button(node)
-        {
+        button = {
           text: node.attributes[:text],
           onClick: {
             openLink: {url: node.attributes[:url]}
           }
         }
+        if node.attributes[:style] == :primary
+          button[:color] = {red: 0.0, green: 0.53, blue: 0.87, alpha: 1.0}
+        elsif node.attributes[:style] == :danger
+          button[:color] = {red: 0.87, green: 0.17, blue: 0.17, alpha: 1.0}
+        end
+        button
       end
 
       def render_select(node)
+        render_selection_input(node, type: "DROPDOWN")
+      end
+
+      def render_radio_select(node)
+        render_selection_input(node, type: "RADIO_BUTTON")
+      end
+
+      def render_selection_input(node, type:)
         {
           selectionInput: {
             name: node.attributes[:id],
-            label: node.attributes[:placeholder] || "Select",
-            type: "DROPDOWN",
-            items: node.children.map { |opt| render_select_option(opt) }
+            label: node.attributes[:label] || node.attributes[:placeholder] || "Select",
+            type: type,
+            items: node.children.map { |option| render_select_option(option, node.attributes[:initial_option]) }
           }
         }
       end
 
-      def render_select_option(node)
-        {
+      def render_select_option(node, initial_option)
+        option = {
           text: node.attributes[:text],
-          value: node.attributes[:value],
-          selected: false
+          value: node.attributes[:value]
         }
+        if initial_option.nil?
+          option[:selected] = false
+        elsif node.attributes[:value] == initial_option
+          option[:selected] = true
+        end
+        option
       end
     end
   end

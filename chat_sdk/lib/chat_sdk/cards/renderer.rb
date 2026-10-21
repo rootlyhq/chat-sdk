@@ -9,6 +9,7 @@ module ChatSDK
         when :text then node.attributes[:content]
         when :divider then "---"
         when :image then "![#{node.attributes[:alt]}](#{node.attributes[:url]})"
+        when :link then "[#{node.attributes[:label]}](#{node.attributes[:url]})"
         when :fields then render_fields(node)
         when :field then "**#{node.attributes[:label]}**: #{node.attributes[:value]}"
         when :section then render_section(node)

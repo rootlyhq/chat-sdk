@@ -13,15 +13,22 @@ Use `ChatSDK::Modals::Builder` to define a modal:
 modal = ChatSDK::Modals::Builder.new(
   title: "Create Issue",
   submit_label: "Submit",
+  close_label: "Cancel",
   callback_id: "create_issue_modal"
 ) do
-  text_input id: "title", label: "Issue Title", placeholder: "Enter a title"
+  text_input id: "title", label: "Issue Title", placeholder: "Enter a title",
+    initial_value: "Example", max_length: 120
   text_input id: "description", label: "Description", multiline: true, optional: true
 
   select_input id: "priority", label: "Priority", placeholder: "Choose priority" do
     option "Low", value: "low"
     option "Medium", value: "medium"
     option "High", value: "high", description: "Needs immediate attention"
+  end
+
+  radio_select_input id: "visibility", label: "Visibility", initial_option: "team" do
+    option "Team", value: "team"
+    option "Private", value: "private"
   end
 
   static_text "Fill out the form above to create a new issue."
@@ -84,6 +91,8 @@ Parameters:
 | `placeholder` | `String` | No | Placeholder text |
 | `multiline` | `Boolean` | No | Multi-line text area (default: false) |
 | `optional` | `Boolean` | No | Whether the field is optional (default: false) |
+| `initial_value` | `String` | No | Initial text shown in the input |
+| `max_length` | `Integer` | No | Maximum number of characters |
 
 ### select\_input
 
@@ -96,6 +105,39 @@ select_input id: "team", label: "Team", placeholder: "Select a team" do
   option "Product", value: "product", description: "Product management"
 end
 ```
+
+Select inputs accept `initial_option:` (an option value) and `dispatch_action:`. Use `radio_select_input` for radio buttons:
+
+```ruby
+radio_select_input id: "priority", label: "Priority", initial_option: "normal" do
+  option "Normal", value: "normal"
+  option "Urgent", value: "urgent"
+end
+```
+
+Use `external_select_input` for a Slack external select. Its `initial_option:` is a hash with `label:`, `value:`, and optional `description:` keys.
+
+```ruby
+external_select_input(
+  id: "owner",
+  label: "Owner",
+  placeholder: "Search people",
+  min_query_length: 2,
+  initial_option: {label: "Ada", value: "ada", description: "Engineer"},
+  optional: true
+)
+```
+
+Group modal fields with `fields`:
+
+```ruby
+fields do
+  field "Region", "us-east-1"
+  field "Environment", "Production"
+end
+```
+
+`close_label:` sets the modal's close button label. These modal inputs and display elements are rendered by Slack; Teams and Google Chat do not support modals.
 
 ### static\_text
 

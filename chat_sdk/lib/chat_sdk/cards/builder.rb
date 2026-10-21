@@ -5,10 +5,11 @@ module ChatSDK
     class Builder
       RESERVED_TEXT_INPUT_IDS = %w[actionId value msteams].freeze
 
-      def initialize(title: nil, subtitle: nil, width: nil, &block)
+      def initialize(title: nil, subtitle: nil, width: nil, image_url: nil, &block)
         @title = title
         @subtitle = subtitle
         @width = width
+        @image_url = image_url
         @children = []
         instance_eval(&block) if block
       end
@@ -18,11 +19,18 @@ module ChatSDK
         attrs[:title] = @title if @title
         attrs[:subtitle] = @subtitle if @subtitle
         attrs[:width] = @width if @width
+        attrs[:image_url] = @image_url if @image_url
         Node.new(:card, attributes: attrs, children: @children)
       end
 
-      def text(content)
-        @children << Node.new(:text, attributes: {content: content})
+      def text(content, style: nil)
+        attrs = {content: content}
+        attrs[:style] = style unless style.nil?
+        @children << Node.new(:text, attributes: attrs)
+      end
+
+      def link(url:, label:)
+        @children << Node.new(:link, attributes: {url: url, label: label})
       end
 
       def divider
@@ -33,7 +41,7 @@ module ChatSDK
         @children << Node.new(:image, attributes: {url: url, alt: alt})
       end
 
-      def text_input(id:, label:, placeholder: nil, multiline: false, optional: false, value: nil)
+      def text_input(id:, label:, placeholder: nil, multiline: false, optional: false, value: nil, max_length: nil)
         if RESERVED_TEXT_INPUT_IDS.include?(id.to_s)
           raise ArgumentError, "Text input id #{id.inspect} is reserved"
         end
@@ -41,6 +49,7 @@ module ChatSDK
         attrs = {id: id, label: label, multiline: multiline, optional: optional}
         attrs[:placeholder] = placeholder if placeholder
         attrs[:value] = value unless value.nil?
+        attrs[:max_length] = max_length unless max_length.nil?
         @children << Node.new(:text_input, attributes: attrs)
       end
 
