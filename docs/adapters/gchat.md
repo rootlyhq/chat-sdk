@@ -101,6 +101,8 @@ end
 
 Google Chat uses resource names like `spaces/SPACE_ID/messages/MESSAGE_ID`. ChatSDK extracts the last segment as the ID, so `message.id` returns just `MESSAGE_ID` and `channel_id` is `SPACE_ID`.
 
+Edit, delete, and reaction operations accept either a bare message ID or a full resource name. Full resource names must belong to the same space as the operation's `channel_id`; malformed or cross-space names are rejected before making an API request.
+
 ## Cards Rendering
 
 Cards are rendered as Google Chat Card v2 JSON using `CardV2Renderer`.

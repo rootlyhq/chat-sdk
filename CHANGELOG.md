@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - AI tools invoked from handlers without a conversation now require an explicit scope or `scope: false`
+- Google Chat edit, delete, and reaction operations validate message resource names against the target space
 
 ## [1.1.0] - 2026-09-12
 

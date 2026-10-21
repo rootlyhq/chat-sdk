@@ -85,7 +85,7 @@ module ChatSDK
         require_capability!(:edit_messages)
         msg = ChatSDK::PostableMessage.from(message)
         request_body = build_message_body(msg)
-        request_body[:name] = "spaces/#{channel_id}/messages/#{message_id}"
+        request_body[:name] = message_resource_name(channel_id, message_id)
 
         @client.update_message(
           message: request_body,
@@ -95,7 +95,7 @@ module ChatSDK
 
       def delete_message(channel_id:, message_id:)
         require_capability!(:delete_messages)
-        @client.delete_message(name: "spaces/#{channel_id}/messages/#{message_id}")
+        @client.delete_message(name: message_resource_name(channel_id, message_id))
       end
 
       def post_ephemeral(channel_id:, user_id:, message:, thread_id: nil)
@@ -123,7 +123,7 @@ module ChatSDK
       def add_reaction(channel_id:, message_id:, emoji:)
         require_capability!(:reactions)
         @client.create_reaction(
-          parent: "spaces/#{channel_id}/messages/#{message_id}",
+          parent: message_resource_name(channel_id, message_id),
           reaction: {
             emoji: {unicode: emoji}
           }
@@ -135,7 +135,7 @@ module ChatSDK
         # Google Chat requires the reaction resource name to delete
         # We construct it from the emoji unicode
         @client.delete_reaction(
-          name: "spaces/#{channel_id}/messages/#{message_id}/reactions/#{emoji}"
+          name: "#{message_resource_name(channel_id, message_id)}/reactions/#{emoji}"
         )
       end
 
