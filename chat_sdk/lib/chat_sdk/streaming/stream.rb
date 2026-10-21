@@ -53,7 +53,8 @@ module ChatSDK
           adapter.edit_message(
             channel_id: channel_id,
             message_id: @message_id,
-            message: PostableMessage.new(text: @buffer.dup)
+            message: PostableMessage.new(text: @buffer.dup),
+            thread_id: thread_id
           )
         elsif !@message_id
           result = adapter.post_message(

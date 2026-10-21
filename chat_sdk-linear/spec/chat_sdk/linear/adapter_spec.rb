@@ -16,6 +16,18 @@ RSpec.describe ChatSDK::Linear::Adapter do
   let(:webhook_secret) { "test-webhook-secret" }
   let(:bot_username) { "TestBot" }
 
+  def comment_ownership_response(comment_id: "c1", issue_id: "issue-1", parent_id: nil)
+    {
+      "data" => {
+        "comment" => {
+          "id" => comment_id,
+          "issue" => {"id" => issue_id},
+          "parent" => parent_id ? {"id" => parent_id} : nil
+        }
+      }
+    }
+  end
+
   it_behaves_like "a chat_sdk platform adapter"
 
   describe "#initialize" do
@@ -282,13 +294,58 @@ RSpec.describe ChatSDK::Linear::Adapter do
     it "updates a comment" do
       stub_request(:post, "https://api.linear.app/graphql")
         .to_return(
-          status: 200,
-          body: JSON.generate({"data" => {"commentUpdate" => {"success" => true, "comment" => {"id" => "c1", "body" => "updated"}}}}),
-          headers: {"Content-Type" => "application/json"}
+          {status: 200, body: JSON.generate(comment_ownership_response), headers: {"Content-Type" => "application/json"}},
+          {
+            status: 200,
+            body: JSON.generate({"data" => {"commentUpdate" => {"success" => true, "comment" => {"id" => "c1", "body" => "updated"}}}}),
+            headers: {"Content-Type" => "application/json"}
+          }
         )
 
       expect { subject.edit_message(channel_id: "issue-1", message_id: "c1", message: "updated") }
         .not_to raise_error
+    end
+
+    it "rejects a comment from another issue before updating it" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate(comment_ownership_response(issue_id: "issue-2")),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect {
+        subject.edit_message(channel_id: "issue-1", message_id: "c1", message: "updated")
+      }.to raise_error(ChatSDK::Error, /does not belong to issue/)
+
+      expect(WebMock).not_to have_requested(:post, "https://api.linear.app/graphql").with { |request|
+        JSON.parse(request.body).dig("query").include?("CommentUpdate")
+      }
+    end
+
+    it "rejects a reply that does not belong to the thread root" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          {
+            status: 200,
+            body: JSON.generate(comment_ownership_response(parent_id: "other-root")),
+            headers: {"Content-Type" => "application/json"}
+          },
+          {
+            status: 200,
+            body: JSON.generate(comment_ownership_response(comment_id: "root", issue_id: "issue-1")),
+            headers: {"Content-Type" => "application/json"}
+          }
+        )
+
+      expect {
+        subject.edit_message(
+          channel_id: "issue-1",
+          message_id: "c1",
+          message: "updated",
+          thread_id: "linear:issue-1:c:root"
+        )
+      }.to raise_error(ChatSDK::Error, /does not belong to thread/)
     end
   end
 
@@ -296,9 +353,16 @@ RSpec.describe ChatSDK::Linear::Adapter do
     it "deletes a comment" do
       stub_request(:post, "https://api.linear.app/graphql")
         .to_return(
-          status: 200,
-          body: JSON.generate({"data" => {"commentDelete" => {"success" => true}}}),
-          headers: {"Content-Type" => "application/json"}
+          {
+            status: 200,
+            body: JSON.generate(comment_ownership_response),
+            headers: {"Content-Type" => "application/json"}
+          },
+          {
+            status: 200,
+            body: JSON.generate({"data" => {"commentDelete" => {"success" => true}}}),
+            headers: {"Content-Type" => "application/json"}
+          }
         )
 
       expect { subject.delete_message(channel_id: "issue-1", message_id: "c1") }
@@ -310,9 +374,16 @@ RSpec.describe ChatSDK::Linear::Adapter do
     it "creates a reaction on a comment" do
       stub_request(:post, "https://api.linear.app/graphql")
         .to_return(
-          status: 200,
-          body: JSON.generate({"data" => {"reactionCreate" => {"success" => true}}}),
-          headers: {"Content-Type" => "application/json"}
+          {
+            status: 200,
+            body: JSON.generate(comment_ownership_response),
+            headers: {"Content-Type" => "application/json"}
+          },
+          {
+            status: 200,
+            body: JSON.generate({"data" => {"reactionCreate" => {"success" => true}}}),
+            headers: {"Content-Type" => "application/json"}
+          }
         )
 
       expect { subject.add_reaction(channel_id: "issue-1", message_id: "c1", emoji: "thumbsup") }
@@ -324,9 +395,16 @@ RSpec.describe ChatSDK::Linear::Adapter do
     it "deletes a reaction from a comment" do
       stub_request(:post, "https://api.linear.app/graphql")
         .to_return(
-          status: 200,
-          body: JSON.generate({"data" => {"reactionDelete" => {"success" => true}}}),
-          headers: {"Content-Type" => "application/json"}
+          {
+            status: 200,
+            body: JSON.generate(comment_ownership_response),
+            headers: {"Content-Type" => "application/json"}
+          },
+          {
+            status: 200,
+            body: JSON.generate({"data" => {"reactionDelete" => {"success" => true}}}),
+            headers: {"Content-Type" => "application/json"}
+          }
         )
 
       expect { subject.remove_reaction(channel_id: "issue-1", message_id: "c1", emoji: "thumbsup") }
@@ -350,6 +428,58 @@ RSpec.describe ChatSDK::Linear::Adapter do
       expect(messages.length).to eq(2)
       expect(messages.first.text).to eq("first comment")
       expect(messages.first.author.name).to eq("Alice")
+    end
+
+    it "checks the root comment belongs to the issue before fetching replies" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          status: 200,
+          body: JSON.generate(comment_ownership_response(issue_id: "issue-2", comment_id: "root")),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      expect {
+        subject.fetch_messages(
+          channel_id: "issue-1",
+          thread_id: "linear:issue-1:c:root"
+        )
+      }.to raise_error(ChatSDK::Error, /does not belong to issue/)
+
+      expect(WebMock).not_to have_requested(:post, "https://api.linear.app/graphql").with { |request|
+        JSON.parse(request.body).dig("query").include?("CommentThread")
+      }
+    end
+
+    it "fetches replies after validating the root comment" do
+      stub_request(:post, "https://api.linear.app/graphql")
+        .to_return(
+          {
+            status: 200,
+            body: JSON.generate(comment_ownership_response(comment_id: "root")),
+            headers: {"Content-Type" => "application/json"}
+          },
+          {
+            status: 200,
+            body: JSON.generate({
+              "data" => {
+                "comment" => {
+                  "children" => {
+                    "nodes" => [{"id" => "reply-1", "body" => "Reply", "user" => {"id" => "u1", "name" => "Alice"}}]
+                  }
+                }
+              }
+            }),
+            headers: {"Content-Type" => "application/json"}
+          }
+        )
+
+      messages, = subject.fetch_messages(
+        channel_id: "issue-1",
+        thread_id: "linear:issue-1:c:root"
+      )
+
+      expect(messages.map(&:id)).to eq(["reply-1"])
+      expect(messages.first.text).to eq("Reply")
     end
   end
 

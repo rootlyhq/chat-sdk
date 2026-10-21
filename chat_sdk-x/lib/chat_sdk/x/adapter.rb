@@ -124,7 +124,7 @@ module ChatSDK
         parse_tweet_message(result, channel_id)
       end
 
-      def delete_message(channel_id:, message_id:) # rubocop:disable Lint/UnusedMethodArgument
+      def delete_message(channel_id:, message_id:, **_options) # rubocop:disable Lint/UnusedMethodArgument
         @client.delete_tweet(tweet_id: message_id)
       end
 
@@ -157,11 +157,11 @@ module ChatSDK
         end
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+      def add_reaction(channel_id:, message_id:, emoji:, **_options) # rubocop:disable Lint/UnusedMethodArgument
         @client.like_tweet(user_id: @user_id, tweet_id: message_id)
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options) # rubocop:disable Lint/UnusedMethodArgument
         @client.unlike_tweet(user_id: @user_id, tweet_id: message_id)
       end
 

@@ -89,7 +89,7 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         content, embeds, components = prepare_message_payload(message)
 
         @client.edit_message(
@@ -101,7 +101,7 @@ module ChatSDK
         )
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         @client.delete_message(channel_id, message_id)
       end
 
@@ -109,11 +109,11 @@ module ChatSDK
         @client.upload_file(channel_id, io, filename)
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         @client.add_reaction(channel_id, message_id, emoji)
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options)
         @client.remove_reaction(channel_id, message_id, emoji)
       end
 

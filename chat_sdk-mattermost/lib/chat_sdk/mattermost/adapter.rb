@@ -84,7 +84,7 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         require_capability!(:edit_messages)
         msg = ChatSDK::PostableMessage.from(message)
 
@@ -101,7 +101,7 @@ module ChatSDK
         )
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         require_capability!(:delete_messages)
         @client.delete_post(post_id: message_id)
       end
@@ -131,7 +131,7 @@ module ChatSDK
         )
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         require_capability!(:reactions)
         raise ChatSDK::ConfigurationError, "bot_user_id required for reactions" unless @bot_user_id
 
@@ -142,7 +142,7 @@ module ChatSDK
         )
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options)
         require_capability!(:reactions)
         raise ChatSDK::ConfigurationError, "bot_user_id required for reactions" unless @bot_user_id
 

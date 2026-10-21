@@ -41,12 +41,12 @@ module ChatSDK
         raise NotImplementedError
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, thread_id: nil)
         require_capability!(:edit_messages)
         raise NotImplementedError
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, thread_id: nil)
         require_capability!(:delete_messages)
         raise NotImplementedError
       end
@@ -61,12 +61,12 @@ module ChatSDK
         raise NotImplementedError
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
         require_capability!(:reactions)
         raise NotImplementedError
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
         require_capability!(:reactions)
         raise NotImplementedError
       end
