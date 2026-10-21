@@ -28,6 +28,9 @@ module ChatSDK
             message_id = data["id"] || data["id_str"]
             text = data["text"] || ""
             conversation_id = data["conversation_id"] || message_id
+            is_mention = !!(bot_user_id && Array(data.dig("entities", "mentions")).any? do |mention|
+              (mention["id"] || mention["id_str"]).to_s == bot_user_id.to_s
+            end)
 
             msg = ChatSDK::Message.new(
               id: message_id&.to_s,
@@ -36,6 +39,7 @@ module ChatSDK
               thread_id: "x:post:#{conversation_id}",
               channel_id: author_id,
               platform: :x,
+              is_mention: is_mention,
               raw: data
             )
 
