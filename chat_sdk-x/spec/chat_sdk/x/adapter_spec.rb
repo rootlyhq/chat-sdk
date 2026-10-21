@@ -184,7 +184,8 @@ RSpec.describe ChatSDK::X::Adapter do
               "id" => "tweet-123",
               "text" => "@mybot hello there",
               "author_id" => "user-456",
-              "conversation_id" => "conv-789"
+              "conversation_id" => "conv-789",
+              "entities" => {"mentions" => [{"id" => user_id, "username" => "mybot"}]}
             }
           ]
         }
@@ -201,6 +202,22 @@ RSpec.describe ChatSDK::X::Adapter do
         expect(event.channel_id).to eq("user-456")
         expect(event.platform).to eq(:x)
         expect(event.adapter_name).to eq(:x)
+        expect(event.message.is_mention).to be true
+      end
+
+      it "sets is_mention false when the post mentions another user" do
+        payload = {
+          "tweet_create_events" => [{
+            "id" => "tweet-124",
+            "text" => "@someone hello there",
+            "author_id" => "user-456",
+            "entities" => {"mentions" => [{"id" => "another-user", "username" => "someone"}]}
+          }]
+        }
+
+        event = subject.parse_events(build_request(JSON.generate(payload))).first
+
+        expect(event.message.is_mention).to be false
       end
 
       it "skips mentions from the bot itself" do

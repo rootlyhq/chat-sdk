@@ -23,7 +23,7 @@ x = ChatSDK::X::Adapter.new(
 )
 ```
 
-`access_token` and `consumer_secret` are required. `user_id` is recommended to filter out the bot's own messages from incoming events.
+`access_token` and `consumer_secret` are required. `user_id` is recommended to filter out the bot's own messages from incoming events and to set mention metadata from `entities.mentions`.
 
 ## Environment Variables
 
