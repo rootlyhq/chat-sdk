@@ -247,7 +247,7 @@ module ChatSDK
           raise ChatSDK::Error, "Invalid WhatsApp phone number ID in thread ID: #{thread_id.inspect}"
         end
 
-        unless match[2] == channel_id.to_s
+        unless channel_id.nil? || match[2] == channel_id.to_s
           raise ChatSDK::Error, "WhatsApp thread recipient does not match channel ID: #{thread_id.inspect}"
         end
 

@@ -1055,6 +1055,35 @@ RSpec.describe ChatSDK::WhatsApp::Adapter do
       expect(result).to be_a(Hash)
       expect(result["success"]).to be true
     end
+
+    it "uses the phone number ID from the thread when channel_id is omitted" do
+      stub = stub_request(:post, %r{graph\.facebook\.com/v25\.0/123/messages})
+        .with { |req|
+          body = JSON.parse(req.body)
+          body["messaging_product"] == "whatsapp" &&
+            body["status"] == "read" &&
+            body["message_id"] == "wamid.abc123"
+        }
+        .to_return(
+          status: 200,
+          body: JSON.generate({"success" => true}),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      subject.mark_as_read(message_id: "wamid.abc123", thread_id: "whatsapp:123:456")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "rejects a thread recipient that differs from a provided channel_id" do
+      expect do
+        subject.mark_as_read(
+          message_id: "wamid.abc123",
+          channel_id: "789",
+          thread_id: "whatsapp:123:456"
+        )
+      end.to raise_error(ChatSDK::Error, /recipient does not match channel ID/)
+    end
   end
 
   describe "#download_media" do
