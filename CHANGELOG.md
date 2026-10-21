@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Message mention classification, generalized `on_new_message` routing, scoped Slack concurrency, card text inputs and button visibility, and AI-generated message metadata
+- Twilio Content API templates and WhatsApp/RCS typing indicators
 
 ### Changed
 

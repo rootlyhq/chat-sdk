@@ -20,6 +20,26 @@ module ChatSDK
         handle_response(response)
       end
 
+      def send_template(to:, content_sid:, content_variables: nil, from: nil, messaging_service_sid: nil)
+        params = {"To" => to, "ContentSid" => content_sid}
+        if content_variables
+          params["ContentVariables"] = content_variables.is_a?(String) ? content_variables : JSON.generate(content_variables)
+        end
+        params["From"] = from if from
+        params["MessagingServiceSid"] = messaging_service_sid if messaging_service_sid
+
+        response = connection.post(messages_path, URI.encode_www_form(params))
+        handle_response(response)
+      end
+
+      def start_typing(body:, messaging_api_url: "https://messaging.twilio.com")
+        response = messaging_connection(messaging_api_url).post(
+          "/v3/Indicators/Typing.json",
+          JSON.generate(body)
+        )
+        handle_response(response)
+      end
+
       def list_messages(to: nil, from: nil, limit: 20)
         params = {"PageSize" => limit.to_s}
         params["To"] = to if to
@@ -50,6 +70,15 @@ module ChatSDK
         end
       end
 
+      def messaging_connection(url)
+        Faraday.new(url: url) do |f|
+          f.request :authorization, :basic, @account_sid, @auth_token
+          f.headers["Content-Type"] = "application/json"
+          f.response :json
+          f.adapter :net_http
+        end
+      end
+
       def handle_response(response)
         body = response.body
 
@@ -66,8 +95,10 @@ module ChatSDK
         end
 
         message = body.is_a?(Hash) ? body["message"] : response.status
+        code = body.is_a?(Hash) ? body["code"] : nil
+        error = code ? "Twilio API error (#{code}): #{message}" : "Twilio API error: #{message}"
         raise ChatSDK::PlatformError.new(
-          "Twilio API error: #{message}",
+          error,
           status: response.status,
           body: body,
           adapter_name: :twilio

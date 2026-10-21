@@ -5,16 +5,24 @@ require "rack/utils"
 module ChatSDK
   module Twilio
     class Adapter < ChatSDK::Adapter::Base
-      capabilities :direct_messages, :message_history, :delete_messages
+      capabilities :direct_messages, :message_history, :delete_messages, :typing_indicator
 
       attr_reader :client
 
-      def initialize(account_sid: nil, auth_token: nil, phone_number: nil, messaging_service_sid: nil, webhook_url: nil)
+      def initialize(
+        account_sid: nil,
+        auth_token: nil,
+        phone_number: nil,
+        messaging_service_sid: nil,
+        webhook_url: nil,
+        messaging_api_url: nil
+      )
         @account_sid = account_sid || ENV["TWILIO_ACCOUNT_SID"]
         @auth_token = auth_token || ENV["TWILIO_AUTH_TOKEN"]
         @phone_number = phone_number || ENV["TWILIO_PHONE_NUMBER"]
         @messaging_service_sid = messaging_service_sid || ENV["TWILIO_MESSAGING_SERVICE_SID"]
         @webhook_url = webhook_url
+        @messaging_api_url = messaging_api_url || ENV["TWILIO_MESSAGING_API_URL"] || "https://messaging.twilio.com"
 
         raise ChatSDK::ConfigurationError, "Twilio account_sid required" unless @account_sid
         raise ChatSDK::ConfigurationError, "Twilio auth_token required" unless @auth_token
@@ -72,6 +80,27 @@ module ChatSDK
         parse_twilio_message(result, channel_id)
       end
 
+      def send_template(channel_id:, content_sid:, content_variables: nil)
+        result = @client.send_template(
+          to: channel_id,
+          content_sid: content_sid,
+          content_variables: content_variables,
+          from: @phone_number,
+          messaging_service_sid: @messaging_service_sid
+        )
+
+        parse_twilio_message(result, channel_id)
+      end
+
+      def start_typing(channel_id:, thread_id: nil, message_id: nil) # rubocop:disable Lint/UnusedMethodArgument
+        return if message_id.to_s.empty?
+
+        body = typing_indicator_body(channel_id, message_id)
+        return unless body
+
+        @client.start_typing(body: body, messaging_api_url: @messaging_api_url)
+      end
+
       def fetch_messages(channel_id:, thread_id: nil, limit: 20) # rubocop:disable Lint/UnusedMethodArgument
         result = @client.list_messages(to: channel_id, limit: limit)
         messages = (result["messages"] || []).map do |msg|
@@ -119,6 +148,14 @@ module ChatSDK
       def prepare_message_payload(message)
         msg = ChatSDK::PostableMessage.from(message)
         msg.text || msg.card&.fallback_text || ""
+      end
+
+      def typing_indicator_body(channel_id, message_id)
+        if channel_id.to_s.start_with?("whatsapp:")
+          {"channel" => "WHATSAPP", "messageId" => message_id}
+        elsif @phone_number.to_s.start_with?("rcs:") && channel_id.to_s.start_with?("rcs:")
+          {"channel" => "RCS", "event" => "START", "from" => @phone_number, "to" => channel_id}
+        end
       end
 
       def parse_twilio_message(data, channel_id)
