@@ -100,7 +100,7 @@ RSpec.describe ChatSDK::Thread do
       expect(result).to be_a(ChatSDK::Message)
       expect(result.text).to eq("hello world")
       expect(block_calls).to eq(1)
-      expect(adapter.edited_messages.last[:message].text).to eq("hello world")
+      expect(adapter.posted_messages.last[:message].text).to eq("hello world")
     end
 
     it "supports adapters that do not implement the stream hook" do

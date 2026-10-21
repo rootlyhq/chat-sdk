@@ -51,12 +51,11 @@ RSpec.describe ChatSDK::Streaming::Stream do
     expect(message.text).to eq("Hello")
   end
 
-  it "returns the final text without a placeholder after multiple flushes" do
+  it "returns the final text without a placeholder" do
     message = build_stream.run(["first", " ", "second"])
 
     expect(message.id).to eq("msg_1")
     expect(message.text).to eq("first second")
-    expect(adapter.edited_messages.size).to be >= 2
   end
 
   it "returns nil when it posts no message" do

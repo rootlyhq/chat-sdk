@@ -73,7 +73,7 @@ module ChatSDK
       end
 
       def maybe_flush
-        return unless @message_id || adapter.supports?(:edit_messages)
+        return unless @message_id
         return if @last_flush_at && (Time.now.to_f - @last_flush_at) < update_interval
 
         flush
