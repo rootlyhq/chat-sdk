@@ -43,6 +43,7 @@
     "adapters/messenger",
     "adapters/whatsapp",
     "adapters/x",
+    "adapters/gitlab",
     "---State Backends---",
     "adapters/state-memory",
     "adapters/state-redis",

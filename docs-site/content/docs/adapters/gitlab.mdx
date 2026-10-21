@@ -1,0 +1,45 @@
+---
+title: GitLab
+description: GitLab issue and merge request comments, reactions, history, and Markdown cards via the chat_sdk-gitlab gem.
+---
+
+The GitLab adapter (`chat_sdk-gitlab`) uses the REST API for issue and merge request notes. It preserves GitLab Markdown references and renders cards as Markdown.
+
+## Installation
+
+```ruby
+gem "chat_sdk"
+gem "chat_sdk-gitlab"
+```
+
+```ruby
+require "chat_sdk/gitlab"
+
+adapter = ChatSDK::GitLab::Adapter.new(
+  token: ENV["GITLAB_TOKEN"],
+  webhook_secret: ENV["GITLAB_WEBHOOK_SECRET"]
+)
+```
+
+## Configuration
+
+The adapter requires `token:` (`GITLAB_TOKEN`) and at least one webhook verifier:
+
+- `webhook_secret:` (`GITLAB_WEBHOOK_SECRET`) checks `X-Gitlab-Token`.
+- `webhook_signing_token:` (`GITLAB_WEBHOOK_SIGNING_TOKEN`) validates Standard Webhooks signatures. The `whsec_` prefix is optional.
+
+`api_url:` (`GITLAB_API_URL`) defaults to `https://gitlab.com/api/v4`. `bot_user_id:` and `bot_username:` accept `GITLAB_BOT_USER_ID` and `GITLAB_BOT_USERNAME`; missing identity fields are looked up lazily with `GET /user`.
+
+## Events and thread IDs
+
+Enable GitLab **Comments** and **Emoji** webhook events. Merge request and issue `Note Hook` events become message events; system, confidential, and bot-authored notes are ignored. `Emoji Hook` events become reaction events. Mention detection ignores code spans.
+
+Thread IDs are `gitlab:{project_id}:{mr|issue}:{iid}` with an optional `:{discussion_id}` suffix. Channel IDs are `gitlab:{project_id}`. History pagination uses GitLab's `x-next-page` cursor for noteable comments and supports individual discussions. Channel-wide aggregation is not available. Typing is a no-op.
+
+## Example
+
+```ruby
+bot.on_new_mention do |thread, message|
+  thread.post("Thanks for the note: #{message.text}")
+end
+```

@@ -12,6 +12,7 @@
     "whatsapp",
     "x",
     "linear",
+    "gitlab",
     "state-memory",
     "state-redis",
     "state-pg"

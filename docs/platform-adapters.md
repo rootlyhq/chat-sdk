@@ -6,19 +6,19 @@ A platform adapter translates between ChatSDK's normalized API and a specific ch
 
 Not every platform supports every feature. Adapters declare their capabilities, and ChatSDK raises `NotSupportedError` if you call a method the adapter does not support.
 
-| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio | Messenger | WhatsApp | X | Linear |
-|---------|-------|-------|-------|------------|---------|----------|--------|-----------|----------|---|--------|
-| Post | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
-| Edit | yes | yes | yes | yes | yes | yes | no | no | no | no | yes |
-| Delete | yes | yes | yes | yes | yes | yes | yes | no | no | yes | yes |
-| Ephemeral | yes | no | yes | yes | no | no | no | no | no | no | no |
-| Reactions | yes | no | yes | yes | yes | yes | no | no | yes | yes | yes |
-| Files | yes | yes | no | yes | yes | yes | no | yes | yes | yes | no |
-| Modals | yes | no | no | no | no | no | no | no | no | no | no |
-| Streaming | yes | yes | yes | yes | yes | yes | no | no | no | no | yes |
-| DMs | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | no |
-| History | yes | no | yes | yes | yes | no | yes | no | no | yes | yes |
-| Typing | yes | yes | no | yes | yes | yes | no | yes | no | no | no |
+| Feature | Slack | Teams | GChat | Mattermost | Discord | Telegram | Twilio | Messenger | WhatsApp | X | Linear | GitLab |
+|---------|-------|-------|-------|------------|---------|----------|--------|-----------|----------|---|--------|--------|
+| Post | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes |
+| Edit | yes | yes | yes | yes | yes | yes | no | no | no | no | yes | yes |
+| Delete | yes | yes | yes | yes | yes | yes | yes | no | no | yes | yes | yes |
+| Ephemeral | yes | no | yes | yes | no | no | no | no | no | no | no | no |
+| Reactions | yes | no | yes | yes | yes | yes | no | no | yes | yes | yes | yes |
+| Files | yes | yes | no | yes | yes | yes | no | yes | yes | yes | no | no |
+| Modals | yes | no | no | no | no | no | no | no | no | no | no | no |
+| Streaming | yes | yes | yes | yes | yes | yes | no | no | no | no | yes | no |
+| DMs | yes | yes | yes | yes | yes | yes | yes | yes | yes | yes | no | no |
+| History | yes | no | yes | yes | yes | no | yes | no | no | yes | yes | yes |
+| Typing | yes | yes | no | yes | yes | yes | no | yes | no | no | no | no |
 
 ## Official Adapters
 
@@ -33,6 +33,7 @@ Not every platform supports every feature. Adapters declare their capabilities, 
 - [WhatsApp](adapters/whatsapp.md) -- `gem "chat_sdk-whatsapp"` -- WhatsApp Business Cloud API adapter with interactive message rendering.
 - [X](adapters/x.md) -- `gem "chat_sdk-x"` -- X API v2 adapter with HMAC-SHA256 webhook verification for tweets, DMs, and likes.
 - [Linear](adapters/linear.md) -- `gem "chat_sdk-linear"` -- Linear GraphQL API adapter with HMAC-SHA256 webhook verification for issue comment threading.
+- [GitLab](adapters/gitlab.md) -- `gem "chat_sdk-gitlab"` -- GitLab REST adapter with Standard Webhooks or secret-token verification for issue and merge request notes.
 
 ## Checking Capabilities at Runtime
 
