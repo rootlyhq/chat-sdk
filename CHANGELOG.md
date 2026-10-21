@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Message mention classification, generalized `on_new_message` routing, scoped Slack concurrency, card text inputs and button visibility, and AI-generated message metadata
 - Teams installation lifecycle callbacks, Adaptive Card input values and native tables, Graph reference attachments, and persistent conversation service URLs
+- Twilio Content API templates and WhatsApp/RCS typing indicators
 
 ### Changed
 
