@@ -8,6 +8,7 @@ module ChatSDK
       @config = Config.new(user_name: user_name, adapters: adapters, state: state, **options)
       @state = state
       @adapters = adapters
+      @adapters.each_value { |adapter| adapter.set_state(state) if adapter.respond_to?(:set_state) }
       @registry = EventRegistry.new
       @history = History.new(self)
       @webhooks = {}
@@ -56,6 +57,14 @@ module ChatSDK
 
     def on_slash_command(command, &block)
       @registry.register(:slash_command, matcher: command, &block)
+    end
+
+    def on_installed(&block)
+      @registry.register(:installed, &block)
+    end
+
+    def on_uninstalled(&block)
+      @registry.register(:uninstalled, &block)
     end
 
     # Adapter access

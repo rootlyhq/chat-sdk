@@ -31,4 +31,29 @@ RSpec.describe ChatSDK::EventSerializer do
 
     expect(loaded.values).to eq("form" => {"name" => "Alice"})
   end
+
+  it "round-trips installation events" do
+    event = ChatSDK::Events::Installed.new(
+      installation_id: "team-1",
+      team_id: "team-1",
+      tenant_id: "tenant-1",
+      conversation_id: "conversation-1",
+      action: "add-upgrade",
+      user: ChatSDK::Author.new(id: "installer-1", name: "Installer", platform: :teams),
+      platform: :teams,
+      adapter_name: :teams,
+      raw: {"type" => "installationUpdate"}
+    )
+
+    loaded = described_class.load(described_class.dump(event))
+
+    expect(loaded).to be_a(ChatSDK::Events::Installed)
+    expect(loaded.installation_id).to eq("team-1")
+    expect(loaded.team_id).to eq("team-1")
+    expect(loaded.tenant_id).to eq("tenant-1")
+    expect(loaded.conversation_id).to eq("conversation-1")
+    expect(loaded.action).to eq("add-upgrade")
+    expect(loaded.user.id).to eq("installer-1")
+    expect(loaded.raw).to eq("type" => "installationUpdate")
+  end
 end
