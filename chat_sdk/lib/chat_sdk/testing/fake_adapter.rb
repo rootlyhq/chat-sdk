@@ -50,7 +50,7 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         record = RecordedCall.new(:edit_message, channel_id: channel_id, message_id: message_id, message: message)
         @edited_messages << record
         record
@@ -68,7 +68,7 @@ module ChatSDK
         record
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         record = RecordedCall.new(:delete_message, channel_id: channel_id, message_id: message_id)
         @deleted_messages << record
         record
@@ -86,13 +86,13 @@ module ChatSDK
         record
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         record = RecordedCall.new(:add_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji)
         @reactions_added << record
         record
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options)
         record = RecordedCall.new(:remove_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji)
         @reactions_removed << record
         record

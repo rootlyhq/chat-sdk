@@ -44,19 +44,20 @@ module ChatSDK
       end
 
       # Outbound
-      def post_message(channel_id:, message:, thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
+      def post_message(channel_id:, message:, thread_id: nil)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
         payload = prepare_message_payload(message)
 
         result = if payload[:type] == "text" && payload.dig(:text, :body)
           chunks = split_message(payload[:text][:body])
           chunks.reduce(nil) do |_, chunk|
-            @client.send_message(to: channel_id, type: "text", text: {body: chunk})
+            @client.send_message(to: channel_id, type: "text", phone_number_id: phone_number_id, text: {body: chunk})
           end
         else
-          @client.send_message(to: channel_id, **payload)
+          @client.send_message(to: channel_id, phone_number_id: phone_number_id, **payload)
         end
 
-        parse_whatsapp_message(result, channel_id)
+        parse_whatsapp_message(result, channel_id, phone_number_id: phone_number_id)
       end
 
       def self.template_components(header: nil, body_params: [], button_payloads: [])
@@ -88,19 +89,30 @@ module ChatSDK
         components
       end
 
-      def post_template(channel_id:, template_name:, language_code: "en", components: nil)
-        @client.send_template(to: channel_id, template_name: template_name, language_code: language_code, components: components)
+      def post_template(channel_id:, template_name:, language_code: "en", components: nil, thread_id: nil)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
+        @client.send_template(
+          to: channel_id,
+          template_name: template_name,
+          language_code: language_code,
+          components: components,
+          phone_number_id: phone_number_id
+        )
       end
 
       def mark_as_read(message_id:, channel_id: nil, thread_id: nil, message: nil) # rubocop:disable Lint/UnusedMethodArgument
-        @client.mark_as_read(message_id: message_id)
+        @client.mark_as_read(
+          message_id: message_id,
+          phone_number_id: outbound_phone_number_id(channel_id, thread_id)
+        )
       end
 
-      def reply_message(channel_id:, message_id:, message:, thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
+      def reply_message(channel_id:, message_id:, message:, thread_id: nil)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
         payload = prepare_message_payload(message)
         payload[:context] = {message_id: message_id}
-        result = @client.send_message(to: channel_id, **payload)
-        parse_whatsapp_message(result, channel_id)
+        result = @client.send_message(to: channel_id, phone_number_id: phone_number_id, **payload)
+        parse_whatsapp_message(result, channel_id, phone_number_id: phone_number_id)
       end
 
       def download_media(media_id:)
@@ -112,27 +124,48 @@ module ChatSDK
         response.body
       end
 
-      def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil) # rubocop:disable Lint/UnusedMethodArgument
+      def upload_file(channel_id:, io:, filename:, thread_id: nil, comment: nil)
+        phone_number_id = outbound_phone_number_id(channel_id, thread_id)
         content_type = detect_content_type(filename)
         media_type = media_type_for(content_type)
 
         # Upload media first
-        media_result = @client.upload_media(io: io, filename: filename, content_type: content_type)
+        media_result = @client.upload_media(
+          io: io,
+          filename: filename,
+          content_type: content_type,
+          phone_number_id: phone_number_id
+        )
         media_id = media_result["id"]
 
         # Send media message
         media_payload = {caption: comment}.compact
-        result = @client.send_message(to: channel_id, type: media_type, **{media_type => media_payload.merge(id: media_id)})
+        result = @client.send_message(
+          to: channel_id,
+          type: media_type,
+          phone_number_id: phone_number_id,
+          **{media_type => media_payload.merge(id: media_id)}
+        )
 
-        parse_whatsapp_message(result, channel_id)
+        parse_whatsapp_message(result, channel_id, phone_number_id: phone_number_id)
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
-        @client.send_reaction(to: channel_id, message_id: message_id, emoji: emoji)
+      def add_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
+        @client.send_reaction(
+          to: channel_id,
+          message_id: message_id,
+          emoji: emoji,
+          phone_number_id: outbound_phone_number_id(channel_id, thread_id)
+        )
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji: "") # rubocop:disable Lint/UnusedMethodArgument
-        @client.send_reaction(to: channel_id, message_id: message_id, emoji: "")
+      def remove_reaction(channel_id:, message_id:, emoji: "", thread_id: nil) # rubocop:disable Lint/UnusedMethodArgument
+        @client.send_reaction(
+          to: channel_id,
+          message_id: message_id,
+          emoji: "",
+          phone_number_id: outbound_phone_number_id(channel_id, thread_id)
+        )
       end
 
       def open_dm(user_id)
@@ -186,7 +219,7 @@ module ChatSDK
         end
       end
 
-      def parse_whatsapp_message(data, channel_id)
+      def parse_whatsapp_message(data, channel_id, phone_number_id: @phone_number_id)
         message_id = data.dig("messages", 0, "id")
 
         ChatSDK::Message.new(
@@ -198,11 +231,27 @@ module ChatSDK
             platform: :whatsapp,
             bot: true
           ),
-          thread_id: "whatsapp:#{@phone_number_id}:#{channel_id}",
+          thread_id: "whatsapp:#{phone_number_id}:#{channel_id}",
           channel_id: channel_id,
           platform: :whatsapp,
           raw: data
         )
+      end
+
+      def outbound_phone_number_id(channel_id, thread_id)
+        return @phone_number_id unless thread_id
+
+        match = thread_id.match(/\Awhatsapp:([^:]+):(.+)\z/) if thread_id.is_a?(String)
+        phone_number_id = match && match[1]
+        unless phone_number_id&.match?(/\A\d+\z/)
+          raise ChatSDK::Error, "Invalid WhatsApp phone number ID in thread ID: #{thread_id.inspect}"
+        end
+
+        unless channel_id.nil? || match[2] == channel_id.to_s
+          raise ChatSDK::Error, "WhatsApp thread recipient does not match channel ID: #{thread_id.inspect}"
+        end
+
+        phone_number_id
       end
     end
   end

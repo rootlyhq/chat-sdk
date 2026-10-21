@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Message mention classification, generalized `on_new_message` routing, scoped Slack concurrency, card text inputs and button visibility, and AI-generated message metadata
 - Teams installation lifecycle callbacks, Adaptive Card input values and native tables, Graph reference attachments, and persistent conversation service URLs
+- Twilio Content API templates and WhatsApp/RCS typing indicators
 
 ### Changed
 
@@ -22,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- X mention events defer classification when mention entities are unavailable; Telegram polling honors reply mention settings and truncation preserves spoiler and code-span boundaries; WhatsApp outbound thread IDs must match the target channel
+- Telegram reply-to-bot mention handling now distinguishes forum topic roots, and MarkdownV2 truncation preserves complete links, code spans, and entities
+- WhatsApp inbound sender identifiers now fall back from empty phone fields to contact IDs, and outbound thread IDs are validated before sending
+- X mention events now set `message.is_mention` from the bot user ID in platform mention entities
+- Discord fetched messages now set `message.is_mention` from bot mention data
 - Message routing now prioritizes direct messages, subscribed threads, and mentions before ordinary message handlers
 - Slack cards now render `title` as a header block and `subtitle` as a context block instead of dropping them
 - Teams filters bot-authored activities by app identity and marks bot/self authors consistently
@@ -29,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 - AI tools invoked from handlers without a conversation now require an explicit scope or `scope: false`
+- Google Chat edit, delete, and reaction operations validate message resource names against the target space
+- Linear comment mutations and threaded history validate comment ownership before exposing or changing content
 
 ## [1.1.0] - 2026-09-12
 

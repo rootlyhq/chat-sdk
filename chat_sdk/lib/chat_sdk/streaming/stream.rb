@@ -3,6 +3,8 @@
 module ChatSDK
   module Streaming
     class Stream
+      include ChatSDK::Adapter::Invocation
+
       attr_reader :adapter, :channel_id, :thread_id, :update_interval
 
       def initialize(adapter:, channel_id:, thread_id:, placeholder: nil, update_interval: 0.5)
@@ -50,10 +52,12 @@ module ChatSDK
         return if @buffer.empty?
 
         if @message_id && adapter.supports?(:edit_messages)
-          adapter.edit_message(
+          call_adapter(
+            :edit_message,
             channel_id: channel_id,
             message_id: @message_id,
-            message: PostableMessage.new(text: @buffer.dup)
+            message: PostableMessage.new(text: @buffer.dup),
+            thread_id: thread_id
           )
         elsif !@message_id
           result = adapter.post_message(

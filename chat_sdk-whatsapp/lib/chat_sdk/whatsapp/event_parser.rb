@@ -11,14 +11,21 @@ module ChatSDK
           (payload["entry"] || [])
             .flat_map { |entry| entry["changes"] || [] }
             .select { |change| change["field"] == "messages" }
-            .flat_map { |change| change.dig("value", "messages") || [] }
-            .filter_map { |msg| parse_message(msg, phone_number_id) }
+            .flat_map do |change|
+              value = change["value"] || {}
+              contacts = value["contacts"] || []
+              (value["messages"] || []).filter_map do |msg|
+                contact = contact_for(msg, contacts)
+                parse_message(msg, phone_number_id, contact)
+              end
+            end
         end
 
         private
 
-        def parse_message(msg, phone_number_id)
-          from = msg["from"]&.to_s
+        def parse_message(msg, phone_number_id, contact)
+          from = first_present(msg["from"], msg["wa_id"], contact&.dig("wa_id"),
+            msg["from_user_id"], contact&.dig("user_id"))
           return nil unless from
 
           author = ChatSDK::Author.new(id: from, name: from, platform: :whatsapp, bot: false)
@@ -34,6 +41,16 @@ module ChatSDK
           when "image", "document", "audio", "video", "sticker"
             parse_media_message(msg, author, from, thread_id)
           end
+        end
+
+        def contact_for(message, contacts)
+          from = message["from"].to_s
+          contacts.find { |contact| contact["wa_id"].to_s == from } ||
+            (contacts.first if contacts.length == 1)
+        end
+
+        def first_present(*values)
+          values.map { |value| value&.to_s }.find { |value| value && !value.empty? }
         end
 
         def parse_reaction_message(msg, from, thread_id)

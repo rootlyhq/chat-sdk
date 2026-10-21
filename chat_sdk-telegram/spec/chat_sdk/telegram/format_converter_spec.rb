@@ -229,4 +229,56 @@ RSpec.describe ChatSDK::Telegram::FormatConverter do
       expect(back).to eq(telegram_text)
     end
   end
+
+  describe "#truncate_markdown_v2" do
+    it "returns in-limit Markdown unchanged" do
+      markdown = "[x](https://example.com/a`b)"
+
+      expect(converter.truncate_markdown_v2(markdown, markdown.length)).to eq(markdown)
+    end
+
+    it "drops an incomplete link destination" do
+      markdown = "prefix [link](https://example.com/#{"a" * 20})"
+
+      expect(converter.truncate_markdown_v2(markdown, 30)).to eq("prefix \\.\\.\\.")
+    end
+
+    it "drops an incomplete code span" do
+      markdown = "prefix `#{"code" * 10}`"
+
+      expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
+    end
+
+    it "ignores link starts inside complete code spans" do
+      markdown = "prefix `arr[` continues with plenty of text #{"after " * 10}"
+      limit = 32
+      ellipsis = "\\.\\.\\."
+
+      truncated = converter.truncate_markdown_v2(markdown, limit)
+
+      expect(truncated).to eq("#{markdown[0, limit - ellipsis.length]}#{ellipsis}")
+      expect(truncated).to include("`arr[` continues")
+    end
+
+    it "does not close a single-backtick span with a triple-backtick run" do
+      markdown = "prefix `abc``` trailing"
+
+      expect(converter.truncate_markdown_v2(markdown, 20)).to eq("prefix \\.\\.\\.")
+    end
+
+    it "drops an unmatched spoiler delimiter" do
+      markdown = "prefix ||spoiler#{"x" * 30}||"
+
+      truncated = converter.truncate_markdown_v2(markdown, 24)
+
+      expect(truncated).to eq("prefix \\.\\.\\.")
+      expect(truncated).not_to include("||")
+    end
+
+    it "drops an incomplete entity" do
+      markdown = "prefix **#{"bold" * 10}**"
+
+      expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
+    end
+  end
 end

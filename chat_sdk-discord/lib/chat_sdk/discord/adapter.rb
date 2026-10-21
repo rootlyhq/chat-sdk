@@ -9,10 +9,11 @@ module ChatSDK
 
       attr_reader :client
 
-      def initialize(bot_token: nil, public_key: nil, application_id: nil)
+      def initialize(bot_token: nil, public_key: nil, application_id: nil, bot_user_id: nil)
         @bot_token = bot_token || ENV["DISCORD_BOT_TOKEN"]
         @public_key = public_key || ENV["DISCORD_PUBLIC_KEY"]
         @application_id = application_id || ENV["DISCORD_APPLICATION_ID"]
+        @bot_user_id = bot_user_id || ENV["DISCORD_BOT_USER_ID"] || @application_id
 
         raise ChatSDK::ConfigurationError, "Discord bot_token required" unless @bot_token
 
@@ -89,7 +90,7 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         content, embeds, components = prepare_message_payload(message)
 
         @client.edit_message(
@@ -101,7 +102,7 @@ module ChatSDK
         )
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         @client.delete_message(channel_id, message_id)
       end
 
@@ -109,11 +110,11 @@ module ChatSDK
         @client.upload_file(channel_id, io, filename)
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         @client.add_reaction(channel_id, message_id, emoji)
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options)
         @client.remove_reaction(channel_id, message_id, emoji)
       end
 
@@ -249,6 +250,7 @@ module ChatSDK
           thread_id: data["id"],
           channel_id: channel_id,
           platform: :discord,
+          is_mention: !!(@bot_user_id && Array(data["mentions"]).any? { |mention| mention["id"].to_s == @bot_user_id }),
           raw: data
         )
       end

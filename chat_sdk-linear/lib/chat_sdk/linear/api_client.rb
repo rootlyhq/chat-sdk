@@ -90,6 +90,19 @@ module ChatSDK
         end
       end
 
+      def fetch_comment(comment_id:)
+        query = <<~GQL
+          query CommentOwnership($id: String!) {
+            comment(id: $id) {
+              id
+              issue { id }
+              parent { id }
+            }
+          }
+        GQL
+        graphql(query, {id: comment_id}).dig("data", "comment")
+      end
+
       private
 
       def base_url
