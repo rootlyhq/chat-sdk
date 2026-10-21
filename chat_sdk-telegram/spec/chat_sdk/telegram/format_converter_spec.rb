@@ -249,6 +249,17 @@ RSpec.describe ChatSDK::Telegram::FormatConverter do
       expect(converter.truncate_markdown_v2(markdown, 16)).to eq("prefix \\.\\.\\.")
     end
 
+    it "ignores link starts inside complete code spans" do
+      markdown = "prefix `arr[` continues with plenty of text #{"after " * 10}"
+      limit = 32
+      ellipsis = "\\.\\.\\."
+
+      truncated = converter.truncate_markdown_v2(markdown, limit)
+
+      expect(truncated).to eq("#{markdown[0, limit - ellipsis.length]}#{ellipsis}")
+      expect(truncated).to include("`arr[` continues")
+    end
+
     it "does not close a single-backtick span with a triple-backtick run" do
       markdown = "prefix `abc``` trailing"
 

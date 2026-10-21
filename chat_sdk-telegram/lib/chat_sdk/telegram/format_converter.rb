@@ -46,7 +46,8 @@ module ChatSDK
 
       def trim_to_safe_boundary(text)
         text = text[0...-1] while trailing_backslashes(text).odd?
-        link_start = incomplete_link_start(text)
+        link_detection_text, = mask_code_spans(text)
+        link_start = incomplete_link_start(link_detection_text)
         text = text[0...link_start] if link_start
 
         masked_links = mask_links(text)
