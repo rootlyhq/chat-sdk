@@ -71,6 +71,8 @@ end
 | `threads` | No |
 | `message_history` | No |
 
+Thread IDs use `whatsapp:<phone_number_id>:<user_id>`. Outbound calls use the numeric phone number ID encoded in the thread.
+
 ## Direct Client Access
 
 ```ruby
