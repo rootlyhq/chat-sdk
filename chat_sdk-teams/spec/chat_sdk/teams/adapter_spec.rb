@@ -946,6 +946,22 @@ RSpec.describe ChatSDK::Teams::Adapter do
         expect(renderer.render(card)["body"]).to be_empty
       end
 
+      it "renders an actions node directly with a flat body" do
+        card = ChatSDK.card do
+          actions do
+            select id: "scope", label: "Scope" do
+              option "All", value: "all"
+            end
+            button "Continue", id: "continue"
+          end
+        end
+
+        result = renderer.render(card.children.first)
+
+        expect(result["body"]).to all(be_a(Hash))
+        expect(result["body"].map { |element| element["type"] }).to eq(["Input.ChoiceSet", "ActionSet"])
+      end
+
       it "renders a section as Container" do
         card = ChatSDK.card do
           section "Details" do

@@ -22,7 +22,7 @@ module ChatSDK
         events = adapter.parse_events(request || env)
         events.each { |event| chat.dispatch(event, adapter_name: adapter_name) }
 
-        response = adapter.webhook_response(events)
+        response = adapter.webhook_response(events, request || env)
         return response if response
 
         [200, {"content-type" => "text/plain"}, [""]]

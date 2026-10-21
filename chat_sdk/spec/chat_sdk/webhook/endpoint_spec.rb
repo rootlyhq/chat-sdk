@@ -139,7 +139,7 @@ RSpec.describe ChatSDK::Webhook::Endpoint do
       allow(test_adapter).to receive(:webhook_response).and_return(response)
 
       expect(endpoint.call(env)).to eq(response)
-      expect(test_adapter).to have_received(:webhook_response).with([])
+      expect(test_adapter).to have_received(:webhook_response).with([], anything)
     end
   end
 

@@ -6,7 +6,10 @@ module ChatSDK
       def render(node)
         case node.type
         when :card then render_card(node)
-        else wrap_card([render_node(node)].compact)
+        else
+          rendered = render_node(node)
+          elements = rendered.is_a?(Array) ? rendered.flatten.compact : [rendered].compact
+          wrap_card(elements)
         end
       end
 

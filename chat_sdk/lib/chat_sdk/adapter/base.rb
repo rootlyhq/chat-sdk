@@ -22,7 +22,7 @@ module ChatSDK
         nil
       end
 
-      def webhook_response(_events)
+      def webhook_response(_events, _request = nil)
         nil
       end
 

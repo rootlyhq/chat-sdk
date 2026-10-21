@@ -204,6 +204,37 @@ RSpec.describe "Teams parity behavior" do
       expect(JSON.parse(body.first)["value"]).to eq("OK")
     end
 
+    it "acknowledges an auto-submit invoke with no values without dispatching actions" do
+      chat = ChatSDK::Chat.new(user_name: "bot", adapters: {teams: adapter}, state: ChatSDK::State::Memory.new)
+      endpoint = ChatSDK::Webhook::Endpoint.new(chat: chat, adapter: adapter, adapter_name: :teams)
+      allow(adapter).to receive(:verify_request!).and_return(true)
+      expect(chat).not_to receive(:dispatch)
+      request = Rack::MockRequest.env_for(
+        "/webhooks/teams",
+        method: "POST",
+        input: JSON.generate(
+          "type" => "invoke",
+          "name" => "adaptiveCard/action",
+          "from" => {"id" => "user-1"},
+          "conversation" => {"id" => "conversation-1"},
+          "value" => {
+            "action" => {"data" => {"actionId" => "__auto_submit"}}
+          }
+        ),
+        content_type: "application/json"
+      )
+
+      status, headers, body = endpoint.call(request)
+
+      expect(status).to eq(200)
+      expect(headers["content-type"]).to eq("application/json")
+      expect(JSON.parse(body.first)).to eq(
+        "statusCode" => 200,
+        "type" => "application/vnd.microsoft.activity.message",
+        "value" => "OK"
+      )
+    end
+
     it "returns the Bot Framework message response" do
       event = ChatSDK::Events::Action.new(
         action_id: "submit",
