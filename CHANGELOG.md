@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Card and modal DSL parity for styled text, links, inputs, selections, and fields across supported adapters
 
+### Fixed
+
+- Teams resolves conversation and DM service URLs from the shared state store so replies from other processes use the right regional endpoint; state reads are no longer cached per process
+
 ## [1.2.0] - 2026-10-21
 
 ### Added

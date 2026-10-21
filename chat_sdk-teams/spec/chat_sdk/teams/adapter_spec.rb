@@ -69,6 +69,20 @@ RSpec.describe ChatSDK::Teams::Adapter do
       }
     end
 
+    def parse_trusted_activity(adapter, activity)
+      token = build_jwt({"serviceurl" => activity.fetch("serviceUrl")})
+      env = Rack::MockRequest.env_for(
+        "/api/messages",
+        :method => "POST",
+        :input => JSON.generate(activity),
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_AUTHORIZATION" => "Bearer #{token}"
+      )
+      request = Rack::Request.new(env)
+      adapter.verify_request!(request)
+      adapter.parse_events(request)
+    end
+
     before do
       openid_config = {"jwks_uri" => "https://login.botframework.com/v1/.well-known/keys"}
       stub_request(:get, ChatSDK::Teams::JwtVerifier::OPENID_CONFIG_URL)
@@ -168,6 +182,213 @@ RSpec.describe ChatSDK::Teams::Adapter do
       expect(state.get("chat_sdk:teams:service_url:normalized-trailing-slash-conversation"))
         .to eq("https://smba.trafficmanager.net/amer")
       expect(state.get("chat_sdk:teams:service_url:insecure-conversation")).to be_nil
+    end
+
+    it "uses shared state for replies and edits in another Chat instance" do
+      state = ChatSDK::State::Memory.new
+      adapter_a = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      adapter_b = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_a}, state: state)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_b}, state: state)
+      service_url = "https://smba.trafficmanager.net/amer/"
+      conversation_id = "cross-process-conversation"
+      allow(adapter_b.client).to receive(:send_activity).and_return({"id" => "reply-1"})
+      allow(adapter_b.client).to receive(:update_activity)
+
+      parse_trusted_activity(adapter_a, {
+        "type" => "message",
+        "text" => "hello",
+        "from" => {"id" => "29:user-1"},
+        "conversation" => {"id" => conversation_id},
+        "serviceUrl" => service_url
+      })
+
+      adapter_b.post_message(channel_id: conversation_id, message: "reply")
+      adapter_b.edit_message(channel_id: conversation_id, message_id: "reply-1", message: "edited")
+
+      expect(adapter_b.client).to have_received(:send_activity).with(
+        service_url: service_url,
+        conversation_id: conversation_id,
+        activity: anything
+      )
+      expect(adapter_b.client).to have_received(:update_activity).with(
+        service_url: service_url,
+        conversation_id: conversation_id,
+        activity_id: "reply-1",
+        activity: anything
+      )
+    end
+
+    it "does not persist untrusted service URLs for conversations or users" do
+      state = ChatSDK::State::Memory.new
+      adapter_a = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      adapter_b = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_a}, state: state)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_b}, state: state)
+      activity = {
+        "type" => "message",
+        "text" => "hello",
+        "from" => {"id" => "29:user-untrusted"},
+        "conversation" => {"id" => "untrusted-conversation"},
+        "serviceUrl" => "https://attacker.example/teams/"
+      }
+      token = build_jwt({"serviceurl" => "https://smba.trafficmanager.net/teams/"})
+      env = Rack::MockRequest.env_for(
+        "/api/messages",
+        :method => "POST",
+        :input => JSON.generate(activity),
+        "CONTENT_TYPE" => "application/json",
+        "HTTP_AUTHORIZATION" => "Bearer #{token}"
+      )
+      request = Rack::Request.new(env)
+      adapter_a.verify_request!(request)
+      adapter_a.parse_events(request)
+      allow(adapter_b.client).to receive(:send_activity).and_return({"id" => "reply-1"})
+
+      expect(state.get("chat_sdk:teams:service_url:untrusted-conversation")).to be_nil
+      expect(state.get("chat_sdk:teams:user_service_url:29:user-untrusted")).to be_nil
+
+      adapter_b.post_message(channel_id: "untrusted-conversation", message: "reply")
+
+      expect(adapter_b.client).to have_received(:send_activity).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        conversation_id: "untrusted-conversation",
+        activity: anything
+      )
+    end
+
+    it "resolves service URLs from event registration, state, and configured defaults in order" do
+      state = ChatSDK::State::Memory.new
+      configured_url = "https://custom.example/teams/"
+      adapter = described_class.new(
+        app_id: app_id,
+        app_password: app_password,
+        tenant_id: tenant_id,
+        service_url: configured_url
+      )
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter}, state: state)
+      allow(adapter.client).to receive(:send_activity).and_return({"id" => "reply-1"})
+      parse_trusted_activity(adapter, {
+        "type" => "message",
+        "text" => "hello",
+        "from" => {"id" => "29:user-1"},
+        "conversation" => {"id" => "event-conversation"},
+        "serviceUrl" => "https://smba.trafficmanager.net/amer/"
+      })
+      state.set("chat_sdk:teams:service_url:event-conversation", "https://state.example/teams/")
+      state.set("chat_sdk:teams:service_url:state-conversation", "https://state.example/teams/")
+
+      adapter.post_message(channel_id: "event-conversation", message: "reply")
+      adapter.post_message(channel_id: "state-conversation", message: "reply")
+      adapter.post_message(channel_id: "configured-conversation", message: "reply")
+
+      expect(adapter.client).to have_received(:send_activity).with(
+        service_url: "https://smba.trafficmanager.net/amer/",
+        conversation_id: "event-conversation",
+        activity: anything
+      )
+      expect(adapter.client).to have_received(:send_activity).with(
+        service_url: "https://state.example/teams/",
+        conversation_id: "state-conversation",
+        activity: anything
+      )
+      expect(adapter.client).to have_received(:send_activity).with(
+        service_url: configured_url,
+        conversation_id: "configured-conversation",
+        activity: anything
+      )
+
+      default_adapter = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: default_adapter}, state: state)
+      allow(default_adapter.client).to receive(:send_activity).and_return({"id" => "reply-2"})
+      default_adapter.post_message(channel_id: "unknown-conversation", message: "reply")
+
+      expect(default_adapter.client).to have_received(:send_activity).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        conversation_id: "unknown-conversation",
+        activity: anything
+      )
+    end
+
+    it "reads updated state URLs instead of caching a previous state value" do
+      state = ChatSDK::State::Memory.new
+      adapter_a = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      adapter_b = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_a}, state: state)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_b}, state: state)
+      conversation_id = "updated-conversation"
+      first_url = "https://smba.trafficmanager.net/amer/"
+      updated_url = "https://smba.trafficmanager.net/emea/"
+      state.set("chat_sdk:teams:service_url:#{conversation_id}", first_url)
+      allow(adapter_b.client).to receive(:send_activity).and_return({"id" => "reply-1"})
+
+      adapter_b.post_message(channel_id: conversation_id, message: "first reply")
+      parse_trusted_activity(adapter_a, {
+        "type" => "message",
+        "text" => "hello again",
+        "from" => {"id" => "29:user-1"},
+        "conversation" => {"id" => conversation_id},
+        "serviceUrl" => updated_url
+      })
+      adapter_b.post_message(channel_id: conversation_id, message: "second reply")
+
+      expect(adapter_b.client).to have_received(:send_activity).with(
+        service_url: first_url,
+        conversation_id: conversation_id,
+        activity: anything
+      )
+      expect(adapter_b.client).to have_received(:send_activity).with(
+        service_url: updated_url,
+        conversation_id: conversation_id,
+        activity: anything
+      )
+    end
+
+    it "uses a trusted user's state URL when opening a DM across Chat instances" do
+      state = ChatSDK::State::Memory.new
+      adapter_a = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      adapter_b = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_a}, state: state)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: adapter_b}, state: state)
+      service_url = "https://smba.trafficmanager.net/amer/"
+      user_id = "29:user-1"
+      allow(adapter_b.client).to receive_messages(
+        create_conversation: {"id" => "new-dm-conversation"},
+        send_activity: {"id" => "reply-1"}
+      )
+      parse_trusted_activity(adapter_a, {
+        "type" => "message",
+        "text" => "hello",
+        "from" => {"id" => user_id},
+        "conversation" => {"id" => "origin-conversation"},
+        "serviceUrl" => service_url
+      })
+
+      dm_conversation_id = adapter_b.open_dm(user_id)
+      adapter_b.post_message(channel_id: dm_conversation_id, message: "DM reply")
+
+      expect(state.get("chat_sdk:teams:user_service_url:#{user_id}")).to eq(service_url)
+      expect(ChatSDK::Teams::Adapter::USER_SERVICE_URL_TTL).to eq(30 * 24 * 60 * 60)
+      expect(adapter_b.client).to have_received(:create_conversation).with(
+        service_url: service_url,
+        payload: anything
+      )
+      expect(adapter_b.client).to have_received(:send_activity).with(
+        service_url: service_url,
+        conversation_id: dm_conversation_id,
+        activity: anything
+      )
+
+      fallback_adapter = described_class.new(app_id: app_id, app_password: app_password, tenant_id: tenant_id)
+      ChatSDK::Chat.new(user_name: "test-bot", adapters: {teams: fallback_adapter}, state: state)
+      allow(fallback_adapter.client).to receive(:create_conversation).and_return({"id" => "default-dm-conversation"})
+      unknown_dm_conversation_id = fallback_adapter.open_dm("29:unknown-user")
+
+      expect(unknown_dm_conversation_id).to eq("default-dm-conversation")
+      expect(fallback_adapter.client).to have_received(:create_conversation).with(
+        service_url: ChatSDK::Teams::Adapter::DEFAULT_SERVICE_URL,
+        payload: anything
+      )
     end
 
     it "rejects missing authorization header" do
