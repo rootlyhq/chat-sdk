@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Adapter and state gems now require `chat_sdk >= 1.2`, so they cannot be installed against an older core that lacks the routing and lifecycle changes they depend on
 - Slack file uploads now use `files_upload_v2`; inbound Slack text and Block Kit rendering handle platform-specific normalization and limits
 - Typing indicators accept the current message ID, and AI tool scopes distinguish handler execution from out-of-handler use
 - Message routing separates subscribed-thread handlers from ordinary message handlers; subscribe the thread to keep receiving every message via `on_subscribed_message`, or use handler-only `on_new_message`
