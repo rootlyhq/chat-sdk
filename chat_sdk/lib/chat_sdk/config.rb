@@ -62,9 +62,13 @@ module ChatSDK
 
     def validate_logger!
       return if @logger.nil?
-      return if %i[debug info warn error].all? { |level| @logger.respond_to?(level) }
+      unless %i[debug info warn error].all? { |level| @logger.respond_to?(level) }
+        raise ConfigurationError, "logger must respond to debug, info, warn, and error"
+      end
 
-      raise ConfigurationError, "logger must respond to debug, info, warn, and error"
+      if !@log_level.nil? && !@logger.respond_to?(:level=)
+        raise ConfigurationError, "logger must respond to level= when log_level is set"
+      end
     end
 
     def validate_on_error!

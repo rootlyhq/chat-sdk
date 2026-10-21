@@ -89,6 +89,53 @@ RSpec.describe ChatSDK::Config do
       }.to raise_error(ChatSDK::ConfigurationError, "logger must respond to debug, info, warn, and error")
     end
 
+    it "requires level= when an explicit log level is set" do
+      logger = double("logger", debug: nil, info: nil, warn: nil, error: nil)
+
+      expect {
+        described_class.new(
+          user_name: "bot",
+          adapters: {test: adapter},
+          state: state,
+          logger: logger,
+          log_level: :debug
+        )
+      }.to raise_error(
+        ChatSDK::ConfigurationError,
+        "logger must respond to level= when log_level is set"
+      )
+    end
+
+    it "allows a logger without level= when log_level is omitted" do
+      logger = double("logger", debug: nil, info: nil, warn: nil, error: nil)
+      original_logger = ChatSDK::Log.logger
+
+      expect(logger).not_to respond_to(:level=)
+      expect {
+        ChatSDK::Chat.new(
+          user_name: "bot",
+          adapters: {test: adapter},
+          state: state,
+          logger: logger
+        )
+      }.not_to raise_error
+    ensure
+      ChatSDK::Log.logger = original_logger
+    end
+
+    it "accepts ::Logger with an explicit log level" do
+      logger = ::Logger.new(StringIO.new)
+      config = described_class.new(
+        user_name: "bot",
+        adapters: {test: adapter},
+        state: state,
+        logger: logger,
+        log_level: :warn
+      )
+
+      expect(config.log_level).to eq(:warn)
+    end
+
     it "keeps the explicit log level when a logger is given" do
       config = described_class.new(
         user_name: "bot",
