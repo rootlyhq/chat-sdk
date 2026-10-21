@@ -292,6 +292,106 @@ RSpec.describe ChatSDK::Twilio::Adapter do
     end
   end
 
+  describe "#send_template" do
+    it "sends a Content API template with JSON variables" do
+      stub_request(:post, "https://api.twilio.com/2010-04-01/Accounts/#{account_sid}/Messages.json")
+        .with { |request|
+          params = URI.decode_www_form(request.body).to_h
+          params["ContentSid"] == "HX123" &&
+            params["ContentVariables"] == '{"1":"Incident"}' &&
+            params["From"] == phone_number
+        }
+        .to_return(
+          status: 201,
+          body: JSON.generate({
+            "sid" => "SM123",
+            "body" => "",
+            "from" => phone_number,
+            "to" => "+15559876543"
+          }),
+          headers: {"Content-Type" => "application/json"}
+        )
+
+      result = subject.send_template(
+        channel_id: "+15559876543",
+        content_sid: "HX123",
+        content_variables: {"1" => "Incident"}
+      )
+
+      expect(result.id).to eq("SM123")
+      expect(result.channel_id).to eq("+15559876543")
+    end
+
+    it "uses MessagingServiceSid when a phone number is not configured" do
+      adapter = described_class.new(
+        account_sid: account_sid,
+        auth_token: auth_token,
+        messaging_service_sid: "MG123"
+      )
+      stub = stub_request(:post, "https://api.twilio.com/2010-04-01/Accounts/#{account_sid}/Messages.json")
+        .with { |request|
+          params = URI.decode_www_form(request.body).to_h
+          params["ContentSid"] == "HX123" &&
+            params["MessagingServiceSid"] == "MG123" &&
+            !params.key?("From") &&
+            !params.key?("ContentVariables")
+        }
+        .to_return(status: 201, body: JSON.generate({"sid" => "SM124", "to" => "+15559876543"}))
+
+      adapter.send_template(channel_id: "+15559876543", content_sid: "HX123")
+
+      expect(stub).to have_been_requested
+    end
+  end
+
+  describe "#start_typing" do
+    it "sends a WhatsApp typing indicator when the message ID is present" do
+      stub = stub_request(:post, "https://messaging.twilio.com/v3/Indicators/Typing.json")
+        .with(
+          body: JSON.generate({"channel" => "WHATSAPP", "messageId" => "SM123"}),
+          headers: {"Content-Type" => "application/json"}
+        )
+        .to_return(status: 200, body: JSON.generate({"success" => true}))
+
+      subject.start_typing(channel_id: "whatsapp:+15559876543", message_id: "SM123")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "uses the configured Messaging API URL and sends RCS typing" do
+      adapter = described_class.new(
+        account_sid: account_sid,
+        auth_token: auth_token,
+        phone_number: "rcs:agent-123",
+        messaging_api_url: "https://messaging.example.test"
+      )
+      stub = stub_request(:post, "https://messaging.example.test/v3/Indicators/Typing.json")
+        .with(
+          body: JSON.generate({
+            "channel" => "RCS",
+            "event" => "START",
+            "from" => "rcs:agent-123",
+            "to" => "rcs:+15559876543"
+          })
+        )
+        .to_return(status: 200, body: JSON.generate({"success" => true}))
+
+      adapter.start_typing(channel_id: "rcs:+15559876543", message_id: "SM123")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "does nothing without a message ID or for SMS" do
+      stub = stub_request(:post, %r{messaging\.twilio\.com/v3/Indicators/Typing\.json})
+        .to_return(status: 200, body: JSON.generate({"success" => true}))
+
+      subject.start_typing(channel_id: "whatsapp:+15559876543")
+      subject.start_typing(channel_id: "+15559876543", message_id: "SM123")
+
+      expect(stub).not_to have_been_requested
+    end
+  end
+
   describe "#fetch_messages" do
     let(:api_url) { "https://api.twilio.com/2010-04-01/Accounts/#{account_sid}/Messages.json" }
 
@@ -405,9 +505,8 @@ RSpec.describe ChatSDK::Twilio::Adapter do
         .to raise_error(ChatSDK::NotSupportedError)
     end
 
-    it "raises NotSupportedError for typing indicator" do
-      expect { subject.start_typing(channel_id: "C1") }
-        .to raise_error(ChatSDK::NotSupportedError)
+    it "does nothing for unsupported channel types" do
+      expect { subject.start_typing(channel_id: "C1", message_id: "SM123") }.not_to raise_error
     end
 
     it "does not support edit_messages capability" do
@@ -434,8 +533,8 @@ RSpec.describe ChatSDK::Twilio::Adapter do
       expect(subject.supports?(:streaming_edit)).to be false
     end
 
-    it "does not support typing_indicator capability" do
-      expect(subject.supports?(:typing_indicator)).to be false
+    it "supports typing_indicator capability" do
+      expect(subject.supports?(:typing_indicator)).to be true
     end
 
     it "supports direct_messages capability" do
@@ -492,12 +591,12 @@ RSpec.describe ChatSDK::Twilio::Adapter do
       stub_request(:post, api_url)
         .to_return(
           status: 400,
-          body: JSON.generate({"message" => "The 'To' number is not a valid phone number."}),
+          body: JSON.generate({"code" => 21211, "message" => "The 'To' number is not a valid phone number."}),
           headers: {"Content-Type" => "application/json"}
         )
 
       expect { subject.post_message(channel_id: "invalid", message: "Hello!") }
-        .to raise_error(ChatSDK::PlatformError, /not a valid phone number/)
+        .to raise_error(ChatSDK::PlatformError, /21211.*not a valid phone number/)
     end
   end
 
