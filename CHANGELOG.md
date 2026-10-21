@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Slack native streaming via `chat.startStream`, `chat.appendStream`, and `chat.stopStream`
 - `ChatSDK::StreamingPlan`, structured streaming chunks, and the optional `Adapter::Base#stream` hook
+- Configurable error reporting through `on_error:` and injectable logging with `logger:`.
 
 ### Changed
 

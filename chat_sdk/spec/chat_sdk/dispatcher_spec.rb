@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 require_relative "../../../spec/spec_helper"
+require "logger"
+require "stringio"
 
 RSpec.describe ChatSDK::Dispatcher do
   let(:adapter) { ChatSDK::Testing::FakeAdapter.new }
@@ -167,13 +169,26 @@ RSpec.describe ChatSDK::Dispatcher do
   end
 
   describe "handler error" do
-    it "logs error and does not propagate exception" do
-      bot = build_bot
-      bot.on_new_mention { |_t, _m| raise "handler kaboom" }
+    it "reports handler context and logs the full exception without propagating" do
+      original_logger = ChatSDK::Log.logger
+      log_output = StringIO.new
+      ChatSDK::Log.logger = Logger.new(log_output)
+      error = RuntimeError.new("handler kaboom")
+      error.set_backtrace(%w[app/handler.rb:10 app/dispatcher.rb:20])
+      reported = nil
+      bot = build_bot(on_error: ->(received_error, context) { reported = [received_error, context] })
+      bot.on_new_mention { |_t, _m| raise error }
 
       expect {
         bot.dispatch(make_mention(message_id: "msg_err"), adapter_name: :test)
       }.not_to raise_error
+      expect(reported).to eq([
+        error,
+        {source: :handler, adapter: :test, event_type: :mention, thread_id: "T1", channel_id: "C1"}
+      ])
+      expect(log_output.string).to include("RuntimeError: handler kaboom", "app/handler.rb:10", "app/dispatcher.rb:20")
+    ensure
+      ChatSDK::Log.logger = original_logger
     end
 
     it "continues to next handler after error" do

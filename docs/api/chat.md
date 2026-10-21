@@ -21,6 +21,8 @@ ChatSDK::Chat.new(
 | `dedupe_ttl` | `Integer` | No | `600` | Deduplication TTL in seconds |
 | `streaming_update_interval` | `Float` | No | `0.5` | Min seconds between stream edits |
 | `on_lock_conflict` | `Symbol` or `Proc` | No | `:drop` | Lock conflict policy |
+| `logger` | Logger-like object | No | `nil` | Process-wide logger; replaces `ChatSDK::Log.logger` |
+| `on_error` | Callable | No | `nil` | Receives `(exception, context)` for handler and webhook errors |
 | `log_level` | `Symbol` | No | `:info` | Log level |
 
 ## Instance Methods
