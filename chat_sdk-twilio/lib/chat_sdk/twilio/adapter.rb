@@ -93,7 +93,7 @@ module ChatSDK
         [messages, nil]
       end
 
-      def delete_message(channel_id:, message_id:) # rubocop:disable Lint/UnusedMethodArgument
+      def delete_message(channel_id:, message_id:, **_options) # rubocop:disable Lint/UnusedMethodArgument
         @client.delete_message(message_sid: message_id)
       end
 

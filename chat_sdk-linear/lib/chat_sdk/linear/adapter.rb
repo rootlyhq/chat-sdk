@@ -89,21 +89,25 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, thread_id: nil)
+        validate_comment_ownership!(channel_id, message_id, thread_id)
         msg = ChatSDK::PostableMessage.from(message)
         text = msg.text || msg.card&.fallback_text || ""
         @client.update_comment(comment_id: message_id, body: text)
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, thread_id: nil)
+        validate_comment_ownership!(channel_id, message_id, thread_id)
         @client.delete_comment(comment_id: message_id)
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+      def add_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
+        validate_comment_ownership!(channel_id, message_id, thread_id)
         @client.create_reaction(comment_id: message_id, emoji: emoji)
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+      def remove_reaction(channel_id:, message_id:, emoji:, thread_id: nil)
+        validate_comment_ownership!(channel_id, message_id, thread_id)
         @client.delete_reaction(comment_id: message_id, emoji: emoji)
       end
 
@@ -112,12 +116,16 @@ module ChatSDK
         parent_id = nil
 
         if thread_id&.include?(":c:")
-          parts = thread_id.split(":c:")
-          parent_id = parts.last
+          parent_id = thread_id.split(":c:", 2).last
+          validate_comment_ownership!(issue_id, parent_id, nil)
         end
 
         result = @client.fetch_comments(issue_id: issue_id, parent_id: parent_id)
-        comments = result.dig("data", "comments", "nodes") || []
+        comments = if parent_id
+          result.dig("data", "comment", "children", "nodes") || []
+        else
+          result.dig("data", "comments", "nodes") || []
+        end
 
         messages = comments.map do |comment|
           user = comment["user"] || {}
@@ -141,6 +149,37 @@ module ChatSDK
 
       def render(postable_message)
         postable_message.text
+      end
+
+      private
+
+      def validate_comment_ownership!(channel_id, message_id, thread_id)
+        comment = @client.fetch_comment(comment_id: message_id)
+        issue_id = comment&.dig("issue", "id")
+        unless comment && same_identifier?(issue_id, channel_id)
+          raise ChatSDK::Error, "Linear comment does not belong to issue #{channel_id}"
+        end
+
+        root_id = thread_root_id(thread_id)
+        return unless root_id
+        return if same_identifier?(comment["id"], root_id)
+
+        root = @client.fetch_comment(comment_id: root_id)
+        root_issue_id = root&.dig("issue", "id")
+        unless root && same_identifier?(root_issue_id, channel_id) &&
+            same_identifier?(comment.dig("parent", "id"), root_id)
+          raise ChatSDK::Error, "Linear comment does not belong to thread #{thread_id}"
+        end
+      end
+
+      def thread_root_id(thread_id)
+        return unless thread_id.is_a?(String) && thread_id.include?(":c:")
+
+        thread_id.split(":c:", 2).last
+      end
+
+      def same_identifier?(left, right)
+        left.is_a?(String) && right.is_a?(String) && left.casecmp?(right)
       end
     end
   end

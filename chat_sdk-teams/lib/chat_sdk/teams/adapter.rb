@@ -80,7 +80,7 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         require_capability!(:edit_messages)
         msg = ChatSDK::PostableMessage.from(message)
         service_url = service_url_for(channel_id)
@@ -96,7 +96,7 @@ module ChatSDK
         )
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         require_capability!(:delete_messages)
         service_url = service_url_for(channel_id)
 

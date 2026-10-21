@@ -93,7 +93,7 @@ module ChatSDK
         parse_telegram_message(result, channel_id)
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         text, reply_markup = prepare_message_payload(message)
 
         @client.edit_message_text(
@@ -104,7 +104,7 @@ module ChatSDK
         )
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         @client.delete_message(chat_id: channel_id, message_id: message_id)
       end
 
@@ -118,7 +118,7 @@ module ChatSDK
         )
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         @client.set_message_reaction(
           chat_id: channel_id,
           message_id: message_id,
@@ -126,7 +126,7 @@ module ChatSDK
         )
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:) # rubocop:disable Lint/UnusedMethodArgument
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options) # rubocop:disable Lint/UnusedMethodArgument
         @client.set_message_reaction(
           chat_id: channel_id,
           message_id: message_id,

@@ -185,7 +185,7 @@ module ChatSDK
         )
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         msg = ChatSDK::PostableMessage.from(message)
         params = {channel: channel_id, ts: message_id}
 
@@ -194,7 +194,7 @@ module ChatSDK
         client.chat_update(**params)
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         client.chat_delete(channel: channel_id, ts: message_id)
       end
 
@@ -217,11 +217,11 @@ module ChatSDK
         client.files_upload_v2(**params)
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         client.reactions_add(channel: channel_id, timestamp: message_id, name: emoji)
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options)
         client.reactions_remove(channel: channel_id, timestamp: message_id, name: emoji)
       end
 

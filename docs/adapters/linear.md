@@ -110,3 +110,4 @@ linear_adapter.mention("quentin")  # => "@quentin"
 - **Thread IDs**: Prefixed strings -- `"linear:{issue_id}:c:{comment_id}"`
 - **Channel IDs**: The Linear issue ID
 - **Reply routing**: When `thread_id` contains `:c:`, `post_message` creates a threaded reply using the comment ID as `parent_id`
+- **Mutations**: Edit, delete, and reaction operations verify the comment belongs to the requested issue and, for comment threads, to the thread's root comment

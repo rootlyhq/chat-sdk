@@ -81,7 +81,7 @@ module ChatSDK
         build_response_message(result, channel_id, msg)
       end
 
-      def edit_message(channel_id:, message_id:, message:)
+      def edit_message(channel_id:, message_id:, message:, **_options)
         require_capability!(:edit_messages)
         msg = ChatSDK::PostableMessage.from(message)
         request_body = build_message_body(msg)
@@ -93,7 +93,7 @@ module ChatSDK
         )
       end
 
-      def delete_message(channel_id:, message_id:)
+      def delete_message(channel_id:, message_id:, **_options)
         require_capability!(:delete_messages)
         @client.delete_message(name: message_resource_name(channel_id, message_id))
       end
@@ -120,7 +120,7 @@ module ChatSDK
         super
       end
 
-      def add_reaction(channel_id:, message_id:, emoji:)
+      def add_reaction(channel_id:, message_id:, emoji:, **_options)
         require_capability!(:reactions)
         @client.create_reaction(
           parent: message_resource_name(channel_id, message_id),
@@ -130,7 +130,7 @@ module ChatSDK
         )
       end
 
-      def remove_reaction(channel_id:, message_id:, emoji:)
+      def remove_reaction(channel_id:, message_id:, emoji:, **_options)
         require_capability!(:reactions)
         # Google Chat requires the reaction resource name to delete
         # We construct it from the emoji unicode
