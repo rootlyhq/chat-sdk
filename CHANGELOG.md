@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-21
+
 ### Added
 
 - Message mention classification, generalized `on_new_message` routing, scoped Slack concurrency, card text inputs and button visibility, and AI-generated message metadata
