@@ -24,6 +24,15 @@ module ChatSDK
           data.merge!("action_id" => event.action_id, "value" => event.value, "values" => json_safe(event.values), "user" => dump_author(event.user), "trigger_id" => event.trigger_id)
         when :slash_command
           data.merge!("command" => event.command, "text" => event.text, "user_id" => event.user_id, "trigger_id" => event.trigger_id)
+        when :installed, :uninstalled
+          data.merge!(
+            "installation_id" => event.installation_id,
+            "team_id" => event.team_id,
+            "tenant_id" => event.tenant_id,
+            "conversation_id" => event.conversation_id,
+            "action" => event.action,
+            "user" => dump_author(event.user)
+          )
         end
         data
       end
@@ -59,6 +68,23 @@ module ChatSDK
         when :slash_command
           common.delete(:thread_id)
           Events::SlashCommand.new(command: data["command"], text: data["text"], user_id: data["user_id"], trigger_id: data["trigger_id"], **common)
+        when :installed, :uninstalled
+          common.delete(:thread_id)
+          common.delete(:channel_id)
+          event_class = if type == :installed
+            Events::Installed
+          else
+            Events::Uninstalled
+          end
+          event_class.new(
+            installation_id: data["installation_id"],
+            team_id: data["team_id"],
+            tenant_id: data["tenant_id"],
+            conversation_id: data["conversation_id"],
+            action: data["action"],
+            user: load_author(data["user"]),
+            **common
+          )
         else
           raise ArgumentError, "unsupported queued event type: #{type}"
         end
@@ -127,6 +153,7 @@ module ChatSDK
           "name" => author.name,
           "platform" => author.platform.to_s,
           "bot" => author.bot?,
+          "me" => author.me?,
           "system" => author.system?,
           "locale" => author.locale,
           "email" => author.email,
@@ -143,6 +170,7 @@ module ChatSDK
           name: data["name"],
           platform: data["platform"].to_sym,
           bot: data["bot"],
+          me: data["me"],
           system: data["system"],
           locale: data["locale"],
           email: data["email"],

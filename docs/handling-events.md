@@ -128,6 +128,24 @@ end
 
 See [Actions](actions.md) for more examples, and [Cards](cards.md) for how to define buttons.
 
+For Adaptive Card text inputs, `event.values` contains submitted input fields. Teams reserves `actionId`, `value`, and `msteams` for action metadata.
+
+## on_installed and on_uninstalled
+
+Teams installation lifecycle activities are delivered as event objects. The callback is useful for application-owned installation records and cleanup; use `event.conversation_id` or `event.installation_id` as the relevant platform key.
+
+```ruby
+bot.on_installed do |event|
+  puts "Installed in #{event.conversation_id} for tenant #{event.tenant_id}"
+end
+
+bot.on_uninstalled do |event|
+  puts "Removed from #{event.installation_id} (#{event.action})"
+end
+```
+
+The event exposes `adapter_name`, `installation_id`, `team_id`, `tenant_id`, `conversation_id`, `action`, `user` (`ChatSDK::Author`), and `raw`. Teams actions include `add`, `add-upgrade`, `remove`, and `remove-upgrade`. These events are not derived from generic `conversationUpdate` membership changes.
+
 ## on_slash_command
 
 Fires when a user types a slash command (e.g., `/deploy`).
@@ -158,6 +176,8 @@ end
 | `on_reaction` | `\|event\|` | Emoji reaction added/removed |
 | `on_action(action_id)` | `\|event\|` | Card button/select interaction |
 | `on_slash_command(command)` | `\|event\|` | Slash command invoked |
+| `on_installed` | `\|event\|` | Teams bot installation or upgrade that adds it |
+| `on_uninstalled` | `\|event\|` | Teams bot removal or upgrade that removes it |
 
 ## Multiple Handlers
 

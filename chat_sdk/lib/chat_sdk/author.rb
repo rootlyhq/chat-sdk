@@ -4,11 +4,12 @@ module ChatSDK
   class Author
     attr_reader :id, :name, :platform, :locale, :email, :raw
 
-    def initialize(id:, name:, platform:, bot: false, system: false, locale: nil, email: nil, raw: nil)
+    def initialize(id:, name:, platform:, bot: false, me: false, system: false, locale: nil, email: nil, raw: nil)
       @id = id
       @name = name
       @platform = platform
       @bot = bot
+      @me = !!me
       @system = system
       @locale = locale
       @email = email
@@ -17,6 +18,10 @@ module ChatSDK
 
     def bot?
       @bot
+    end
+
+    def me?
+      @me
     end
 
     def system?

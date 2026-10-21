@@ -3,6 +3,8 @@
 module ChatSDK
   module Cards
     class Builder
+      RESERVED_TEXT_INPUT_IDS = %w[actionId value msteams].freeze
+
       def initialize(title: nil, subtitle: nil, width: nil, &block)
         @title = title
         @subtitle = subtitle
@@ -32,9 +34,13 @@ module ChatSDK
       end
 
       def text_input(id:, label:, placeholder: nil, multiline: false, optional: false, value: nil)
+        if RESERVED_TEXT_INPUT_IDS.include?(id.to_s)
+          raise ArgumentError, "Text input id #{id.inspect} is reserved"
+        end
+
         attrs = {id: id, label: label, multiline: multiline, optional: optional}
         attrs[:placeholder] = placeholder if placeholder
-        attrs[:value] = value if value
+        attrs[:value] = value unless value.nil?
         @children << Node.new(:text_input, attributes: attrs)
       end
 
@@ -57,11 +63,15 @@ module ChatSDK
         @children << Node.new(:actions, children: ctx.nodes)
       end
 
-      def table(headers:, rows:, align: nil, caption: nil, page_size: nil)
+      def table(headers:, rows:, align: nil, caption: nil, page_size: nil, widths: nil, grid_lines: nil, grid_style: nil, vertical_align: nil)
         attrs = {headers: headers, rows: rows}
         attrs[:align] = align if align
         attrs[:caption] = caption if caption
         attrs[:page_size] = page_size if page_size
+        attrs[:widths] = widths if widths
+        attrs[:grid_lines] = grid_lines unless grid_lines.nil?
+        attrs[:grid_style] = grid_style if grid_style
+        attrs[:vertical_align] = vertical_align if vertical_align
         @children << Node.new(:table, attributes: attrs)
       end
 

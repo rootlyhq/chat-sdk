@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Message mention classification, generalized `on_new_message` routing, scoped Slack concurrency, card text inputs and button visibility, and AI-generated message metadata
+- Teams installation lifecycle callbacks, Adaptive Card input values and native tables, Graph reference attachments, and persistent conversation service URLs
 - Twilio Content API templates and WhatsApp/RCS typing indicators
 - GitLab adapter for issue and merge request notes, reactions, history, and Markdown-rendered cards
 
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Typing indicators accept the current message ID, and AI tool scopes distinguish handler execution from out-of-handler use
 - Message routing separates subscribed-thread handlers from ordinary message handlers; subscribe the thread to keep receiving every message via `on_subscribed_message`, or use handler-only `on_new_message`
 - Card button `visible_to` is a Slack-only display hint; other platforms still show the button, so handlers must check `event.user`
+- Teams Graph history follows Graph pagination cursors; top-level channel posts return replyable thread IDs and invoke activities receive a non-empty acknowledgement
 
 ### Fixed
 
@@ -28,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Discord fetched messages now set `message.is_mention` from bot mention data
 - Message routing now prioritizes direct messages, subscribed threads, and mentions before ordinary message handlers
 - Slack cards now render `title` as a header block and `subtitle` as a context block instead of dropping them
+- Teams filters bot-authored activities by app identity and marks bot/self authors consistently
 
 ### Security
 

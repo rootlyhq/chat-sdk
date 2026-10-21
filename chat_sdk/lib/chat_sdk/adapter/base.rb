@@ -22,6 +22,10 @@ module ChatSDK
         nil
       end
 
+      def webhook_response(_events)
+        nil
+      end
+
       def parse_events(rack_request)
         raise NotImplementedError
       end

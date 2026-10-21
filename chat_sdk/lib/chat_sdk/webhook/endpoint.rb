@@ -22,6 +22,9 @@ module ChatSDK
         events = adapter.parse_events(request || env)
         events.each { |event| chat.dispatch(event, adapter_name: adapter_name) }
 
+        response = adapter.webhook_response(events)
+        return response if response
+
         [200, {"content-type" => "text/plain"}, [""]]
       rescue ChatSDK::SignatureVerificationError => e
         ChatSDK::Log.warn("Signature verification failed: #{e.message}")

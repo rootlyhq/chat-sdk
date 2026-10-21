@@ -9,11 +9,17 @@ module ChatSDK
 
           case activity["type"]
           when "message"
-            parse_message(activity, bot_app_id)
+            if action_submission?(activity)
+              parse_invoke(activity, bot_app_id)
+            else
+              parse_message(activity, bot_app_id)
+            end
           when "messageReaction"
             parse_message_reaction(activity)
           when "invoke"
-            parse_invoke(activity)
+            parse_invoke(activity, bot_app_id)
+          when "installationUpdate"
+            parse_installation(activity, bot_app_id)
           else
             []
           end
@@ -22,9 +28,9 @@ module ChatSDK
         private
 
         def parse_message(activity, bot_app_id)
-          return [] if activity.dig("from", "id") == bot_app_id
+          return [] if self_message?(activity, bot_app_id)
 
-          author = build_author(activity)
+          author = build_author(activity, bot_app_id)
           conversation_id = activity.dig("conversation", "id")
           thread_id = activity.dig("conversation", "id")
 
@@ -103,19 +109,37 @@ module ChatSDK
           events
         end
 
-        def parse_invoke(activity)
+        def parse_invoke(activity, bot_app_id)
           return [] unless activity.dig("value")
 
           conversation_id = activity.dig("conversation", "id")
-          user = build_author(activity)
+          user = build_author(activity, bot_app_id)
 
-          action_id = activity.dig("value", "action") || activity["name"] || "invoke"
-          value = activity.dig("value", "data") || activity["value"]
+          value_data = activity["value"]
+          nested_data = value_data["data"] if value_data.is_a?(Hash)
+          action = value_data["action"] if value_data.is_a?(Hash)
+          action_data = action.is_a?(Hash) ? action["data"] : nil
+          data = if nested_data.is_a?(Hash)
+            nested_data
+          elsif action_data.is_a?(Hash)
+            action_data
+          else
+            value_data
+          end
+          data = {} unless data.is_a?(Hash)
+          action_id = if action_data.is_a?(Hash)
+            action_data["actionId"] || action_data["action"]
+          end
+          action_id ||= action["verb"] if action.is_a?(Hash)
+          action_id ||= data["actionId"] || data["action"] ||
+            (action unless action.is_a?(Hash)) || activity["name"] || "invoke"
+          value = data["value"] || (nested_data unless nested_data.is_a?(Hash)) || data
           value = value.is_a?(Hash) ? JSON.generate(value) : value.to_s
 
           [ChatSDK::Events::Action.new(
             action_id: action_id,
             value: value,
+            values: action_values(data),
             user: user,
             thread_id: conversation_id,
             channel_id: conversation_id,
@@ -125,15 +149,78 @@ module ChatSDK
           )]
         end
 
-        def build_author(activity)
-          from = activity["from"] || {}
-          ChatSDK::Author.new(
-            id: from["id"] || "unknown",
-            name: from["name"] || from["id"] || "unknown",
+        def action_submission?(activity)
+          value = activity["value"]
+          value.is_a?(Hash) && (value.key?("data") || value.key?("action") || value.key?("actionId"))
+        end
+
+        def parse_installation(activity, bot_app_id)
+          return [] unless app_id?(activity.dig("recipient", "id"), bot_app_id)
+
+          action = activity["action"]
+          event_class = case action
+          when "add", "add-upgrade" then ChatSDK::Events::Installed
+          when "remove", "remove-upgrade" then ChatSDK::Events::Uninstalled
+          else return []
+          end
+
+          conversation_id = activity.dig("conversation", "id")
+          return [] unless conversation_id
+
+          team_id = activity.dig("channelData", "team", "id")
+          tenant_id = activity.dig("conversation", "tenantId") ||
+            activity.dig("channelData", "tenant", "id")
+          user_id = activity.dig("from", "aadObjectId") || activity.dig("from", "id")
+          installation_id = if team_id
+            team_id
+          elsif tenant_id && user_id
+            "#{tenant_id}:#{user_id}"
+          else
+            tenant_id || conversation_id
+          end
+          [event_class.new(
+            installation_id: installation_id,
+            team_id: team_id,
+            tenant_id: tenant_id,
+            conversation_id: conversation_id,
+            action: action,
+            user: build_author(activity, bot_app_id),
             platform: :teams,
-            bot: from["role"] == "bot",
+            adapter_name: :teams,
+            raw: activity
+          )]
+        end
+
+        def build_author(activity, bot_app_id)
+          from = activity["from"] || {}
+          from_id = from["id"] || "unknown"
+          ChatSDK::Author.new(
+            id: from_id,
+            name: from["name"] || from_id,
+            platform: :teams,
+            bot: from["role"].to_s.downcase == "bot" || from_id.start_with?("28:"),
+            me: self_message?(activity, bot_app_id),
             locale: activity["locale"]
           )
+        end
+
+        def self_message?(activity, bot_app_id)
+          from_id = activity.dig("from", "id")
+          return true if app_id?(from_id, bot_app_id)
+
+          recipient_id = activity.dig("recipient", "id")
+          from_id && recipient_id && from_id == recipient_id
+        end
+
+        def app_id?(id, bot_app_id)
+          return false unless id && bot_app_id
+
+          id == bot_app_id || id == "28:#{bot_app_id}"
+        end
+
+        def action_values(data)
+          values = data.except("action", "actionId", "value", "msteams")
+          values.empty? ? nil : values
         end
 
         def bot_mentioned?(activity, bot_app_id)

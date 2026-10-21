@@ -118,6 +118,33 @@ RSpec.describe ChatSDK::Cards::Builder do
       expect(ChatSDK::Cards::Renderer.new.render(card)).to include("Your name")
     end
 
+    it "rejects Teams-reserved text input ids and preserves empty values" do
+      %w[actionId value msteams].each do |id|
+        expect { ChatSDK.card { text_input(id: id, label: "Reserved") } }
+          .to raise_error(ArgumentError, /reserved/)
+      end
+
+      card = ChatSDK.card do
+        text_input id: "name", label: "Name", value: ""
+      end
+
+      expect(card.children.first.attributes[:value]).to eq("")
+    end
+
+    it "stores native table rendering options" do
+      card = ChatSDK.card do
+        table headers: ["Name"], rows: [["Ada"]], widths: [2], grid_lines: false,
+          grid_style: :accent, vertical_align: :center
+      end
+
+      expect(card.children.first.attributes).to include(
+        widths: [2],
+        grid_lines: false,
+        grid_style: :accent,
+        vertical_align: :center
+      )
+    end
+
     it "stores visible user IDs on buttons" do
       card = ChatSDK.card do
         actions { button "Approve", id: "approve", visible_to: %w[U1 U2] }

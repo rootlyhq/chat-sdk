@@ -29,6 +29,18 @@ RSpec.describe ChatSDK::Author do
     end
   end
 
+  describe "#me?" do
+    it "returns true when me flag is set" do
+      author = described_class.new(id: "B1", name: "Bot", platform: :teams, me: true)
+      expect(author.me?).to be true
+    end
+
+    it "returns false by default" do
+      author = described_class.new(id: "U1", name: "Human", platform: :teams)
+      expect(author.me?).to be false
+    end
+  end
+
   describe "equality" do
     it "equals another author with the same id and platform" do
       a = described_class.new(id: "U1", name: "Alice", platform: :slack)

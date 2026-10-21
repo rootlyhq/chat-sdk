@@ -62,6 +62,7 @@ module ChatSDK
         when :button then render_action_submit(node)
         when :link_button then render_action_open_url(node)
         when :select then render_select(node)
+        when :text_input then render_text_input(node)
         when :table then render_table(node)
         when :chart then render_chart(node)
         end
@@ -142,7 +143,7 @@ module ChatSDK
         action = {
           "type" => "Action.Submit",
           "title" => node.attributes[:text],
-          "data" => {"action" => node.attributes[:id]}
+          "data" => {"actionId" => node.attributes[:id]}
         }
         action["data"]["value"] = node.attributes[:value] if node.attributes[:value]
         action["tooltip"] = node.attributes[:tooltip] if node.attributes[:tooltip]
@@ -180,23 +181,65 @@ module ChatSDK
         input
       end
 
+      def render_text_input(node)
+        input = {
+          "type" => "Input.Text",
+          "id" => node.attributes[:id],
+          "label" => node.attributes[:label],
+          "isMultiline" => node.attributes[:multiline],
+          "isRequired" => !node.attributes[:optional]
+        }
+        input["placeholder"] = node.attributes[:placeholder] if node.attributes[:placeholder]
+        input["value"] = node.attributes[:value] unless node.attributes[:value].nil?
+        input
+      end
+
       def render_table(node)
-        rows = [Array(node.attributes[:headers]), *Array(node.attributes[:rows])]
+        headers = Array(node.attributes[:headers])
+        data_rows = Array(node.attributes[:rows])
+        column_count = data_rows.reduce(headers.length) { |count, row| [count, Array(row).length].max }
+        return if column_count.zero?
+
+        alignment = {left: "Left", center: "Center", right: "Right"}
+        vertical_alignment = {top: "Top", center: "Center", bottom: "Bottom"}
+        widths = Array(node.attributes[:widths])
+        aligns = Array(node.attributes[:align])
+        rows = data_rows.map { |row| Array(row) }
+        rows.unshift(headers) unless headers.empty?
+
         {
-          "type" => "Container",
-          "items" => rows.each_with_index.map do |row, index|
+          "type" => "Table",
+          "firstRowAsHeaders" => !headers.empty?,
+          "showGridLines" => node.attributes.fetch(:grid_lines, true),
+          "columns" => Array.new(column_count) do |index|
+            width = widths[index]
+            column_width = width
+            column_width = 1 unless column_width.is_a?(Integer) && column_width.positive?
+            column = {"width" => column_width}
+            column_alignment = alignment[aligns[index]&.to_sym]
+            column["horizontalCellContentAlignment"] = column_alignment if column_alignment
+            column
+          end,
+          "rows" => rows.each_with_index.map do |row, index|
             {
-              "type" => "ColumnSet",
-              "columns" => Array(row).map do |cell|
+              "type" => "TableRow",
+              "cells" => Array.new(column_count) do |cell_index|
                 {
-                  "type" => "Column",
-                  "width" => "stretch",
-                  "items" => [{"type" => "TextBlock", "text" => cell.to_s, "weight" => ("bolder" if index.zero?), "wrap" => true}.compact]
+                  "type" => "TableCell",
+                  "items" => [{
+                    "type" => "TextBlock",
+                    "text" => Array(row)[cell_index].to_s,
+                    "weight" => ("Bolder" if index.zero? && !headers.empty?),
+                    "wrap" => true
+                  }.compact]
                 }
               end
             }
-          end
+          end,
+          "gridStyle" => node.attributes[:grid_style],
+          "verticalCellContentAlignment" => vertical_alignment[node.attributes[:vertical_align]&.to_sym]
         }
+          .compact
       end
 
       def render_chart(node)
