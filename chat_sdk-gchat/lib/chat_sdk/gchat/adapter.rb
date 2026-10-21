@@ -42,12 +42,12 @@ module ChatSDK
             "set disable_signature_verification to true to accept unverified requests"
         end
 
-        @credentials = build_credentials(credentials)
+        @default_credentials = credentials
         @credentials_resolver = credentials_resolver
         @credential_client_cache = {}
         @credential_client_cache_mutex = Mutex.new
         @credentials_context_key = :"chat_sdk_gchat_credentials_#{object_id}"
-        @client = build_client(@credentials)
+        @default_client = nil
         @verifier = TokenVerifier.new(
           @project_number,
           endpoint_url: @endpoint_url,
@@ -61,7 +61,7 @@ module ChatSDK
 
       def client
         context = ::Thread.current[@credentials_context_key]
-        return @client unless context
+        return default_client unless context
 
         client_for_credentials(context[:credentials])
       end
@@ -246,20 +246,22 @@ module ChatSDK
         return client_for_credentials(context[:credentials]) if context
 
         credentials = @credentials_resolver.call(channel_id) if @credentials_resolver && channel_id
-        return @client if credentials.nil?
+        return default_client if credentials.nil?
 
         client_for_credentials(credentials)
       end
 
       def client_for_credentials(credentials)
-        return @client if credentials.nil?
+        return default_client if credentials.nil?
 
         cache_key = credential_cache_key(credentials)
         @credential_client_cache_mutex.synchronize do
           cached_entry = @credential_client_cache.delete(cache_key)
           if cached_entry
-            @credential_client_cache[cache_key] = cached_entry
-            return cached_entry[:client]
+            if cache_key.first != :object || cached_entry[:credentials].equal?(credentials)
+              @credential_client_cache[cache_key] = cached_entry
+              return cached_entry[:client]
+            end
           end
 
           client = build_client(build_credentials(credentials))
@@ -269,14 +271,35 @@ module ChatSDK
         end
       end
 
+      def default_client
+        @credential_client_cache_mutex.synchronize do
+          @default_client ||= build_client(build_credentials(@default_credentials))
+        end
+      end
+
       def credential_cache_key(credentials)
         case credentials
         when Hash
-          [:hash, Digest::SHA256.hexdigest(JSON.generate(credentials))]
+          canonical_credentials = canonicalize_credential_value(credentials)
+          [:hash, Digest::SHA256.hexdigest(JSON.generate(canonical_credentials))]
         when String
-          [:path, File.expand_path(credentials)]
+          path = File.expand_path(credentials)
+          [:path, path, File.mtime(path).to_f]
         else
           [:object, credentials.object_id]
+        end
+      end
+
+      def canonicalize_credential_value(value)
+        case value
+        when Hash
+          value.each_with_object({}) do |(key, nested_value), canonical|
+            canonical[key.to_s] = canonicalize_credential_value(nested_value)
+          end.sort.to_h
+        when Array
+          value.map { |nested_value| canonicalize_credential_value(nested_value) }
+        else
+          value
         end
       end
 

@@ -31,13 +31,32 @@ RSpec.describe ChatSDK::GChat::Adapter do
       resolved_client = instance_double(client_class)
       allow(resolved_client).to receive(:delete_message)
       allow(resolver).to receive(:call).with("SPACE1").and_return(credentials)
-      stub_clients(default_client, resolved_client)
+      stub_clients(resolved_client)
       adapter = build_adapter(credentials_resolver: resolver)
 
       expect(resolved_client).to receive(:delete_message)
         .with(name: "spaces/SPACE1/messages/MSG1")
       adapter.delete_message(channel_id: "SPACE1", message_id: "MSG1")
       expect(resolver).to have_received(:call).with("SPACE1")
+    end
+
+    it "defers ADC for resolver-only adapters" do
+      credentials = Object.new
+      resolver = ->(channel_id) do
+        expect(channel_id).to eq("SPACE1")
+        credentials
+      end
+      resolved_client = instance_double(client_class)
+      stub_clients(resolved_client)
+      expect(Google::Auth).not_to receive(:get_application_default)
+      adapter = described_class.new(
+        project_number: "123456789",
+        credentials_resolver: resolver
+      )
+
+      expect(resolved_client).to receive(:delete_message)
+        .with(name: "spaces/SPACE1/messages/MSG1")
+      adapter.delete_message(channel_id: "SPACE1", message_id: "MSG1")
     end
 
     it "uses the default client when the resolver returns nil" do
@@ -66,7 +85,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
         resolved_channels << channel_id
         resolver_credentials
       end
-      stub_clients(default_client, scoped_client, resolver_client)
+      stub_clients(scoped_client, resolver_client)
       adapter = build_adapter(credentials_resolver: resolver)
 
       expect(scoped_client).to receive(:delete_message)
@@ -84,7 +103,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
       scoped_client = double("Google Chat client")
       space = double("space", name: "spaces/DM1")
       allow(scoped_client).to receive(:setup_space).and_return(space)
-      stub_clients(default_client, scoped_client)
+      stub_clients(scoped_client)
       adapter = build_adapter
 
       expect(adapter.with_credentials(Object.new) { adapter.open_dm("user-1") }).to eq("DM1")
@@ -93,7 +112,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
     it "restores the previous credentials when the block raises" do
       scoped_client = instance_double(client_class)
-      stub_clients(default_client, scoped_client)
+      stub_clients(scoped_client, default_client)
       adapter = build_adapter
 
       expect {
@@ -109,7 +128,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
     it "restores the outer scope after a nested scope" do
       outer_client = instance_double(client_class)
       inner_client = instance_double(client_class)
-      stub_clients(default_client, outer_client, inner_client)
+      stub_clients(outer_client, inner_client, default_client)
       adapter = build_adapter
 
       adapter.with_credentials(Object.new) do
@@ -125,7 +144,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
     it "does not carry its thread-local scope to another thread" do
       scoped_client = instance_double(client_class)
-      stub_clients(default_client, scoped_client)
+      stub_clients(scoped_client, default_client)
       adapter = build_adapter
 
       adapter.with_credentials(Object.new) do
@@ -163,7 +182,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
       resolved_client = instance_double(client_class)
       allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
         .and_return(resolved_credentials)
-      stub_clients(default_client, resolved_client)
+      stub_clients(resolved_client)
       adapter = build_adapter
 
       first_client = adapter.with_credentials(credentials) { adapter.client }
@@ -171,7 +190,33 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
       expect(second_client).to equal(first_client)
       expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).once
-      expect(client_class).to have_received(:new).twice
+      expect(client_class).to have_received(:new).once
+    end
+
+    it "reuses clients for hashes with different key order and key types" do
+      first_credentials = {
+        "b" => 2,
+        "a" => 1,
+        "nested" => {"z" => [{"y" => 3, "x" => 2}]}
+      }
+      second_credentials = {
+        nested: {z: [{x: 2, y: 3}]},
+        a: 1,
+        b: 2
+      }
+      resolved_credentials = Object.new
+      resolved_client = instance_double(client_class)
+      allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
+        .and_return(resolved_credentials)
+      stub_clients(resolved_client)
+      adapter = build_adapter
+
+      first = adapter.with_credentials(first_credentials) { adapter.client }
+      second = adapter.with_credentials(second_credentials) { adapter.client }
+
+      expect(second).to equal(first)
+      expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).once
+      expect(client_class).to have_received(:new).once
     end
 
     it "does not reuse clients for hashes missing a private_key_id" do
@@ -186,7 +231,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
       second_client = instance_double(client_class)
       allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
         .and_return(first_resolved_credentials, second_resolved_credentials)
-      stub_clients(default_client, first_client, second_client)
+      stub_clients(first_client, second_client)
       adapter = build_adapter
 
       first = adapter.with_credentials(first_credentials) { adapter.client }
@@ -194,11 +239,26 @@ RSpec.describe ChatSDK::GChat::Adapter do
 
       expect(second).not_to equal(first)
       expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).twice
-      expect(client_class).to have_received(:new).exactly(3).times
+      expect(client_class).to have_received(:new).twice
+    end
+
+    it "changes path keys when the file mtime changes" do
+      path = "service-account.json"
+      expanded_path = File.expand_path(path)
+      allow(File).to receive(:mtime).with(expanded_path)
+        .and_return(Time.at(1), Time.at(2))
+      adapter = build_adapter
+
+      first_key = adapter.send(:credential_cache_key, path)
+      second_key = adapter.send(:credential_cache_key, path)
+
+      expect(second_key).not_to eq(first_key)
+      expect(File).to have_received(:mtime).with(expanded_path).twice
     end
 
     it "reuses clients for a path without reading the file for the cache key" do
       path = "service-account.json"
+      allow(File).to receive(:mtime).with(File.expand_path(path)).and_return(Time.at(1))
       file_open_count = 0
       resolved_credentials = Object.new
       resolved_client = instance_double(client_class)
@@ -209,7 +269,7 @@ RSpec.describe ChatSDK::GChat::Adapter do
       expect(File).not_to receive(:read)
       allow(Google::Auth::ServiceAccountCredentials).to receive(:make_creds)
         .and_return(resolved_credentials)
-      stub_clients(default_client, resolved_client)
+      stub_clients(resolved_client)
       adapter = build_adapter
 
       first = adapter.with_credentials(path) { adapter.client }
@@ -218,12 +278,33 @@ RSpec.describe ChatSDK::GChat::Adapter do
       expect(second).to equal(first)
       expect(file_open_count).to eq(1)
       expect(Google::Auth::ServiceAccountCredentials).to have_received(:make_creds).once
-      expect(client_class).to have_received(:new).twice
+      expect(client_class).to have_received(:new).once
+    end
+
+    it "rebuilds an object-key client when a cache entry has another credential object" do
+      credentials = Object.new
+      different_credentials = Object.new
+      stale_client = instance_double(client_class)
+      rebuilt_client = instance_double(client_class)
+      stub_clients(rebuilt_client)
+      adapter = build_adapter
+      cache_key = adapter.send(:credential_cache_key, credentials)
+      adapter.instance_variable_get(:@credential_client_cache)[cache_key] = {
+        credentials: different_credentials,
+        client: stale_client
+      }
+
+      client = adapter.send(:client_for_credentials, credentials)
+
+      expect(client).to equal(rebuilt_client)
+      expect(adapter.instance_variable_get(:@credential_client_cache)[cache_key][:credentials])
+        .to equal(credentials)
+      expect(client_class).to have_received(:new).once
     end
 
     it "evicts the least recently used client after reaching the cache limit" do
       credentials = Array.new(101) { Object.new }
-      clients = Array.new(103) { Object.new }
+      clients = Array.new(102) { Object.new }
       stub_clients(*clients)
       adapter = build_adapter
 
