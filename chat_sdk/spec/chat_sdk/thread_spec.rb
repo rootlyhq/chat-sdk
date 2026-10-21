@@ -87,6 +87,70 @@ RSpec.describe ChatSDK::Thread do
     end
   end
 
+  describe "mutation adapter compatibility" do
+    let(:legacy_adapter) do
+      Class.new(ChatSDK::Adapter::Base) do
+        attr_reader :calls
+
+        def initialize
+          @calls = []
+        end
+
+        def name = :legacy
+        def client = self
+
+        def edit_message(channel_id:, message_id:, message:)
+          calls << {method: :edit_message, channel_id: channel_id, message_id: message_id, message: message}
+        end
+
+        def delete_message(channel_id:, message_id:)
+          calls << {method: :delete_message, channel_id: channel_id, message_id: message_id}
+        end
+
+        def add_reaction(channel_id:, message_id:, emoji:)
+          calls << {method: :add_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji}
+        end
+
+        def remove_reaction(channel_id:, message_id:, emoji:)
+          calls << {method: :remove_reaction, channel_id: channel_id, message_id: message_id, emoji: emoji}
+        end
+      end.new
+    end
+    let(:legacy_thread) do
+      described_class.new(id: "T123", channel_id: "C123", adapter: legacy_adapter, chat: bot)
+    end
+
+    it "omits thread_id for legacy mutation methods" do
+      legacy_thread.edit("M1", "updated")
+      legacy_thread.delete("M1")
+      legacy_thread.react("M1", "sparkles")
+      legacy_thread.unreact("M1", "sparkles")
+
+      expect(legacy_adapter.calls.map { |call| call[:method] }).to eq(
+        %i[edit_message delete_message add_reaction remove_reaction]
+      )
+    end
+
+    it "forwards thread_id to adapters that accept it" do
+      thread_aware_adapter = Class.new(ChatSDK::Adapter::Base) do
+        attr_reader :thread_ids
+
+        def initialize
+          @thread_ids = []
+        end
+
+        def edit_message(channel_id:, message_id:, message:, thread_id: nil)
+          thread_ids << thread_id
+        end
+      end.new
+      thread_aware = described_class.new(id: "T123", channel_id: "C123", adapter: thread_aware_adapter, chat: bot)
+
+      thread_aware.edit("M1", "updated")
+
+      expect(thread_aware_adapter.thread_ids).to eq(["T123"])
+    end
+  end
+
   describe "#state / #set_state" do
     it "stores and retrieves state" do
       thread.set_state({count: 1})
