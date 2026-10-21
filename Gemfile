@@ -20,9 +20,9 @@ gem "chat_sdk-state-mysql", path: "chat_sdk-state-mysql"
 
 group :development, :test do
   gem "rspec", "~> 3.13"
-  gem "webmock", "~> 3.26"
+  gem "webmock", "~> 3.34"
   gem "rack-test", "~> 2.1"
-  gem "standard", "~> 1.46", require: false
+  gem "standard", "~> 1.57", require: false
   gem "rubocop-rspec", "~> 3.0", require: false
   gem "standard-performance", "~> 1.7", require: false
   gem "rake", "~> 13.0"
