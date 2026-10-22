@@ -11,16 +11,48 @@ module ChatSDK
 
       attr_reader :client
 
-      def initialize(project_number:, credentials: nil)
-        @project_number = project_number.to_s
+      def initialize(
+        project_number: nil,
+        endpoint_url: nil,
+        pubsub_audience: nil,
+        pubsub_service_account_email: nil,
+        workspace_add_on_service_account_email: nil,
+        disable_signature_verification: ENV["GOOGLE_CHAT_DISABLE_SIGNATURE_VERIFICATION"] == "true",
+        credentials: nil
+      )
+        @project_number = normalize_config_value(project_number || ENV["GOOGLE_CHAT_PROJECT_NUMBER"])
+        @endpoint_url = normalize_config_value(endpoint_url)
+        @pubsub_audience = normalize_config_value(pubsub_audience || ENV["GOOGLE_CHAT_PUBSUB_AUDIENCE"])
+        @pubsub_service_account_email = normalize_config_value(
+          pubsub_service_account_email || ENV["GOOGLE_CHAT_PUBSUB_SERVICE_ACCOUNT_EMAIL"]
+        )
+        @workspace_add_on_service_account_email = normalize_config_value(
+          workspace_add_on_service_account_email || ENV["GOOGLE_CHAT_WORKSPACE_ADDON_SERVICE_ACCOUNT_EMAIL"]
+        )
+        @disable_signature_verification = if disable_signature_verification.nil?
+          ENV["GOOGLE_CHAT_DISABLE_SIGNATURE_VERIFICATION"] == "true"
+        else
+          disable_signature_verification
+        end
 
-        raise ChatSDK::ConfigurationError, "Google Chat project_number required" if @project_number.empty?
+        unless @project_number || @endpoint_url || @pubsub_audience || @disable_signature_verification
+          raise ChatSDK::ConfigurationError,
+            "Google Chat webhook verification requires project_number, endpoint_url, or pubsub_audience; " \
+            "set disable_signature_verification to true to accept unverified requests"
+        end
 
         @credentials = build_credentials(credentials)
         @client = Google::Apps::Chat::V1::ChatService::Client.new do |config|
           config.credentials = @credentials if @credentials
         end
-        @verifier = TokenVerifier.new(@project_number)
+        @verifier = TokenVerifier.new(
+          @project_number,
+          endpoint_url: @endpoint_url,
+          pubsub_audience: @pubsub_audience,
+          pubsub_service_account_email: @pubsub_service_account_email,
+          workspace_add_on_service_account_email: @workspace_add_on_service_account_email,
+          disable_signature_verification: @disable_signature_verification
+        )
         @renderer = CardV2Renderer.new
       end
 
@@ -30,36 +62,28 @@ module ChatSDK
 
       # Inbound
       def verify_request!(rack_request)
-        auth_header = rack_request.env["HTTP_AUTHORIZATION"] || ""
-        token = auth_header.sub(/\ABearer\s+/i, "")
-        @verifier.verify!(token)
-        true
+        @verifier.verify_request!(rack_request)
       end
 
       def parse_events(rack_request)
         payload = read_json_body(rack_request)
+        return parse_pubsub_payload(payload) if PubSubPush.pubsub_push?(payload)
+
         EventParser.parse(payload)
       rescue JSON::ParserError
         []
       end
 
-      # Parses a Google Cloud Pub/Sub push message containing a Google Chat event.
-      #
-      # When a Pub/Sub subscription is configured externally (via Google Cloud
-      # Console or Terraform) for Google Workspace Events, push messages arrive
-      # as HTTP POSTs with the Chat event base64-encoded inside
-      # `message.data`. This method decodes the envelope and delegates to
-      # {EventParser}.
+      # Parses a Pub/Sub push after its request has been verified with #verify_request!.
+      # The standard webhook endpoint verifies and parses Pub/Sub pushes automatically.
       #
       # @param rack_request [Rack::Request] the incoming Pub/Sub push request
       # @return [Array<ChatSDK::Events::Base>] parsed events (empty on bad payload)
       def parse_pubsub_event(rack_request)
         envelope = read_json_body(rack_request)
-        data = envelope.dig("message", "data")
-        return [] unless data
+        return [] unless PubSubPush.pubsub_push?(envelope)
 
-        decoded = JSON.parse(Base64.decode64(data))
-        EventParser.parse(decoded)
+        parse_pubsub_payload(envelope)
       rescue JSON::ParserError, ArgumentError
         []
       end
@@ -181,6 +205,23 @@ module ChatSDK
       end
 
       private
+
+      def parse_pubsub_payload(envelope)
+        data = envelope.dig("message", "data")
+        return [] unless data
+
+        decoded = JSON.parse(Base64.decode64(data))
+        EventParser.parse(decoded)
+      rescue JSON::ParserError, ArgumentError
+        []
+      end
+
+      def normalize_config_value(value)
+        return nil if value.nil?
+
+        normalized = value.to_s
+        normalized.empty? ? nil : normalized
+      end
 
       def build_credentials(credentials)
         case credentials
