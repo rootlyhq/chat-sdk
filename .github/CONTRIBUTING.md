@@ -11,7 +11,7 @@ For security vulnerabilities, see [SECURITY.md](./SECURITY.md). Do not file a pu
 ```bash
 git clone git@github.com:rootlyhq/chat-sdk.git
 cd chat-sdk
-mise install        # installs Ruby 4.0.8
+mise install        # installs Ruby 4.0.9
 bundle install
 bundle exec rake spec
 ```
